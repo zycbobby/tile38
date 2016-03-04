@@ -5,8 +5,7 @@ cd $(dirname "${BASH_SOURCE[0]}")
 WD=$(pwd)
 
 if [ ! -f "tile38-server" ];then 
-	echo missing tile38-server binary
-	exit 1
+	./build.sh
 fi
 
 TMP="$(mktemp -d -t data-test)"

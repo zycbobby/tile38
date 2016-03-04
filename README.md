@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="https://github.com/tile38/draft"><img 
-    src="https://raw.githubusercontent.com/tile38/something/master/doc/logo1500.png" 
+  <a href="https://github.com/tidwall/tile38"><img 
+    src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/logo1500.png" 
     width="200" height="200" border="0" alt="Tile38"></a>
 </p>
 
@@ -87,17 +87,17 @@ To set a field when an object already exists:
 
 ## Searching
 
-<img src="https://raw.githubusercontent.com/tile38/something/master/doc/search-within.png" width="200" height="200" border="0" alt="Search Within" align="left">
+<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/search-within.png" width="200" height="200" border="0" alt="Search Within" align="left">
 #### Within 
 WITHIN searches a collection for objects that are fully contained inside a specified bounding area.
 <BR CLEAR="ALL">
 
-<img src="https://raw.githubusercontent.com/tile38/something/master/doc/search-intersects.png" width="200" height="200" border="0" alt="Search Intersects" align="left">
+<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/search-intersects.png" width="200" height="200" border="0" alt="Search Intersects" align="left">
 #### Intersects
 INTERSECTS searches a collection for objects that intersect a specified bounding area.
 <BR CLEAR="ALL">
 
-<img src="https://raw.githubusercontent.com/tile38/something/master/doc/search-nearby.png" width="200" height="200" border="0" alt="Search Nearby" align="left">
+<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/search-nearby.png" width="200" height="200" border="0" alt="Search Nearby" align="left">
 #### Nearby
 NEARBY searches a collection for objects that intersect a specified radius.
 <BR CLEAR="ALL">
@@ -108,13 +108,13 @@ NEARBY searches a collection for objects that intersect a specified radius.
 This is very helpful for example; when you have many (perhaps millions) of objects and do not want them all clustered together on a map. Sparse will limit the number of objects returned and provide them evenly distributed so that your map looks clean.<br><br>
 You can choose a value between 1 and 8. The value 1 will result in no more than 4 items. The value 8 will result in no more than 65536. *1=4, 2=16, 3=64, 4=256, 5=1024, 6=4098, 7=16384, 8=65536.*<br><br>
 <table>
-<td>No Sparsing<img src="https://raw.githubusercontent.com/tile38/something/master/doc/sparse-none.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 1<img src="https://raw.githubusercontent.com/tile38/something/master/doc/sparse-1.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 2<img src="https://raw.githubusercontent.com/tile38/something/master/doc/sparse-2.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 3<img src="https://raw.githubusercontent.com/tile38/something/master/doc/sparse-3.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 4<img src="https://raw.githubusercontent.com/tile38/something/master/doc/sparse-4.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 5<img src="https://raw.githubusercontent.com/tile38/something/master/doc/sparse-5.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 6<img src="https://raw.githubusercontent.com/tile38/something/master/doc/sparse-6.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>No Sparsing<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-none.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 1<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-1.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 2<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-2.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 3<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-3.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 4<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-4.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 5<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-5.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 6<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-6.png" width="100" height="100" border="0" alt="Search Within"></td>
 </table>
 *Please note that higher the sparse value, the slower the performance. Also, LIMIT and CURSOR are not available when using SPARSE.* 
 
@@ -131,7 +131,7 @@ You can choose a value between 1 and 8. The value 1 will result in no more than 
 
 ## Geofencing
 
-<img src="https://raw.githubusercontent.com/tile38/something/master/doc/geofence.gif" width="200" height="200" border="0" alt="Geofence animation" align="left">
+<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/geofence.gif" width="200" height="200" border="0" alt="Geofence animation" align="left">
 A [geofence](https://en.wikipedia.org/wiki/Geo-fence) is a virtual boundary that can detect when an object enters or exits the area. This boundary can be a radius, bounding box, or a polygon. Tile38 can turn any standard search into a geofence monitor by adding by the FENCE keyword to the search. 
 <br clear="all">
 

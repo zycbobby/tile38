@@ -6,11 +6,13 @@ BUILD_TIME=$(date +%FT%T%z)
 GIT_SHA=$(git rev-parse --short HEAD)
 LDFLAGS="-X github.com/tidwall/tile38/core.Version=${VERSION} -X github.com/tidwall/tile38/core.BuildTime=${BUILD_TIME} -X github.com/tidwall/tile38/core.GitSHA=${GIT_SHA}"
 
+export GO15VENDOREXPERIMENT=1
+
 cd $(dirname "${BASH_SOURCE[0]}")
 OD="$(pwd)"
 
 # copy all files to an isloated directory.
-TMP="$(mktemp -d -t tile38)"
+TMP="$(mktemp -d -t tile38.XXXX)"
 function rmtemp {
   	rm -rf "$TMP"
 }

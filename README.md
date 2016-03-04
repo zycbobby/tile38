@@ -23,7 +23,7 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 - `tile38-cli    ` - Command line interface tool
 
 ## Building Tile38
-Tile38 can be compiled and used on Linux, OSX, Windows, FreeBSD, and probably others since the codebase is 100% Go. We support both 32 bit and 64 bit systems. [Go 1.6+](https://golang.org/dl/) must be installed on the build machine.
+Tile38 can be compiled and used on Linux, OSX, Windows, FreeBSD, and probably others since the codebase is 100% Go. We support both 32 bit and 64 bit systems. [Go](https://golang.org/dl/) must be installed on the build machine.
 
 To build everything simply:
 ```

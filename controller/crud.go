@@ -313,7 +313,7 @@ func (c *Controller) parseSetArgs(line string) (d commandDetailsT, fields []stri
 		sp.Y = lat
 		d.obj = sp
 	case lc(typ, "object"):
-		d.obj, err = geojson.ObjectAuto([]byte(line))
+		d.obj, err = geojson.ObjectJSON(line)
 		if err != nil {
 			return
 		}

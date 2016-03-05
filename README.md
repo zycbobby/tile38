@@ -14,6 +14,7 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 - Server responses are in json.
 - Full [command line interface](#cli).
 - Leader / follower [replication](#replication).
+- In-memory database that persists on disk.
 - Simliar feel and syntax style to the fantastic [Redis](http://redis.io) api.
 - Written 100% in [Go](https://golang.org).
 - Very high performance.
@@ -151,9 +152,9 @@ And the connection will be kept open. If any object enters or exits the 6 km rad
 
 The server will notify the client if the `command` is `del | set | drop`. 
 
-- `del` is when an object has been deleted from the collection that is being fenced.
-- `drop` is when the entire collection is dropped.
-- `set` is when an object has been added or updated, and when it's position is detected by the fence.
+- `del` notifies the client that an object has been deleted from the collection that is being fenced.
+- `drop` notifies the client that the entire collection is dropped.
+- `set` notifies the client that an object has been added or updated, and when it's position is detected by the fence.
 
 The `detect` may be `enter | exit | cross`.
 

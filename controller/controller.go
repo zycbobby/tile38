@@ -52,6 +52,7 @@ func (col *collectionT) Less(item btree.Item) bool {
 // Controller is a tile38 controller
 type Controller struct {
 	mu        sync.RWMutex
+	host      string
 	port      int
 	f         *os.File
 	cols      *btree.BTree                      // use both tree and map. provide ordering.
@@ -80,9 +81,10 @@ type Config struct {
 }
 
 // ListenAndServe starts a new tile38 server
-func ListenAndServe(port int, dir string) error {
+func ListenAndServe(host string, port int, dir string) error {
 	log.Infof("Server started, Tile38 version %s, git %s", core.Version, core.GitSHA)
 	c := &Controller{
+		host:    host,
 		port:    port,
 		dir:     dir,
 		cols:    btree.New(16),
@@ -127,7 +129,7 @@ func ListenAndServe(port int, dir string) error {
 		}
 		return nil
 	}
-	return server.ListenAndServe(port, handler)
+	return server.ListenAndServe(host, port, handler)
 }
 
 func (c *Controller) setCol(key string, col *collection.Collection) {

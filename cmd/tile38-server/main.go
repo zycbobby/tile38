@@ -18,6 +18,7 @@ import (
 var (
 	dir         string
 	port        int
+	host        string
 	verbose     bool
 	veryVerbose bool
 	devMode     bool
@@ -25,7 +26,8 @@ var (
 )
 
 func main() {
-	flag.IntVar(&port, "p", 9851, "The listening port for communication.")
+	flag.IntVar(&port, "p", 9851, "The listening port.")
+	flag.StringVar(&host, "h", "127.0.0.1", "The listening host.")
 	flag.StringVar(&dir, "d", "data", "The data directory.")
 	flag.BoolVar(&verbose, "v", false, "Enable verbose logging.")
 	flag.BoolVar(&quiet, "q", false, "Quiet logging. Totally silent.")
@@ -53,13 +55,13 @@ func main() {
    _______ _______
   |       |       |
   |____   |   _   |   Tile38 %s (%s) %d bit (%s/%s)
-  |       |       |   Port: %d, PID: %d
+  |       |       |   Host: %s, Port: %d, PID: %d
   |____   |   _   |
   |       |       |   tile38.com
   |_______|_______|
-`+"\n", core.Version, core.GitSHA, strconv.IntSize, runtime.GOARCH, runtime.GOOS, port, os.Getpid())
+`+"\n", core.Version, core.GitSHA, strconv.IntSize, runtime.GOARCH, runtime.GOOS, host, port, os.Getpid())
 
-	if err := controller.ListenAndServe(port, dir); err != nil {
+	if err := controller.ListenAndServe(host, port, dir); err != nil {
 		log.Fatal(err)
 	}
 }

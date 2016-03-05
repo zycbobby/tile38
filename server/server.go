@@ -20,10 +20,10 @@ var ShowDebugMessages = false
 
 // ListenAndServe starts a tile38 server at the specified address.
 func ListenAndServe(
-	port int,
+	host string, port int,
 	handler func(command []byte, conn net.Conn, rd *bufio.Reader, w io.Writer, websocket bool) error,
 ) error {
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
 		return err
 	}

@@ -11,7 +11,7 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 - Spatial index with [search](#searching) methods such as Nearby, Within, and Intersects.
 - Realtime [geofencing](#geofencing).
 - Variety of client protocols, including [http](#http) (curl), [websockets](#websockets), [telnet](#telnet), and a [native interface](#native-interface).
-- Multiple object types including [lat/lon point](#latlon-point), [bounding box](#bounding-box), [Geohash](#geohash), [GeoJSON](#geojson), [QuadKey](#quadkey), and [XYZ tile](#xyz-tile).
+- Object types of [lat/lon](#latlon-point), [bbox](#bounding-box), [Geohash](#geohash), [GeoJSON](#geojson), [QuadKey](#quadkey), and [XYZ tile](#xyz-tile).
 - Server responses are in json.
 - Full [command line interface](#cli).
 - Leader / follower [replication](#replication).
@@ -202,7 +202,7 @@ set city tempe object {"type":"Polygon","coordinates":[[[0,0],[10,10],[10,0],[0,
 An XYZ tile is rectangle bounding area on earth that is represented by an X, Y coordinate and a Z (zoom) level.
 Check out [maptiler.org](http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/) for an interactive example.
 
-### QuadKey Tile
+### QuadKey
 A QuadKey used the same coordinate system as an XYZ tile except that the string representation is a string characters composed of 0, 1, 2, or 3. For a detailed explanation checkout [The Bing Maps Tile System](https://msdn.microsoft.com/en-us/library/bb259689.aspx).
 
 
@@ -247,7 +247,7 @@ Should be sent to the server as (without quotes):
 "$16 get fleet truck1\r\n"
 ```
 
-The server responds will always respond in JSON, and will include the top level member `ok`. When `ok` is `false` there will also be an accompanied `err` member describing the problem. In nearly every response there will also be an `elapsed` member that is the duration of time that it took to process the request on the server. For more information on this string please refer to the [time.Duration](https://golang.org/pkg/time/#Duration) Go documentation.
+The server will always respond in JSON, and will include the top level member `ok`. When `ok` is `false` there will also be an accompanied `err` member describing the problem. In nearly every response there will also be an `elapsed` member that is the duration of time that it took to process the request on the server. For more information on this string please refer to the [time.Duration](https://golang.org/pkg/time/#Duration) Go documentation.
 
 So the response message:
 ```json

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/btree"
-	"github.com/tidwall/tile38/collection"
+	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/geojson/geohash"
 )

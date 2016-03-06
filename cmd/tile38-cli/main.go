@@ -15,7 +15,6 @@ import (
 	"github.com/peterh/liner"
 	"github.com/tidwall/tile38/client"
 	"github.com/tidwall/tile38/core"
-	"github.com/tidwall/tile38/kml"
 )
 
 func userHomeDir() string {
@@ -306,7 +305,7 @@ func main() {
 }
 
 func convert2kml(msg []byte) []byte {
-	k := kml.New()
+	k := NewKML()
 	var m map[string]interface{}
 	if err := json.Unmarshal(msg, &m); err == nil {
 		if v, ok := m["points"].([]interface{}); ok {

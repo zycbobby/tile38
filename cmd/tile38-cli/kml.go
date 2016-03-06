@@ -1,4 +1,4 @@
-package kml
+package main
 
 import (
 	"bytes"
@@ -16,7 +16,7 @@ type KML struct {
 	points []pointT
 }
 
-func New() *KML {
+func NewKML() *KML {
 	return &KML{}
 }
 

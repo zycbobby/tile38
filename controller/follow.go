@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/tidwall/tile38/client"
-	"github.com/tidwall/tile38/log"
+	"github.com/tidwall/tile38/controller/log"
+	"github.com/tidwall/tile38/core"
 )
 
 var errNoLongerFollowing = errors.New("no longer following")
@@ -156,7 +157,7 @@ func (c *Controller) followStep(host string, port int, followc uint64) error {
 		}
 		return errors.New("invalid response to aof live request")
 	}
-	if ShowDebugMessages {
+	if core.ShowDebugMessages {
 		log.Debug("follow:", addr, ":read aof")
 	}
 	caughtUp := pos >= int64(stats.Stats.AOFSize)

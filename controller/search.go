@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tidwall/tile38/bing"
+	"github.com/tidwall/tile38/controller/bing"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/geojson/geohash"
 )

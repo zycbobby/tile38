@@ -10,13 +10,11 @@ import (
 	"strings"
 
 	"github.com/tidwall/tile38/client"
-	"github.com/tidwall/tile38/log"
+	"github.com/tidwall/tile38/controller/log"
+	"github.com/tidwall/tile38/core"
 )
 
 var errCloseHTTP = errors.New("close http")
-
-// ShowDebugMessages allows for log.Debug to print to console.
-var ShowDebugMessages = false
 
 // ListenAndServe starts a tile38 server at the specified address.
 func ListenAndServe(
@@ -42,7 +40,7 @@ func handleConn(
 	conn net.Conn,
 	handler func(command []byte, conn net.Conn, rd *bufio.Reader, w io.Writer, websocket bool) error,
 ) {
-	if ShowDebugMessages {
+	if core.ShowDebugMessages {
 		addr := conn.RemoteAddr().String()
 		log.Debugf("opened connection: %s", addr)
 		defer func() {

@@ -3,7 +3,7 @@ package controller
 import (
 	"strings"
 
-	"github.com/tidwall/tile38/log"
+	"github.com/tidwall/tile38/controller/log"
 )
 
 func (c *Controller) cmdReadOnly(line string) error {

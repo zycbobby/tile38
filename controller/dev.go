@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tidwall/tile38/log"
+	"github.com/tidwall/tile38/controller/log"
 )
 
 func (c *Controller) cmdMassInsert(line string) error {

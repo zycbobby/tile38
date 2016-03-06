@@ -16,7 +16,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/google/btree"
 	"github.com/tidwall/tile38/client"
-	"github.com/tidwall/tile38/log"
+	"github.com/tidwall/tile38/controller/log"
 )
 
 const backwardsBufferSize = 50000

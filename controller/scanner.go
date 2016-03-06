@@ -6,7 +6,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/tidwall/tile38/collection"
+	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/geojson"
 )
 

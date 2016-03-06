@@ -10,9 +10,9 @@ import (
 	"sync"
 
 	"github.com/tidwall/tile38/client"
-	"github.com/tidwall/tile38/collection"
+	"github.com/tidwall/tile38/controller/collection"
+	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/geojson"
-	"github.com/tidwall/tile38/log"
 )
 
 type liveBuffer struct {

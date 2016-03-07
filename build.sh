@@ -21,6 +21,7 @@ WD="$TMP/src/github.com/tidwall/tile38"
 GOPATH="$TMP"
 
 for file in `find . -type f`; do
+	# TODO: use .gitignore to ignore, or possibly just use git to determine the file list.
 	if [[ "$file" != "." && "$file" != ./.git* && "$file" != ./data* && "$file" != ./tile38-* ]]; then
 		mkdir -p "$WD/$(dirname "${file}")"
 		cp -P "$file" "$WD/$(dirname "${file}")"
@@ -32,5 +33,14 @@ cd $WD
 go build -ldflags "$LDFLAGS" -o "$OD/tile38-server" cmd/tile38-server/*.go
 go build -ldflags "$LDFLAGS" -o "$OD/tile38-cli" cmd/tile38-cli/*.go
 
-
+# test if requested
+if [ "$1" == "test" ]; then
+	$OD/tile38-server -p 9876 -d "$TMP" -q &
+	PID=$!
+	function testend {
+	  	kill $PID &
+	}
+	trap testend EXIT
+	go test $(go list ./... | grep -v /vendor/)
+fi
 

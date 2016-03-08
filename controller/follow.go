@@ -71,7 +71,7 @@ func (c *Controller) cmdFollow(line string) error {
 		c.config.FollowHost = host
 		c.config.FollowPort = port
 	}
-	if err := c.writeConfig(); err != nil {
+	if err := c.writeConfig(false); err != nil {
 		c.config = pconfig // revert
 		return err
 	}

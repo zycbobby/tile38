@@ -31,7 +31,7 @@ func (c *Controller) cmdReadOnly(line string) error {
 		c.config.ReadOnly = false
 		log.Info("read write")
 	}
-	err := c.writeConfig()
+	err := c.writeConfig(false)
 	if err != nil {
 		c.config = backup
 		return err

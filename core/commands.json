@@ -701,12 +701,43 @@
     "since": "1.0.0",
     "group": "search"
   },
-  "PING": {
-    "summary":"Ping the server",
-    "complexity": "O(1)",
-    "arguments": [],
-    "since": "1.0.0",
-    "group": "server"
+  "CONFIG": {
+    "summary": "Authenticate to the server",
+    "arguments": [
+      {
+        "name": "which",
+        "enumargs": [
+          {
+            "name": "GET",
+            "arguments":[
+              {
+                "name": "parameter",
+                "type": "string"    
+              }
+            ]
+          },
+          {
+            "name": "SET",
+            "arguments":[
+              {
+                "name": "parameter",
+                "type": "string"    
+              },
+              {
+                "name": "value",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "REWRITE",
+            "arguments":[]
+          }
+        ]
+      }
+    ],
+    "group": "connection"
   },
   "SERVER": {
     "summary":"Show server stats and details",
@@ -786,9 +817,24 @@
   },
   "AOFSHRINK": {
     "summary": "Shrinks the aof in the background",
-    "complexity": "O(1)",
-    "arguments": [],
-    "since": "1.0.0",
     "group": "replication"
+  },
+  "PING": {
+    "summary": "Ping the server",
+    "group": "connection"
+  },
+  "QUIT": {
+    "summary": "Close the connection",
+    "group": "connection"
+  },
+  "AUTH": {
+    "summary": "Authenticate to the server",
+    "arguments": [
+      {
+        "name": "password",
+        "type": "string"
+      }
+    ],
+    "group": "connection"
   }
 }

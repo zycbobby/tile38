@@ -14,12 +14,44 @@ import (
 	"github.com/tidwall/tile38/core"
 )
 
+// This phrase is copied nearly verbatim from Redis.
+// https://github.com/antirez/redis/blob/cf42c48adcea05c1bd4b939fcd36a01f23ec6303/src/networking.c
+var deniedMessage = []byte(strings.TrimSpace(`
+ACCESS DENIED
+Tile38 is running in protected mode because protected mode is enabled, no host
+address was specified, no authentication password is requested to clients. In
+this mode connections are only accepted from the loopback interface. If you
+want to connect from external computers to Tile38 you may adopt one of the
+following solutions: 
+
+1) Disable protected mode sending the command 'CONFIG SET protected-mode no'
+   from the loopback interface by connecting to Tile38 from the same host 
+   the server is running, however MAKE SURE Tile38 is not publicly accessible
+   from internet if you do so. Use CONFIG REWRITE to make this change
+   permanent. 
+2) Alternatively you can just disable the protected mode by editing the Tile38
+   configuration file, and setting the protected mode option to 'no', and then
+   restarting the server. 
+3) If you started the server manually just for testing, restart it with the
+   '--protected-mode no' option. 
+4) Setup a host address or an authentication password. 
+
+NOTE: You only need to do one of the above things in order for the server 
+to start accepting connections from the outside.
+`) + "\r\n")
+
+type Conn struct {
+	net.Conn
+	Authenticated bool
+}
+
 var errCloseHTTP = errors.New("close http")
 
 // ListenAndServe starts a tile38 server at the specified address.
 func ListenAndServe(
 	host string, port int,
-	handler func(command []byte, conn net.Conn, rd *bufio.Reader, w io.Writer, websocket bool) error,
+	protected func() bool,
+	handler func(conn *Conn, command []byte, rd *bufio.Reader, w io.Writer, websocket bool) error,
 ) error {
 	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
@@ -32,13 +64,14 @@ func ListenAndServe(
 			log.Error(err)
 			continue
 		}
-		go handleConn(conn, handler)
+		go handleConn(&Conn{Conn: conn}, protected, handler)
 	}
 }
 
 func handleConn(
-	conn net.Conn,
-	handler func(command []byte, conn net.Conn, rd *bufio.Reader, w io.Writer, websocket bool) error,
+	conn *Conn,
+	protected func() bool,
+	handler func(conn *Conn, command []byte, rd *bufio.Reader, w io.Writer, websocket bool) error,
 ) {
 	if core.ShowDebugMessages {
 		addr := conn.RemoteAddr().String()
@@ -46,6 +79,14 @@ func handleConn(
 		defer func() {
 			log.Debugf("closed connection: %s", addr)
 		}()
+		if !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "[::1]:") {
+			if protected() {
+				// This is a protected server. Only loopback is allowed.
+				conn.Write(deniedMessage)
+				conn.Close()
+				return
+			}
+		}
 	}
 	defer conn.Close()
 	rd := bufio.NewReader(conn)
@@ -59,7 +100,8 @@ func handleConn(
 				return io.EOF
 			}
 			var b bytes.Buffer
-			if err := handler(command, conn, rd, &b, proto == client.WebSocket); err != nil {
+
+			if err := handler(conn, command, rd, &b, proto == client.WebSocket); err != nil {
 				if proto == client.HTTP {
 					conn.Write([]byte(`HTTP/1.1 500 ` + err.Error() + "\r\nConnection: close\r\n\r\n"))
 				}

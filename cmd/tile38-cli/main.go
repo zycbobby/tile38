@@ -113,6 +113,10 @@ func main() {
 	if !parseArgs() {
 		return
 	}
+	if len(oneCommand) > 0 && (oneCommand[0] == 'h' || oneCommand[0] == 'H') && strings.Split(strings.ToLower(oneCommand), " ")[0] == "help" {
+		showHelp()
+		return
+	}
 
 	addr := fmt.Sprintf("%s:%d", hostname, port)
 	conn, err := client.Dial(addr)

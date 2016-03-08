@@ -1,7 +1,7 @@
 package core
 
 var (
-	Version   string
-	BuildTime string
-	GitSHA    string
+	Version   = "0.0.0"
+	BuildTime = ""
+	GitSHA    = "0000000"
 )

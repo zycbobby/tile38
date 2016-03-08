@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/tidwall/tile38/controller"
 	"github.com/tidwall/tile38/controller/log"
@@ -15,23 +16,48 @@ import (
 )
 
 var (
-	dir         string
-	port        int
-	host        string
-	verbose     bool
-	veryVerbose bool
-	devMode     bool
-	quiet       bool
+	dir           string
+	port          int
+	host          string
+	verbose       bool
+	veryVerbose   bool
+	devMode       bool
+	quiet         bool
+	protectedMode bool = true
 )
 
 func main() {
+	// parse non standard args.
+	nargs := []string{os.Args[0]}
+	for i := 1; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--protected-mode", "-protected-mode":
+			i++
+			if i < len(os.Args) {
+				switch strings.ToLower(os.Args[i]) {
+				case "no":
+					protectedMode = false
+				case "yes":
+					protectedMode = true
+				}
+				continue
+			}
+			fmt.Fprintf(os.Stderr, "protected-mode must be 'yes' or 'no'\n")
+			os.Exit(1)
+		case "--dev", "-dev":
+			devMode = true
+			continue
+		}
+		nargs = append(nargs, os.Args[i])
+	}
+	os.Args = nargs
+
 	flag.IntVar(&port, "p", 9851, "The listening port.")
-	flag.StringVar(&host, "h", "127.0.0.1", "The listening host.")
+	flag.StringVar(&host, "h", "", "The listening host.")
 	flag.StringVar(&dir, "d", "data", "The data directory.")
 	flag.BoolVar(&verbose, "v", false, "Enable verbose logging.")
 	flag.BoolVar(&quiet, "q", false, "Quiet logging. Totally silent.")
 	flag.BoolVar(&veryVerbose, "vv", false, "Enable very verbose logging.")
-	flag.BoolVar(&devMode, "dev", false, "Activates dev mode. DEV ONLY.")
 	flag.Parse()
 	var logw io.Writer = os.Stderr
 	if quiet {
@@ -43,6 +69,12 @@ func main() {
 	})
 	core.DevMode = devMode
 	core.ShowDebugMessages = veryVerbose
+	core.ProtectedMode = protectedMode
+
+	hostd := ""
+	if host != "" {
+		hostd = "Addr: " + host + ", "
+	}
 
 	//  _____ _ _     ___ ___
 	// |_   _|_| |___|_  | . |
@@ -53,11 +85,11 @@ func main() {
    _______ _______
   |       |       |
   |____   |   _   |   Tile38 %s (%s) %d bit (%s/%s)
-  |       |       |   Host: %s, Port: %d, PID: %d
+  |       |       |   %sPort: %d, PID: %d
   |____   |   _   |
   |       |       |   tile38.com
   |_______|_______|
-`+"\n", core.Version, core.GitSHA, strconv.IntSize, runtime.GOARCH, runtime.GOOS, host, port, os.Getpid())
+`+"\n", core.Version, core.GitSHA, strconv.IntSize, runtime.GOARCH, runtime.GOOS, hostd, port, os.Getpid())
 
 	if err := controller.ListenAndServe(host, port, dir); err != nil {
 		log.Fatal(err)

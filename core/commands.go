@@ -33,13 +33,13 @@ func (c Command) String() string {
 func (c Command) TermOutput(indent string) string {
 	line1 := bright + strings.Replace(c.String(), " ", " "+clear+gray, 1) + clear
 	line2 := yellow + "summary: " + clear + c.Summary
-	line3 := yellow + "since: " + clear + c.Since
-	return indent + line1 + "\n" + indent + line2 + "\n" + indent + line3 + "\n"
+	//line3 := yellow + "since: " + clear + c.Since
+	return indent + line1 + "\n" + indent + line2 + "\n" //+ indent + line3 + "\n"
 }
 
 type EnumArg struct {
 	Name      string     `json:"name"`
-	Arguments []Argument `json:"arguments`
+	Arguments []Argument `json:"arguments"`
 }
 
 func (a EnumArg) String() string {
@@ -846,12 +846,43 @@ var commandsJSON = `{
     "since": "1.0.0",
     "group": "search"
   },
-  "PING": {
-    "summary":"Ping the server",
-    "complexity": "O(1)",
-    "arguments": [],
-    "since": "1.0.0",
-    "group": "server"
+  "CONFIG GET": {
+    "summary": "Authenticate to the server",
+    "arguments": [
+      {
+        "name": "which",
+        "enumargs": [
+          {
+            "name": "GET",
+            "arguments":[
+              {
+                "name": "parameter",
+                "type": "string"    
+              }
+            ]
+          },
+          {
+            "name": "SET",
+            "arguments":[
+              {
+                "name": "parameter",
+                "type": "string"    
+              },
+              {
+                "name": "value",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "REWRITE",
+            "arguments":[]
+          }
+        ]
+      }
+    ],
+    "group": "connection"
   },
   "SERVER": {
     "summary":"Show server stats and details",
@@ -931,10 +962,25 @@ var commandsJSON = `{
   },
   "AOFSHRINK": {
     "summary": "Shrinks the aof in the background",
-    "complexity": "O(1)",
-    "arguments": [],
-    "since": "1.0.0",
     "group": "replication"
+  },
+  "PING": {
+    "summary": "Ping the server",
+    "group": "connection"
+  },
+  "QUIT": {
+    "summary": "Close the connection",
+    "group": "connection"
+  },
+  "AUTH": {
+    "summary": "Authenticate to the server",
+    "arguments": [
+      {
+        "name": "password",
+        "type": "string"
+      }
+    ],
+    "group": "connection"
   }
 }`
 
@@ -960,6 +1006,8 @@ var commandsJSON = `{
 // HELP                                                                        -- Prints this menu. -- O(1) -- F()
 // READONLY    value                                                           -- Turn on or off readonly mode. -- O(1) -- F(value boolean)
 // FLUSHDB                                                                     -- Removes all keys. -- O(1) -- F()
+// CONFIG SET property value                                                   -- Set a config property. Is not yet permanent.
+// CONFIG REWRITE                                                              -- Make config changes permanent.
 
 // --- Replication ---
 // FOLLOW      host port                                                       -- Follows a leader host. -- O(1) F(host string, port integer)
@@ -990,3 +1038,6 @@ var commandsJSON = `{
 // QUADKEY...  QUADKEY key                                                     -- Quadkey. -- F(key quadkey)
 // TILE...     TILE x y z                                                      -- Google XYZ tile. -- F(x double, y double, z double)
 // GET...      GET key id                                                      -- An internal object. -- F(key string, id string)
+
+// --- Security ---
+// AUTH password                                                               -- Authenticate to server.

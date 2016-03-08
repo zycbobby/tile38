@@ -4,14 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"net"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,16 +62,6 @@ type Controller struct {
 	shrinking bool // aof shrinking flag
 }
 
-// Config is a tile38 config
-type Config struct {
-	FollowHost string `json:"follow_host,omitempty"`
-	FollowPort int    `json:"follow_port,omitempty"`
-	FollowID   string `json:"follow_id,omitempty"`
-	FollowPos  int    `json:"follow_pos,omitempty"`
-	ServerID   string `json:"server_id,omitempty"`
-	ReadOnly   bool   `json:"read_only,omitempty"`
-}
-
 // ListenAndServe starts a new tile38 server
 func ListenAndServe(host string, port int, dir string) error {
 	log.Infof("Server started, Tile38 version %s, git %s", core.Version, core.GitSHA)
@@ -113,8 +101,8 @@ func ListenAndServe(host string, port int, dir string) error {
 		c.mu.Unlock()
 	}()
 	go c.processLives()
-	handler := func(command []byte, conn net.Conn, rd *bufio.Reader, w io.Writer, websocket bool) error {
-		err := c.handleInputCommand(string(command), w)
+	handler := func(conn *server.Conn, command []byte, rd *bufio.Reader, w io.Writer, websocket bool) error {
+		err := c.handleInputCommand(conn, string(command), w)
 		if err != nil {
 			if err.Error() == "going live" {
 				return c.goLive(err, conn, rd, websocket)
@@ -123,7 +111,21 @@ func ListenAndServe(host string, port int, dir string) error {
 		}
 		return nil
 	}
-	return server.ListenAndServe(host, port, handler)
+	protected := func() bool {
+		if !core.ProtectedMode {
+			// --protected-mode no
+			return false
+		}
+		if host != "" && host != "127.0.0.1" && host != "::1" && host != "localhost" {
+			// -h address
+			return false
+		}
+		c.mu.RLock()
+		is := c.config.ProtectedMode != "no" && c.config.RequirePass == ""
+		c.mu.RUnlock()
+		return is
+	}
+	return server.ListenAndServe(host, port, protected, handler)
 }
 
 func (c *Controller) setCol(key string, col *collection.Collection) {
@@ -156,12 +158,12 @@ func isReservedFieldName(field string) bool {
 	return false
 }
 
-func (c *Controller) handleInputCommand(line string, w io.Writer) error {
+func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Writer) error {
 	if core.ShowDebugMessages && line != "pInG" {
 		log.Debug(line)
 	}
 	start := time.Now()
-	// Ping and Help. Just send back the response. No need to put through the pipeline.
+	// Ping. Just send back the response. No need to put through the pipeline.
 	if len(line) == 4 && (line[0] == 'p' || line[0] == 'P') && lc(line, "ping") {
 		w.Write([]byte(`{"ok":true,"ping":"pong","elapsed":"` + time.Now().Sub(start).String() + `"}`))
 		return nil
@@ -180,6 +182,26 @@ func (c *Controller) handleInputCommand(line string, w io.Writer) error {
 	if cmd == "" {
 		return writeErr(errors.New("empty command"))
 	}
+
+	if !conn.Authenticated {
+		c.mu.RLock()
+		requirePass := c.config.RequirePass
+		c.mu.RUnlock()
+		if requirePass != "" {
+			// This better be an AUTH command.
+			if cmd != "auth" {
+				// Just shut down the pipeline now. The less the client connection knows the better.
+				return writeErr(errors.New("authentication required"))
+			}
+			password, _ := token(line)
+			if requirePass == strings.TrimSpace(password) {
+				conn.Authenticated = true
+			} else {
+				return writeErr(errors.New("invalid password"))
+			}
+		}
+	}
+
 	// choose the locking strategy
 	switch cmd {
 	default:
@@ -203,7 +225,7 @@ func (c *Controller) handleInputCommand(line string, w io.Writer) error {
 		if c.config.FollowHost != "" && !c.fcup {
 			return writeErr(errors.New("catching up to leader"))
 		}
-	case "follow", "readonly":
+	case "follow", "readonly", "config":
 		// system operations
 		// does not write to aof, but requires a write lock.
 		c.mu.Lock()
@@ -231,37 +253,6 @@ func (c *Controller) handleInputCommand(line string, w io.Writer) error {
 		if _, err := io.WriteString(w, resp); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func (c *Controller) loadConfig() error {
-	data, err := ioutil.ReadFile(c.dir + "/config")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return c.initConfig()
-		}
-		return err
-	}
-	err = json.Unmarshal(data, &c.config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *Controller) initConfig() error {
-	c.config = Config{ServerID: randomKey(16)}
-	return c.writeConfig()
-}
-
-func (c *Controller) writeConfig() error {
-	data, err := json.MarshalIndent(c.config, "", "\t")
-	if err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(c.dir+"/config", data, 0600); err != nil {
-		return err
 	}
 	return nil
 }
@@ -322,8 +313,13 @@ func (c *Controller) command(line string, w io.Writer) (resp string, d commandDe
 	case "follow":
 		err = c.cmdFollow(nline)
 		resp = okResp()
+	case "config":
+		resp, err = c.cmdConfig(nline)
 	case "readonly":
 		err = c.cmdReadOnly(nline)
+		resp = okResp()
+	case "auth":
+		err = c.cmdAuth(nline)
 		resp = okResp()
 	case "stats":
 		resp, err = c.cmdServer(nline)

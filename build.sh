@@ -38,7 +38,7 @@ if [ "$NOCOPY" != "1" ]; then
 	cd $WD
 fi
 
-core/gen.sh
+#core/gen.sh
 
 # build and store objects into original directory.
 go build -ldflags "$LDFLAGS" -o "$OD/tile38-server" cmd/tile38-server/*.go

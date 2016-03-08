@@ -12,8 +12,8 @@ type Standard struct {
 	Elapsed string `json:"elapsed"`
 }
 
-// Stats represents tile38 server statistics.
-type Stats struct {
+// Server represents tile38 server statistics.
+type ServerStats struct {
 	Standard
 	Stats struct {
 		ServerID       string `json:"id"`
@@ -30,9 +30,9 @@ type Stats struct {
 }
 
 // Stats returns tile38 server statistics.
-func (conn *Conn) Stats() (Stats, error) {
-	var stats Stats
-	msg, err := conn.Do("stats")
+func (conn *Conn) Server() (ServerStats, error) {
+	var stats ServerStats
+	msg, err := conn.Do("server")
 	if err != nil {
 		return stats, err
 	}
@@ -40,7 +40,7 @@ func (conn *Conn) Stats() (Stats, error) {
 		return stats, err
 	}
 	if !stats.OK {
-		if stats.Err == "" {
+		if stats.Err != "" {
 			return stats, errors.New(stats.Err)
 		}
 		return stats, errors.New("not ok")

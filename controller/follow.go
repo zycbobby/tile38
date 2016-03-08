@@ -45,6 +45,7 @@ func (c *Controller) cmdFollow(line string) error {
 		}
 		port := int(n)
 		update = c.config.FollowHost != host || c.config.FollowPort != port
+		auth := c.config.LeaderAuth
 		if update {
 			c.mu.Unlock()
 			conn, err := client.DialTimeout(fmt.Sprintf("%s:%d", host, port), time.Second*2)
@@ -53,7 +54,12 @@ func (c *Controller) cmdFollow(line string) error {
 				return fmt.Errorf("cannot follow: %v", err)
 			}
 			defer conn.Close()
-			msg, err := conn.Stats()
+			if auth != "" {
+				if err := c.followDoLeaderAuth(conn, auth); err != nil {
+					return fmt.Errorf("cannot follow: %v", err)
+				}
+			}
+			msg, err := conn.Server()
 			if err != nil {
 				c.mu.Lock()
 				return fmt.Errorf("cannot follow: %v", err)
@@ -103,6 +109,25 @@ func (c *Controller) followHandleCommand(line string, followc uint64, w io.Write
 	return c.aofsz, nil
 }
 
+func (c *Controller) followDoLeaderAuth(conn *client.Conn, auth string) error {
+	data, err := conn.Do("AUTH " + auth)
+	if err != nil {
+		return err
+	}
+	var msg client.Standard
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return err
+	}
+	if !msg.OK {
+		if msg.Err != "" {
+			return errors.New(msg.Err)
+		} else {
+			return errors.New("cannot follow: auth no ok")
+		}
+	}
+	return nil
+}
+
 func (c *Controller) followStep(host string, port int, followc uint64) error {
 	c.mu.Lock()
 	if c.followc != followc {
@@ -110,6 +135,7 @@ func (c *Controller) followStep(host string, port int, followc uint64) error {
 		return errNoLongerFollowing
 	}
 	c.fcup = false
+	auth := c.config.LeaderAuth
 	c.mu.Unlock()
 	addr := fmt.Sprintf("%s:%d", host, port)
 	// check if we are following self
@@ -118,7 +144,13 @@ func (c *Controller) followStep(host string, port int, followc uint64) error {
 		return fmt.Errorf("cannot follow: %v", err)
 	}
 	defer conn.Close()
-	stats, err := conn.Stats()
+	if auth != "" {
+		if err := c.followDoLeaderAuth(conn, auth); err != nil {
+			return fmt.Errorf("cannot follow: %v", err)
+		}
+	}
+
+	stats, err := conn.Server()
 	if err != nil {
 		return fmt.Errorf("cannot follow: %v", err)
 	}
@@ -133,13 +165,6 @@ func (c *Controller) followStep(host string, port int, followc uint64) error {
 	if err != nil {
 		return err
 	}
-
-	// make real connection
-	conn, err = client.Dial(addr)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
 
 	msg, err := conn.Do(fmt.Sprintf("aof %d", pos))
 	if err != nil {
@@ -198,7 +223,7 @@ func (c *Controller) follow(host string, port int, followc uint64) {
 			return
 		}
 		if err != nil && err != io.EOF {
-			log.Debug("follow: " + err.Error())
+			log.Error("follow: " + err.Error())
 		}
 		time.Sleep(time.Second)
 	}

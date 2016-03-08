@@ -103,7 +103,7 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *bufio.Reader, websoc
 			conn.Close()
 		}()
 		for {
-			command, _, err := client.ReadMessage(rd, nil)
+			command, _, _, err := client.ReadMessage(rd, nil)
 			if err != nil {
 				if err != io.EOF {
 					log.Error(err)

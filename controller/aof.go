@@ -251,7 +251,7 @@ func (c *Controller) liveAOF(pos int64, conn net.Conn, rd *bufio.Reader) error {
 			cond.L.Unlock()
 		}()
 		for {
-			command, _, err := client.ReadMessage(rd, nil)
+			command, _, _, err := client.ReadMessage(rd, nil)
 			if err != nil {
 				if err != io.EOF {
 					log.Error(err)

@@ -183,7 +183,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Wri
 		return writeErr(errors.New("empty command"))
 	}
 
-	if !conn.Authenticated {
+	if !conn.Authenticated || cmd == "auth" {
 		c.mu.RLock()
 		requirePass := c.config.RequirePass
 		c.mu.RUnlock()
@@ -194,11 +194,14 @@ func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Wri
 				return writeErr(errors.New("authentication required"))
 			}
 			password, _ := token(line)
-			if requirePass == strings.TrimSpace(password) {
-				conn.Authenticated = true
-			} else {
+			if requirePass != strings.TrimSpace(password) {
 				return writeErr(errors.New("invalid password"))
 			}
+			conn.Authenticated = true
+			w.Write([]byte(`{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"))
+			return nil
+		} else if cmd == "auth" {
+			return writeErr(errors.New("invalid password"))
 		}
 	}
 
@@ -318,13 +321,10 @@ func (c *Controller) command(line string, w io.Writer) (resp string, d commandDe
 	case "readonly":
 		err = c.cmdReadOnly(nline)
 		resp = okResp()
-	case "auth":
-		err = c.cmdAuth(nline)
-		resp = okResp()
 	case "stats":
-		resp, err = c.cmdServer(nline)
-	case "server":
 		resp, err = c.cmdStats(nline)
+	case "server":
+		resp, err = c.cmdServer(nline)
 	case "scan":
 		err = c.cmdScan(nline, w)
 	case "nearby":

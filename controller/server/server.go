@@ -68,6 +68,13 @@ func ListenAndServe(
 	}
 }
 
+func writeCommandErr(proto client.Proto, conn *Conn, err error) error {
+	if proto == client.HTTP || proto == client.WebSocket {
+		conn.Write([]byte(`HTTP/1.1 500 ` + err.Error() + "\r\nConnection: close\r\n\r\n"))
+	}
+	return err
+}
+
 func handleConn(
 	conn *Conn,
 	protected func() bool,
@@ -92,7 +99,7 @@ func handleConn(
 	rd := bufio.NewReader(conn)
 	for i := 0; ; i++ {
 		err := func() error {
-			command, proto, err := client.ReadMessage(rd, conn)
+			command, proto, auth, err := client.ReadMessage(rd, conn)
 			if err != nil {
 				return err
 			}
@@ -100,12 +107,21 @@ func handleConn(
 				return io.EOF
 			}
 			var b bytes.Buffer
-
-			if err := handler(conn, command, rd, &b, proto == client.WebSocket); err != nil {
-				if proto == client.HTTP {
-					conn.Write([]byte(`HTTP/1.1 500 ` + err.Error() + "\r\nConnection: close\r\n\r\n"))
+			var denied bool
+			if (proto == client.HTTP || proto == client.WebSocket) && auth != "" {
+				if err := handler(conn, []byte("AUTH "+auth), rd, &b, proto == client.WebSocket); err != nil {
+					return writeCommandErr(proto, conn, err)
 				}
-				return err
+				if strings.HasPrefix(b.String(), `{"ok":false`) {
+					denied = true
+				} else {
+					b.Reset()
+				}
+			}
+			if !denied {
+				if err := handler(conn, command, rd, &b, proto == client.WebSocket); err != nil {
+					return writeCommandErr(proto, conn, err)
+				}
 			}
 			switch proto {
 			case client.Native:

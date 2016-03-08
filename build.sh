@@ -2,9 +2,7 @@
 set -e
 
 VERSION="0.0.1"
-BUILD_TIME=$(date +%FT%T%z)
-GIT_SHA=$(git rev-parse --short HEAD)
-LDFLAGS="-X github.com/tidwall/tile38/core.Version=${VERSION} -X github.com/tidwall/tile38/core.BuildTime=${BUILD_TIME} -X github.com/tidwall/tile38/core.GitSHA=${GIT_SHA}"
+PROTECTED_MODE="no" 
 
 export GO15VENDOREXPERIMENT=1
 
@@ -33,6 +31,13 @@ if [ "$NOCOPY" != "1" ]; then
 fi
 
 core/gen.sh
+
+LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.Version=${VERSION}"
+LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.GitSHA=$(git rev-parse --short HEAD)"
+LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.BuildTime=$(date +%FT%T%z)"
+if [ "$PROTECTED_MODE" == "no" ]; then
+	LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.ProtectedMode=no"
+fi
 
 # build and store objects into original directory.
 go build -ldflags "$LDFLAGS" -o "$OD/tile38-server" cmd/tile38-server/*.go

@@ -112,7 +112,7 @@ func ListenAndServe(host string, port int, dir string) error {
 		return nil
 	}
 	protected := func() bool {
-		if !core.ProtectedMode {
+		if core.ProtectedMode == "no" {
 			// --protected-mode no
 			return false
 		}

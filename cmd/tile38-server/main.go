@@ -16,14 +16,13 @@ import (
 )
 
 var (
-	dir           string
-	port          int
-	host          string
-	verbose       bool
-	veryVerbose   bool
-	devMode       bool
-	quiet         bool
-	protectedMode bool = true
+	dir         string
+	port        int
+	host        string
+	verbose     bool
+	veryVerbose bool
+	devMode     bool
+	quiet       bool
 )
 
 func main() {
@@ -36,9 +35,9 @@ func main() {
 			if i < len(os.Args) {
 				switch strings.ToLower(os.Args[i]) {
 				case "no":
-					protectedMode = false
+					core.ProtectedMode = "no"
 				case "yes":
-					protectedMode = true
+					core.ProtectedMode = "yes"
 				}
 				continue
 			}
@@ -69,7 +68,6 @@ func main() {
 	})
 	core.DevMode = devMode
 	core.ShowDebugMessages = veryVerbose
-	core.ProtectedMode = protectedMode
 
 	hostd := ""
 	if host != "" {

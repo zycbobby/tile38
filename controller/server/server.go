@@ -34,7 +34,7 @@ following solutions:
    then restarting the server.
 3) If you started the server manually just for testing, restart it with the
    '--protected-mode no' option. 
-4) Setup a host address or an authentication password. 
+4) Use a host address or an authentication password. 
 
 NOTE: You only need to do one of the above things in order for the server 
 to start accepting connections from the outside.
@@ -73,19 +73,19 @@ func handleConn(
 	protected func() bool,
 	handler func(conn *Conn, command []byte, rd *bufio.Reader, w io.Writer, websocket bool) error,
 ) {
+	addr := conn.RemoteAddr().String()
 	if core.ShowDebugMessages {
-		addr := conn.RemoteAddr().String()
 		log.Debugf("opened connection: %s", addr)
 		defer func() {
 			log.Debugf("closed connection: %s", addr)
 		}()
-		if !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "[::1]:") {
-			if protected() {
-				// This is a protected server. Only loopback is allowed.
-				conn.Write(deniedMessage)
-				conn.Close()
-				return
-			}
+	}
+	if !strings.HasPrefix(addr, "127.0.0.1:") && !strings.HasPrefix(addr, "[::1]:") {
+		if protected() {
+			// This is a protected server. Only loopback is allowed.
+			conn.Write(deniedMessage)
+			conn.Close()
+			return
 		}
 	}
 	defer conn.Close()

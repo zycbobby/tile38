@@ -6,4 +6,4 @@ var DevMode = false
 // ShowDebugMessages allows for log.Debug to print to console.
 var ShowDebugMessages = false
 
-var ProtectedMode = true
+var ProtectedMode = "yes"

@@ -11,25 +11,30 @@ export GO15VENDOREXPERIMENT=1
 cd $(dirname "${BASH_SOURCE[0]}")
 OD="$(pwd)"
 
-# copy all files to an isloated directory.
+# temp directory for storing isolated environment.
 TMP="$(mktemp -d -t tile38.XXXX)"
 function rmtemp {
   	rm -rf "$TMP"
 }
 trap rmtemp EXIT
-WD="$TMP/src/github.com/tidwall/tile38"
-GOPATH="$TMP"
 
-for file in `find . -type f`; do
-	# TODO: use .gitignore to ignore, or possibly just use git to determine the file list.
-	if [[ "$file" != "." && "$file" != ./.git* && "$file" != ./data* && "$file" != ./tile38-* ]]; then
-		mkdir -p "$WD/$(dirname "${file}")"
-		cp -P "$file" "$WD/$(dirname "${file}")"
-	fi
-done
+if [ "$NOCOPY" != "1" ]; then
+	# copy all files to an isloated directory.
+	WD="$TMP/src/github.com/tidwall/tile38"
+	GOPATH="$TMP"
+	for file in `find . -type f`; do
+		# TODO: use .gitignore to ignore, or possibly just use git to determine the file list.
+		if [[ "$file" != "." && "$file" != ./.git* && "$file" != ./data* && "$file" != ./tile38-* ]]; then
+			mkdir -p "$WD/$(dirname "${file}")"
+			cp -P "$file" "$WD/$(dirname "${file}")"
+		fi
+	done
+	cd $WD
+fi
+
+core/gen.sh
 
 # build and store objects into original directory.
-cd $WD
 go build -ldflags "$LDFLAGS" -o "$OD/tile38-server" cmd/tile38-server/*.go
 go build -ldflags "$LDFLAGS" -o "$OD/tile38-cli" cmd/tile38-cli/*.go
 

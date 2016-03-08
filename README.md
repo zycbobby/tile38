@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="https://github.com/tidwall/tile38"><img 
-    src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/logo1500.png" 
+  <a href="https://tile38.com"><img 
+    src="/doc/logo1500.png" 
     width="200" height="200" border="0" alt="Tile38"></a>
 </p>
 
@@ -87,17 +87,17 @@ To set a field when an object already exists:
 
 ## Searching
 
-<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/search-within.png" width="200" height="200" border="0" alt="Search Within" align="left">
+<img src="/doc/search-within.png" width="200" height="200" border="0" alt="Search Within" align="left">
 #### Within 
 WITHIN searches a collection for objects that are fully contained inside a specified bounding area.
 <BR CLEAR="ALL">
 
-<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/search-intersects.png" width="200" height="200" border="0" alt="Search Intersects" align="left">
+<img src="/doc/search-intersects.png" width="200" height="200" border="0" alt="Search Intersects" align="left">
 #### Intersects
 INTERSECTS searches a collection for objects that intersect a specified bounding area.
 <BR CLEAR="ALL">
 
-<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/search-nearby.png" width="200" height="200" border="0" alt="Search Nearby" align="left">
+<img src="/doc/search-nearby.png" width="200" height="200" border="0" alt="Search Nearby" align="left">
 #### Nearby
 NEARBY searches a collection for objects that intersect a specified radius.
 <BR CLEAR="ALL">
@@ -108,13 +108,13 @@ NEARBY searches a collection for objects that intersect a specified radius.
 This is very helpful for example; when you have many (perhaps millions) of objects and do not want them all clustered together on a map. Sparse will limit the number of objects returned and provide them evenly distributed so that your map looks clean.<br><br>
 You can choose a value between 1 and 8. The value 1 will result in no more than 4 items. The value 8 will result in no more than 65536. *1=4, 2=16, 3=64, 4=256, 5=1024, 6=4098, 7=16384, 8=65536.*<br><br>
 <table>
-<td>No Sparsing<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-none.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 1<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-1.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 2<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-2.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 3<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-3.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 4<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-4.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 5<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-5.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 6<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/sparse-6.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>No Sparsing<img src="/doc/sparse-none.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 1<img src="/doc/sparse-1.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 2<img src="/doc/sparse-2.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 3<img src="/doc/sparse-3.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 4<img src="/doc/sparse-4.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 5<img src="/doc/sparse-5.png" width="100" height="100" border="0" alt="Search Within"></td>
+<td>Sparse 6<img src="/doc/sparse-6.png" width="100" height="100" border="0" alt="Search Within"></td>
 </table>
 *Please note that the higher the sparse value, the slower the performance. Also, LIMIT and CURSOR are not available when using SPARSE.* 
 
@@ -131,7 +131,7 @@ You can choose a value between 1 and 8. The value 1 will result in no more than 
 
 ## Geofencing
 
-<img src="https://raw.githubusercontent.com/tidwall/tile38/master/doc/geofence.gif" width="200" height="200" border="0" alt="Geofence animation" align="left">
+<img src="/doc/geofence.gif" width="200" height="200" border="0" alt="Geofence animation" align="left">
 A [geofence](https://en.wikipedia.org/wiki/Geo-fence) is a virtual boundary that can detect when an object enters or exits the area. This boundary can be a radius, bounding box, or a polygon. Tile38 can turn any standard search into a geofence monitor by adding the FENCE keyword to the search. 
 <br clear="all">
 
@@ -165,25 +165,25 @@ The `detect` may be `enter | exit | cross`.
 
 All object types except for XYZ Tiles and QuadKeys can be stored in a collection. XYZ Tiles and QuadKeys are reserved for the SEARCH keyword only.
 
-### Lat/lon point
+#### Lat/lon point
 The most basic object type is a point that is composed of a latitude and a longitude. There is an optional `z` member that may be used for auxilary data such as elevation or a timestamp.
 ```
 set fleet truck1 point 33.5123 -112.2693     # plain lat/lon
 set fleet truck1 point 33.5123 -112.2693 225 # lat/lon with z member
 ```
 
-### Bounding box
+#### Bounding box
 A bounding box consists of two points. The first being the southwestern most point and the second is the northeastern most point.
 ```
 set fleet truck1 bounds 30 -110 40 -100
 ```
-### Geohash
+#### Geohash
 A [geohash](https://en.wikipedia.org/wiki/Geohash) is a string respresentation of a point. With the length of the string indicating the precision of the point. 
 ```
 set fleet truck1 hash 9tbnthxzr # this would be equivlent to 'point 33.5123 -112.2693'
 ```
 
-### GeoJSON
+#### GeoJSON
 [GeoJSON](http://geojson.org/) is an industry standard format for representing a variety of object types including a point, multipoint, linestring, multilinestring, polygon, multipolygon, geometrycollection, feature, and featurecollection. Tile38 supports all of the standards with these exceptions.
 
 1. The `crs` member is not supported and will be ignored. The CRS84/WGS84 projection is assumed.
@@ -198,11 +198,11 @@ set fleet truck1 hash 9tbnthxzr # this would be equivlent to 'point 33.5123 -112
 set city tempe object {"type":"Polygon","coordinates":[[[0,0],[10,10],[10,0],[0,0]]]}
 ```
 
-### XYZ Tile
+#### XYZ Tile
 An XYZ tile is rectangle bounding area on earth that is represented by an X, Y coordinate and a Z (zoom) level.
 Check out [maptiler.org](http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/) for an interactive example.
 
-### QuadKey
+#### QuadKey
 A QuadKey used the same coordinate system as an XYZ tile except that the string representation is a string characters composed of 0, 1, 2, or 3. For a detailed explanation checkout [The Bing Maps Tile System](https://msdn.microsoft.com/en-us/library/bb259689.aspx).
 
 
@@ -210,7 +210,7 @@ A QuadKey used the same coordinate system as an XYZ tile except that the string 
 
 It's recommended to use the [native interface](#native-interface), but there are times when only HTTP is available or when you need to test from a remote terminal. In those cases we provide an HTTP and telnet options.
 
-### HTTP
+#### HTTP
 One of the simplest ways to call a tile38 command is to use HTTP. From the command line you can use [curl](https://curl.haxx.se/). For example:
 
 ```
@@ -221,10 +221,10 @@ curl --data "set fleet truck3 point 33.4762 -112.10923" localhost:9851
 curl localhost:9851/set+fleet+truck3+point+33.4762+-112.10923
 ```
 
-### Websockets
+#### Websockets
 Websockets can be used when you need to Geofence and keep the connection alive. It works just like the HTTP example above, with the exception that the connection stays alive and the data is sent from the server as text websocket messages.
 
-### Telnet
+#### Telnet
 There is the option to use a plain telnet connection.
 
 ```
@@ -233,7 +233,7 @@ set fleet truck3 point 33.4762 -112.10923
 {"ok":true,"elapsed":"18.73µs"}
 ```
 
-### Native interface
+#### Native interface
 The native interface is very simple. A single message is composed of a '$' + TEXT_DATA_SIZE + SPACE + DATA + CRLF.
 
 So the request message:
@@ -264,11 +264,10 @@ Currently we have only one native client written in Go. Though is should be triv
 
 - [Go](https://github.com/tidwall/tile38/tree/master/client)
 
-
 ## Commands
 This is the full list of commands available to Tile38. 
 
-### Crud
+#### Crud
 ```md
 GET key id [OBJECT|POINT|BOUNDS|(HASH precision)]
 summary: Get the object of an id
@@ -292,8 +291,7 @@ STATS key [key ...]
 summary: Show stats for one or more keys
 ```
 
-
-### Search
+#### Search
 ```md
 INTERSECTS key [CURSOR start] [LIMIT count] [SPARSE spread] [MATCH pattern] [WHERE field min max ...] [NOFIELDS] [FENCE] [COUNT|IDS|OBJECTS|POINTS|BOUNDS|(HASHES precision)] (GET key id)|(BOUNDS minlat minlon maxlat maxlon)|(OBJECT geojson)|(TILE x y z)|(QUADKEY quadkey)|(HASH precision)
 summary: Searches for ids that are nearby a point
@@ -308,14 +306,30 @@ SCAN key [CURSOR start] [LIMIT count] [MATCH pattern] [WHERE field min max ...] 
 summary: Incrementally iterate though a key
 ```
 
-### Server
+#### Connection
 
 ```md
+AUTH password
+summary: Authenticate to the server
+
 PING
 summary: Ping the server
 
-SERVER
-summary: Show server stats and details
+QUIT
+summary: Close the connection
+```
+
+#### Server
+
+```md
+CONFIG GET parameter
+summary: Get the value of a configuration parameter
+
+CONFIG REWRITE
+summary: Rewrite the configuration file with the in memory configuration
+
+CONFIG SET parameter [value]
+summary: Set a configuration parameter to the given value
 
 FLUSHDB
 summary: Removes all keys
@@ -325,9 +339,12 @@ summary: Forces a garbage collection
 
 READONLY yes|no
 summary: Turns on or off readonly mode
+
+SERVER
+summary: Show server stats and details
 ```
 
-### Replication
+#### Replication
 ```md
 FOLLOW host port
 summary: Follows a leader host

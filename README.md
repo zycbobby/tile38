@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://tile38.com"><img 
+  <a href="http://tile38.com"><img 
     src="/doc/logo1500.png" 
     width="200" height="200" border="0" alt="Tile38"></a>
 </p>

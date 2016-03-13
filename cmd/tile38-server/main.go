@@ -73,6 +73,10 @@ func main() {
 	if host != "" {
 		hostd = "Addr: " + host + ", "
 	}
+	gitsha := " (" + core.GitSHA + ")"
+	if gitsha == " (0000000)" {
+		gitsha = ""
+	}
 
 	//  _____ _ _     ___ ___
 	// |_   _|_| |___|_  | . |
@@ -82,12 +86,12 @@ func main() {
 	fmt.Fprintf(logw, `
    _______ _______
   |       |       |
-  |____   |   _   |   Tile38 %s (%s) %d bit (%s/%s)
+  |____   |   _   |   Tile38 %s%s %d bit (%s/%s)
   |       |       |   %sPort: %d, PID: %d
   |____   |   _   |
   |       |       |   tile38.com
   |_______|_______|
-`+"\n", core.Version, core.GitSHA, strconv.IntSize, runtime.GOARCH, runtime.GOOS, hostd, port, os.Getpid())
+`+"\n", core.Version, gitsha, strconv.IntSize, runtime.GOARCH, runtime.GOOS, hostd, port, os.Getpid())
 
 	if err := controller.ListenAndServe(host, port, dir); err != nil {
 		log.Fatal(err)

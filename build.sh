@@ -6,7 +6,9 @@ PROTECTED_MODE="no"
 
 # Hardcode some values to the core package
 LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.Version=${VERSION}"
-LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.GitSHA=$(git rev-parse --short HEAD)"
+if [ -d ".git" ]; then
+	LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.GitSHA=$(git rev-parse --short HEAD)"
+fi
 LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.BuildTime=$(date +%FT%T%z)"
 if [ "$PROTECTED_MODE" == "no" ]; then
 	LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.ProtectedMode=no"

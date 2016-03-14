@@ -953,7 +953,7 @@ var commandsJSON = `{
         "type": "integer"
       },
       {
-        "name": "sizs",
+        "name": "size",
         "type": "integer"
       }
     ],

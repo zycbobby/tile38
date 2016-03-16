@@ -45,7 +45,14 @@ var (
 )
 
 func showHelp() bool {
-	fmt.Fprintf(os.Stdout, "tile38-cli %s (git:%s)\n\n", core.Version, core.GitSHA)
+
+	gitsha := ""
+	if core.GitSHA == "" || core.GitSHA == "0000000" {
+		gitsha = ""
+	} else {
+		gitsha = " (git:" + core.GitSHA + ")"
+	}
+	fmt.Fprintf(os.Stdout, "tile38-cli %s%s\n\n", core.Version, gitsha)
 	fmt.Fprintf(os.Stdout, "Usage: tile38-cli [OPTIONS] [cmd [arg [arg ...]]]\n")
 	fmt.Fprintf(os.Stdout, " -h <hostname>      Server hostname (default: %s).\n", hostname)
 	fmt.Fprintf(os.Stdout, " -p <port>          Server port (default: %d).\n", port)

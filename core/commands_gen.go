@@ -235,7 +235,7 @@ var commandsJSON = `{
       }
     ],
     "since": "1.0.0",
-    "group": "crud"
+    "group": "keys"
   },
   "FSET": {
     "summary": "Set the value for a single field of an id",
@@ -259,7 +259,7 @@ var commandsJSON = `{
       }
     ],
     "since": "1.0.0",
-    "group": "crud"
+    "group": "keys"
   },
   "GET": {
     "summary": "Get the object of an id",
@@ -290,8 +290,8 @@ var commandsJSON = `{
             "name": "HASH",
             "arguments": [
               {
-                "name": "precision",
-                "type": "integer"
+                "name": "geohash",
+                "type": "geohash"
               }
             ]
           }
@@ -299,7 +299,7 @@ var commandsJSON = `{
       }
     ],
     "since": "1.0.0",
-    "group": "crud"
+    "group": "keys"
   },
   "DEL": {
     "summary": "Delete an id from a key",
@@ -315,7 +315,7 @@ var commandsJSON = `{
       }
     ],
     "since": "1.0.0",
-    "group": "crud"
+    "group": "keys"
   },
   "DROP": {
     "summary": "Remove a key from the database",
@@ -327,7 +327,7 @@ var commandsJSON = `{
       }
     ],
     "since": "1.0.0",
-    "group": "crud"
+    "group": "keys"
   },
   "KEYS": {
     "summary": "Finds all keys matching the given pattern",
@@ -339,7 +339,7 @@ var commandsJSON = `{
       }
     ],
     "since": "1.0.0",
-    "group": "crud"
+    "group": "keys"
   },
   "STATS": {
     "summary": "Show stats for one or more keys",
@@ -352,7 +352,7 @@ var commandsJSON = `{
       }
     ],
     "since": "1.0.0",
-    "group": "crud"
+    "group": "keys"
   },
 
   "SCAN": {
@@ -675,8 +675,8 @@ var commandsJSON = `{
             "name": "HASH",
             "arguments": [
               {
-                "name": "precision",
-                "type": "integer"
+                "name": "geohash",
+                "type": "geohash"
               }
             ]
           }
@@ -843,8 +843,8 @@ var commandsJSON = `{
             "name": "HASH",
             "arguments": [
               {
-                "name": "precision",
-                "type": "integer"
+                "name": "geohash",
+                "type": "geohash"
               }
             ]
           }
@@ -933,7 +933,7 @@ var commandsJSON = `{
     "group": "replication"
   },
   "AOF": {
-    "summary": "Downloads the AOF start from pos and keeps the connection alive",
+    "summary": "Downloads the AOF starting from pos and keeps the connection alive",
     "complexity": "O(1)",
     "arguments": [
       {

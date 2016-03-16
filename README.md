@@ -65,7 +65,7 @@ $ ./tile38-cli
 > scan fleet                                 # returns both trucks in 'fleet'
 > nearby fleet point 33.462 -112.268 6000    # search 6 kilometers around a point. returns one truck.
 
-# crud operations
+# key value operations
 > get fleet truck1                           # returns 'truck1'
 > del fleet truck2                           # deletes 'truck2'
 > drop fleet                                 # removes all 
@@ -272,7 +272,7 @@ Currently we have only one native client written in Go. Though is should be triv
 ## Commands
 This is the full list of commands available to Tile38. 
 
-#### Crud
+#### Keys
 ```md
 GET key id [OBJECT|POINT|BOUNDS|(HASH precision)]
 summary: Get the object of an id

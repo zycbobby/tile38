@@ -4,9 +4,9 @@
     width="200" height="200" border="0" alt="Tile38"></a>
 </p>
 
-This README is quick start document. You can find detailed documentation at [http://tile38.com](http://tile38.com).
-
 Tile38 is an open source (MIT licensed), in-memory geolocation data store, spatial index, and realtime geofence. It supports a variety of object types including lat/lon points, bounding boxes, XYZ tiles, Geohashes, and GeoJSON. 
+
+*This README is quick start document. You can find detailed documentation at [http://tile38.com](http://tile38.com).*
 
 ## Features
 

@@ -14,6 +14,55 @@ if [ "$PROTECTED_MODE" == "no" ]; then
 	LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.ProtectedMode=no"
 fi
 
+if [ "$(which go)" == "" ]; then
+	echo "error: Go is not installed. Please download and follow installation instructions at https://golang.org/dl to continue."
+	exit 1
+fi
+
+vercomp () {
+    if [[ $1 == $2 ]]
+    then
+        echo "0"
+        return
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+    do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++))
+    do
+        if [[ -z ${ver2[i]} ]]
+        then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]}))
+        then
+            echo "1"
+        	return
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]}))
+        then
+            echo "-1"
+            return
+        fi
+    done
+    echo "0"
+    return
+}
+
+GOVERS="$(go version | cut -d " " -f 3)"
+GOVERS="${GOVERS:2}"
+EQRES=$(vercomp "$GOVERS" "1.5")  
+
+if [ "$EQRES" == "-1" ]; then
+      echo "error: Go '1.5' or greater is required and '$GOVERS' is currently installed. Please upgrade Go at https://golang.org/dl to continue."	
+      exit 1
+fi
+
 export GO15VENDOREXPERIMENT=1
 
 cd $(dirname "${BASH_SOURCE[0]}")
@@ -29,7 +78,7 @@ trap rmtemp EXIT
 if [ "$NOCOPY" != "1" ]; then
 	# copy all files to an isloated directory.
 	WD="$TMP/src/github.com/tidwall/tile38"
-	GOPATH="$TMP"
+	export GOPATH="$TMP"
 	for file in `find . -type f`; do
 		# TODO: use .gitignore to ignore, or possibly just use git to determine the file list.
 		if [[ "$file" != "." && "$file" != ./.git* && "$file" != ./data* && "$file" != ./tile38-* ]]; then

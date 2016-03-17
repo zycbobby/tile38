@@ -14,53 +14,54 @@ if [ "$PROTECTED_MODE" == "no" ]; then
 	LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.ProtectedMode=no"
 fi
 
+# Check go install
 if [ "$(which go)" == "" ]; then
 	echo "error: Go is not installed. Please download and follow installation instructions at https://golang.org/dl to continue."
 	exit 1
 fi
 
-vercomp () {
-    if [[ $1 == $2 ]]
-    then
-        echo "0"
-        return
-    fi
-    local IFS=.
-    local i ver1=($1) ver2=($2)
-    # fill empty fields in ver1 with zeros
-    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
-    do
-        ver1[i]=0
-    done
-    for ((i=0; i<${#ver1[@]}; i++))
-    do
-        if [[ -z ${ver2[i]} ]]
-        then
-            # fill empty fields in ver2 with zeros
-            ver2[i]=0
-        fi
-        if ((10#${ver1[i]} > 10#${ver2[i]}))
-        then
-            echo "1"
-        	return
-        fi
-        if ((10#${ver1[i]} < 10#${ver2[i]}))
-        then
-            echo "-1"
-            return
-        fi
-    done
-    echo "0"
-    return
-}
-
+# Check go version
 GOVERS="$(go version | cut -d " " -f 3)"
-GOVERS="${GOVERS:2}"
 if [ "$GOVERS" != "devel" ]; then
+	vercomp () {
+		if [[ $1 == $2 ]]
+		then
+			echo "0"
+			return
+		fi
+		local IFS=.
+		local i ver1=($1) ver2=($2)
+		# fill empty fields in ver1 with zeros
+		for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+		do
+			ver1[i]=0
+		done
+		for ((i=0; i<${#ver1[@]}; i++))
+		do
+			if [[ -z ${ver2[i]} ]]
+			then
+				# fill empty fields in ver2 with zeros
+				ver2[i]=0
+			fi
+			if ((10#${ver1[i]} > 10#${ver2[i]}))
+			then
+				echo "1"
+				return
+			fi
+			if ((10#${ver1[i]} < 10#${ver2[i]}))
+			then
+				echo "-1"
+				return
+			fi
+		done
+		echo "0"
+		return
+	}
+	GOVERS="${GOVERS:2}"
 	EQRES=$(vercomp "$GOVERS" "1.5")  
 	if [ "$EQRES" == "-1" ]; then
-	      echo "error: Go '1.5' or greater is required and '$GOVERS' is currently installed. Please upgrade Go at https://golang.org/dl to continue."	
-	      exit 1
+		  echo "error: Go '1.5' or greater is required and '$GOVERS' is currently installed. Please upgrade Go at https://golang.org/dl to continue."	
+		  exit 1
 	fi
 fi
 
@@ -72,7 +73,7 @@ OD="$(pwd)"
 # temp directory for storing isolated environment.
 TMP="$(mktemp -d -t tile38.XXXX)"
 function rmtemp {
-  	rm -rf "$TMP"
+	rm -rf "$TMP"
 }
 trap rmtemp EXIT
 
@@ -101,7 +102,7 @@ if [ "$1" == "test" ]; then
 	$OD/tile38-server -p 9876 -d "$TMP" -q &
 	PID=$!
 	function testend {
-	  	kill $PID &
+		kill $PID &
 	}
 	trap testend EXIT
 	go test $(go list ./... | grep -v /vendor/)

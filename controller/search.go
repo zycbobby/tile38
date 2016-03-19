@@ -212,10 +212,13 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 	return
 }
 
+var nearbyTypes = []string{"point"}
+var withinOrIntersectsTypes = []string{"geo", "bounds", "hash", "tile", "quadkey", "get"}
+
 func (c *Controller) cmdNearby(line string, w io.Writer) error {
 	start := time.Now()
 	wr := &bytes.Buffer{}
-	s, err := c.cmdSearchArgs("nearby", line, []string{"point"})
+	s, err := c.cmdSearchArgs("nearby", line, nearbyTypes)
 	if err != nil {
 		return err
 	}
@@ -251,7 +254,7 @@ func (c *Controller) cmdIntersects(line string, w io.Writer) error {
 func (c *Controller) cmdWithinOrIntersects(cmd string, line string, w io.Writer) error {
 	start := time.Now()
 	wr := &bytes.Buffer{}
-	s, err := c.cmdSearchArgs(cmd, line, []string{"geo", "bounds", "hash", "tile", "quadkey", "get"})
+	s, err := c.cmdSearchArgs(cmd, line, withinOrIntersectsTypes)
 	if err != nil {
 		return err
 	}

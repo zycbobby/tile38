@@ -32,6 +32,14 @@ type AOFReader struct {
 	p     int       // pointer
 }
 
+type errAOFHook struct {
+	err error
+}
+
+func (err errAOFHook) Error() string {
+	return fmt.Sprintf("hook: %v", err.err)
+}
+
 func (rd *AOFReader) ReadCommand() ([]byte, error) {
 	if rd.l >= 4 {
 		sz1 := int(binary.LittleEndian.Uint32(rd.buf[rd.p:]))
@@ -123,7 +131,16 @@ func (c *Controller) loadAOF() error {
 			}
 			return err
 		}
-
+		empty := true
+		for i := 0; i < len(buf); i++ {
+			if buf[i] != 0 {
+				empty = false
+				break
+			}
+		}
+		if empty {
+			return nil
+		}
 		if _, _, err := c.command(string(buf), nil); err != nil {
 			return err
 		}
@@ -145,6 +162,33 @@ func (c *Controller) writeAOF(line string, d *commandDetailsT) error {
 	if err != nil {
 		return err
 	}
+
+	if d != nil {
+		// Process hooks
+		if hm, ok := c.hookcols[d.key]; ok {
+			for _, hook := range hm {
+				if err := c.DoHook(hook, d); err != nil {
+					// There was an error when processing the hook.
+					// This is a bad thing because we have already written the data to disk.
+					// But sinced the Controller mutex is currently locked, we have an opportunity
+					// to revert the written data on disk and return an error code back to the client.
+					// Not sure if this is the best route, but it's all we have at the moment.
+					// Instead of truncating the file, which is an expensive and more fault possible
+					// solution, we will simple overwrite the previous command with Zeros.
+					blank := make([]byte, len([]byte(line)))
+					// Seek to origin of the faulty command.
+					if _, err := c.f.Seek(int64(c.aofsz), 0); err != nil {
+						return err // really bad
+					}
+					if _, err := writeCommand(c.f, blank); err != nil {
+						return err // really bad
+					}
+					return errAOFHook{err}
+				}
+			}
+		}
+	}
+
 	c.aofsz += n
 
 	// notify aof live connections that we have new data
@@ -152,13 +196,14 @@ func (c *Controller) writeAOF(line string, d *commandDetailsT) error {
 	c.fcond.Broadcast()
 	c.fcond.L.Unlock()
 
-	// write to live connection streams
 	if d != nil {
+		// write to live connection streams
 		c.lcond.L.Lock()
 		c.lstack = append(c.lstack, d)
 		c.lcond.Broadcast()
 		c.lcond.L.Unlock()
 	}
+
 	return nil
 }
 

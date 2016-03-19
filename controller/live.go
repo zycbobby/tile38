@@ -10,9 +10,7 @@ import (
 	"sync"
 
 	"github.com/tidwall/tile38/client"
-	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/controller/log"
-	"github.com/tidwall/tile38/geojson"
 )
 
 type liveBuffer struct {
@@ -122,7 +120,6 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *bufio.Reader, websoc
 	if err := writeMessage(conn, []byte(client.LiveJSON), websocket); err != nil {
 		return nil // nil return is fine here
 	}
-	var col *collection.Collection
 	for {
 		lb.cond.L.Lock()
 		if mustQuit {
@@ -136,100 +133,11 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *bufio.Reader, websoc
 				lb.details = nil
 			}
 			fence := lb.fence
-			glob := lb.glob
 			lb.cond.L.Unlock()
-			if details.command == "drop" {
-				col = nil
-				if err := writeMessage(conn, []byte(`{"cmd":"drop"}`), websocket); err != nil {
-					return nil
-				}
-			} else {
-				match := true
-				if glob != "" && glob != "*" {
-					match, _ = globMatch(glob, details.id)
-				}
-				if match {
-					if details.obj != nil && !(details.command == "fset" && sw.nofields) {
-						match = false
-						detect := "outside"
-						if fence != nil {
-							match1 := fenceMatchObject(fence, details.oldObj)
-							match2 := fenceMatchObject(fence, details.obj)
-							if match1 && match2 {
-								match = true
-								detect = "inside"
-							} else if match1 && !match2 {
-								match = true
-								detect = "exit"
-							} else if !match1 && match2 {
-								match = true
-								detect = "enter"
-							} else {
-								// Maybe the old object and new object create a line that crosses the fence.
-								// Must detect for that possibility.
-								if details.oldObj != nil {
-									ls := geojson.LineString{
-										Coordinates: []geojson.Position{
-											details.oldObj.CalculatedPoint(),
-											details.obj.CalculatedPoint(),
-										},
-									}
-									temp := false
-									if fence.cmd == "within" {
-										// because we are testing if the line croses the area we need to use
-										// "intersects" instead of "within".
-										fence.cmd = "intersects"
-										temp = true
-									}
-									if fenceMatchObject(fence, ls) {
-										match = true
-										detect = "cross"
-									}
-									if temp {
-										fence.cmd = "within"
-									}
-								}
-							}
-						}
-						if match {
-							if details.command == "del" {
-								if err := writeMessage(conn, []byte(`{"command":"del","id":`+jsonString(details.id)+`}`), websocket); err != nil {
-									return nil
-								}
-							} else {
-								var fmap map[string]int
-								c.mu.RLock()
-								if col == nil {
-									col = c.getCol(details.key)
-								}
-								if col != nil {
-									fmap = col.FieldMap()
-								}
-								c.mu.RUnlock()
-								if fmap != nil {
-									sw.fmap = fmap
-									sw.fullFields = true
-									sw.writeObject(details.id, details.obj, details.fields)
-									if wr.Len() > 0 {
-										res := wr.String()
-										wr.Reset()
-										if strings.HasPrefix(res, ",") {
-											res = res[1:]
-										}
-										if sw.output == outputIDs {
-											res = `{"id":` + res + `}`
-										}
-										if strings.HasPrefix(res, "{") {
-											res = `{"command":"` + details.command + `","detect":"` + detect + `",` + res[1:]
-										}
-										if err := writeMessage(conn, []byte(res), websocket); err != nil {
-											return nil
-										}
-									}
-								}
-							}
-						}
-					}
+			msgs := c.FenceMatch(sw, fence, details, true)
+			for _, msg := range msgs {
+				if err := writeMessage(conn, msg, websocket); err != nil {
+					return nil // nil return is fine here
 				}
 			}
 			lb.cond.L.Lock()
@@ -237,32 +145,4 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *bufio.Reader, websoc
 		lb.cond.Wait()
 		lb.cond.L.Unlock()
 	}
-}
-
-func fenceMatchObject(fence *liveFenceSwitches, obj geojson.Object) bool {
-	if obj == nil {
-		return false
-	}
-	if fence.cmd == "nearby" {
-		return obj.Nearby(geojson.Position{X: fence.lon, Y: fence.lat, Z: 0}, fence.meters)
-	} else if fence.cmd == "within" {
-		if fence.o != nil {
-			return obj.Within(fence.o)
-		} else {
-			return obj.WithinBBox(geojson.BBox{
-				Min: geojson.Position{X: fence.minLon, Y: fence.minLat, Z: 0},
-				Max: geojson.Position{X: fence.maxLon, Y: fence.maxLat, Z: 0},
-			})
-		}
-	} else if fence.cmd == "intersects" {
-		if fence.o != nil {
-			return obj.Intersects(fence.o)
-		} else {
-			return obj.IntersectsBBox(geojson.BBox{
-				Min: geojson.Position{X: fence.minLon, Y: fence.minLat, Z: 0},
-				Max: geojson.Position{X: fence.maxLon, Y: fence.maxLat, Z: 0},
-			})
-		}
-	}
-	return false
 }

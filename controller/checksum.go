@@ -16,6 +16,9 @@ import (
 
 // checksum performs a simple md5 checksum on the aof file
 func (c *Controller) checksum(pos, size int64) (sum string, err error) {
+	if pos+size > int64(c.aofsz) {
+		return "", io.EOF
+	}
 	var f *os.File
 	f, err = os.Open(c.f.Name())
 	if err != nil {
@@ -25,7 +28,7 @@ func (c *Controller) checksum(pos, size int64) (sum string, err error) {
 	data := make([]byte, size)
 	err = func() error {
 		if size == 0 {
-			n, err := f.Seek(0, 2)
+			n, err := f.Seek(int64(c.aofsz), 0)
 			if err != nil {
 				return err
 			}

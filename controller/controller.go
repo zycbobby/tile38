@@ -58,23 +58,27 @@ type Controller struct {
 	lstack    []*commandDetailsT
 	lives     map[*liveBuffer]bool
 	lcond     *sync.Cond
-	fcup      bool // follow caught up
-	shrinking bool // aof shrinking flag
+	fcup      bool                        // follow caught up
+	shrinking bool                        // aof shrinking flag
+	hooks     map[string]*Hook            // hook name
+	hookcols  map[string]map[string]*Hook // col key
 }
 
 // ListenAndServe starts a new tile38 server
 func ListenAndServe(host string, port int, dir string) error {
 	log.Infof("Server started, Tile38 version %s, git %s", core.Version, core.GitSHA)
 	c := &Controller{
-		host:    host,
-		port:    port,
-		dir:     dir,
-		cols:    btree.New(16),
-		colsm:   make(map[string]*collection.Collection),
-		follows: make(map[*bytes.Buffer]bool),
-		fcond:   sync.NewCond(&sync.Mutex{}),
-		lives:   make(map[*liveBuffer]bool),
-		lcond:   sync.NewCond(&sync.Mutex{}),
+		host:     host,
+		port:     port,
+		dir:      dir,
+		cols:     btree.New(16),
+		colsm:    make(map[string]*collection.Collection),
+		follows:  make(map[*bytes.Buffer]bool),
+		fcond:    sync.NewCond(&sync.Mutex{}),
+		lives:    make(map[*liveBuffer]bool),
+		lcond:    sync.NewCond(&sync.Mutex{}),
+		hooks:    make(map[string]*Hook),
+		hookcols: make(map[string]map[string]*Hook),
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -210,7 +214,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Wri
 	default:
 		c.mu.RLock()
 		defer c.mu.RUnlock()
-	case "set", "del", "drop", "fset", "flushdb":
+	case "set", "del", "drop", "fset", "flushdb", "addhook", "delhook":
 		// write operations
 		write = true
 		c.mu.Lock()
@@ -221,7 +225,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Wri
 		if c.config.ReadOnly {
 			return writeErr(errors.New("read only"))
 		}
-	case "get", "keys", "scan", "nearby", "within", "intersects":
+	case "get", "keys", "scan", "nearby", "within", "intersects", "hooks":
 		// read operations
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -248,6 +252,9 @@ func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Wri
 	}
 	if write {
 		if err := c.writeAOF(line, &d); err != nil {
+			if _, ok := err.(errAOFHook); ok {
+				return writeErr(err)
+			}
 			log.Fatal(err)
 			return err
 		}
@@ -306,6 +313,14 @@ func (c *Controller) command(line string, w io.Writer) (resp string, d commandDe
 	case "flushdb":
 		d, err = c.cmdFlushDB(nline)
 		resp = okResp()
+	case "addhook":
+		err = c.cmdAddHook(nline)
+		resp = okResp()
+	case "delhook":
+		err = c.cmdDelHook(nline)
+		resp = okResp()
+	case "hooks":
+		err = c.cmdHooks(nline, w)
 	case "massinsert":
 		if !core.DevMode {
 			err = fmt.Errorf("unknown command '%s'", cmd)

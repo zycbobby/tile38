@@ -136,6 +136,8 @@ func (c *Controller) cmdFlushDB(line string) (d commandDetailsT, err error) {
 	}
 	c.cols = btree.New(16)
 	c.colsm = make(map[string]*collection.Collection)
+	c.hooks = make(map[string]*Hook)
+	c.hookcols = make(map[string]map[string]*Hook)
 	d.command = "flushdb"
 	return
 }

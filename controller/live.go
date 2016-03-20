@@ -134,7 +134,7 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *bufio.Reader, websoc
 			}
 			fence := lb.fence
 			lb.cond.L.Unlock()
-			msgs := c.FenceMatch(sw, fence, details, true)
+			msgs := c.FenceMatch("", sw, fence, details, true)
 			for _, msg := range msgs {
 				if err := writeMessage(conn, msg, websocket); err != nil {
 					return nil // nil return is fine here

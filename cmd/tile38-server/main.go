@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"runtime"
 	"strconv"
@@ -26,6 +27,27 @@ var (
 )
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "--webhook-consumer-port" {
+		log.Default = log.New(os.Stderr, &log.Config{})
+		port, err := strconv.ParseUint(os.Args[2], 10, 16)
+		if err != nil {
+			log.Fatal(err)
+		}
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			data, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			log.HTTPf("http: %s : %s", r.URL.Path, string(data))
+		})
+		log.Infof("webhook server http://localhost:%d/", port)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	// parse non standard args.
 	nargs := []string{os.Args[0]}
 	for i := 1; i < len(os.Args); i++ {

@@ -158,37 +158,21 @@ func writeCommand(w io.Writer, line []byte) (n int, err error) {
 }
 
 func (c *Controller) writeAOF(line string, d *commandDetailsT) error {
-	n, err := writeCommand(c.f, []byte(line))
-	if err != nil {
-		return err
-	}
-
 	if d != nil {
-		// Process hooks
+		// process hooks
 		if hm, ok := c.hookcols[d.key]; ok {
 			for _, hook := range hm {
 				if err := c.DoHook(hook, d); err != nil {
-					// There was an error when processing the hook.
-					// This is a bad thing because we have already written the data to disk.
-					// But sinced the Controller mutex is currently locked, we have an opportunity
-					// to revert the written data on disk and return an error code back to the client.
-					// Not sure if this is the best route, but it's all we have at the moment.
-					// Instead of truncating the file, which is an expensive and more fault possible
-					// solution, we will simple overwrite the previous command with Zeros.
-					blank := make([]byte, len([]byte(line)))
-					// Seek to origin of the faulty command.
-					if _, err := c.f.Seek(int64(c.aofsz), 0); err != nil {
-						return err // really bad
-					}
-					if _, err := writeCommand(c.f, blank); err != nil {
-						return err // really bad
-					}
 					return errAOFHook{err}
 				}
 			}
 		}
 	}
 
+	n, err := writeCommand(c.f, []byte(line))
+	if err != nil {
+		return err
+	}
 	c.aofsz += n
 
 	// notify aof live connections that we have new data
@@ -395,6 +379,10 @@ func (k *treeKeyBoolT) Less(item btree.Item) bool {
 //    - Has this key been marked 'ignore'?
 //      - Yes, then ignore
 //      - No, Mark key as 'ignore'?
+// 'ADDHOOK'
+//    - Direct copy from memory.
+// 'DELHOOK'
+//    - Direct copy from memory.
 // 'FLUSHDB'
 //    - Stop shrinking, nothing left to do
 
@@ -409,6 +397,12 @@ func (c *Controller) aofshrink() {
 	endpos := int64(c.aofsz)
 	start := time.Now()
 	log.Infof("aof shrink started at pos %d", endpos)
+
+	var hooks []string
+	for _, hook := range c.hooks {
+		hooks = append(hooks, "ADDHOOK "+hook.Name+" "+hook.Endpoint.Original+" "+hook.Command)
+	}
+
 	c.mu.Unlock()
 	var err error
 	defer func() {
@@ -584,7 +578,7 @@ reading:
 			break reading // all done
 		case "drop":
 			if line, key = token(line); key == "" {
-				err = errors.New("drop is missing key")
+				err = errors.New("DROP is missing key")
 				return
 			}
 			if !keyIgnoreM[key] {
@@ -592,14 +586,14 @@ reading:
 			}
 		case "del":
 			if line, key = token(line); key == "" {
-				err = errors.New("del is missing key")
+				err = errors.New("DEL is missing key")
 				return
 			}
 			if keyIgnoreM[key] {
 				continue // ignore
 			}
 			if line, id = token(line); id == "" {
-				err = errors.New("del is missing id")
+				err = errors.New("DEL is missing id")
 				return
 			}
 			if keyBucketM.Get(&treeKeyBoolT{key}) == nil {
@@ -788,4 +782,13 @@ reading:
 		}
 		return true
 	})
+	if err == nil {
+		// add all of the hooks
+		for _, line := range hooks {
+			_, err = writeCommand(nf, []byte(line))
+			if err != nil {
+				return
+			}
+		}
+	}
 }

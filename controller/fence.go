@@ -2,11 +2,12 @@ package controller
 
 import (
 	"strings"
+	"time"
 
 	"github.com/tidwall/tile38/geojson"
 )
 
-func (c *Controller) FenceMatch(sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT, mustLock bool) [][]byte {
+func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT, mustLock bool) [][]byte {
 	glob := fence.glob
 	if details.command == "drop" {
 		return [][]byte{[]byte(`{"cmd":"drop"}`)}
@@ -94,15 +95,18 @@ func (c *Controller) FenceMatch(sw *scanWriter, fence *liveFenceSwitches, detail
 	if sw.output == outputIDs {
 		res = `{"id":` + res + `}`
 	}
+	jskey := jsonString(details.key)
+	jstime := time.Now().Format("2006-01-02T15:04:05.999999999Z07:00")
+	jshookName := jsonString(hookName)
 	if strings.HasPrefix(res, "{") {
-		res = `{"command":"` + details.command + `","detect":"` + detect + `",` + res[1:]
+		res = `{"command":"` + details.command + `","detect":"` + detect + `","hook":` + jshookName + `,"time":"` + jstime + `,"key":` + jskey + `,` + res[1:]
 	}
 	msgs := [][]byte{[]byte(res)}
 	switch detect {
 	case "enter":
-		msgs = append(msgs, []byte(`{"command":"`+details.command+`","detect":"inside",`+res[1:]))
+		msgs = append(msgs, []byte(`{"command":"`+details.command+`","detect":"inside","hook":`+jshookName+`,"time":"`+jstime+`,"key":`+jskey+`,`+res[1:]))
 	case "exit", "cross":
-		msgs = append(msgs, []byte(`{"command":"`+details.command+`","detect":"outside",`+res[1:]))
+		msgs = append(msgs, []byte(`{"command":"`+details.command+`","detect":"outside","hook":`+jshookName+`,"time":"`+jstime+`,"key":`+jskey+`,`+res[1:]))
 	}
 	return msgs
 }

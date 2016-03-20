@@ -3,7 +3,9 @@ package controller
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -32,9 +34,22 @@ type Hook struct {
 }
 
 func (c *Controller) DoHook(hook *Hook, details *commandDetailsT) error {
-	msgs := c.FenceMatch(hook.ScanWriter, hook.Fence, details, false)
+	msgs := c.FenceMatch(hook.Name, hook.ScanWriter, hook.Fence, details, false)
 	for _, msg := range msgs {
-		println(">>", string(msg))
+		switch hook.Endpoint.Protocol {
+		case HTTP:
+			resp, err := http.Post(hook.Endpoint.Original, "application/json", bytes.NewBuffer(msg))
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != 200 {
+				return fmt.Errorf("enpoint returned status code %d", resp.StatusCode)
+			}
+			return nil
+		case Disque:
+			println(">>", string(msg))
+		}
 	}
 	return nil
 }

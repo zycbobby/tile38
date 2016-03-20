@@ -379,7 +379,7 @@ func (k *treeKeyBoolT) Less(item btree.Item) bool {
 //    - Has this key been marked 'ignore'?
 //      - Yes, then ignore
 //      - No, Mark key as 'ignore'?
-// 'ADDHOOK'
+// 'SETHOOK'
 //    - Direct copy from memory.
 // 'DELHOOK'
 //    - Direct copy from memory.
@@ -400,7 +400,12 @@ func (c *Controller) aofshrink() {
 
 	var hooks []string
 	for _, hook := range c.hooks {
-		hooks = append(hooks, "ADDHOOK "+hook.Name+" "+hook.Endpoint.Original+" "+hook.Command)
+		var orgs []string
+		for _, endpoint := range hook.Endpoints {
+			orgs = append(orgs, endpoint.Original)
+		}
+
+		hooks = append(hooks, "SETHOOK "+hook.Name+" "+strings.Join(orgs, ",")+" "+hook.Command)
 	}
 
 	c.mu.Unlock()

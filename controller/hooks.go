@@ -268,7 +268,7 @@ func (c *Controller) cmdHooks(line string, w io.Writer) (err error) {
 		if i > 0 {
 			buf.WriteByte(',')
 		}
-		buf.WriteString(`"hook":{`)
+		buf.WriteString(`{`)
 		buf.WriteString(`"name":` + jsonString(hook.Name))
 		buf.WriteString(`,"key":` + jsonString(hook.Key))
 		buf.WriteString(`,"endpoints":[`)

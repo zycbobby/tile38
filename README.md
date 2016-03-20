@@ -12,13 +12,13 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 
 - Spatial index with [search](#searching) methods such as Nearby, Within, and Intersects.
 - Realtime [geofencing](#geofencing).
+- Assign [Webhooks](http://tile38.com/commands/sethook) to Geofences.
 - Variety of client protocols, including [http](#http) (curl), [websockets](#websockets), [telnet](#telnet), and a [native interface](#native-interface).
 - Object types of [lat/lon](#latlon-point), [bbox](#bounding-box), [Geohash](#geohash), [GeoJSON](#geojson), [QuadKey](#quadkey), and [XYZ tile](#xyz-tile).
 - Server responses are in json.
 - Full [command line interface](#cli).
 - Leader / follower [replication](#replication).
 - In-memory database that persists on disk.
-- Simliar feel and syntax style to the fantastic [Redis](http://redis.io) api.
 
 ## Components
 - `tile38-server ` - The server
@@ -72,6 +72,8 @@ $ ./tile38-cli
 > del fleet truck2                           # deletes 'truck2'
 > drop fleet                                 # removes all 
 ```
+
+Tile38 has a ton of [great commands](http://tile38.com/commands).
 
 ## Fields
 Fields are extra data that belongs to an object. A field is always a double precision floating point. There is no limit to the number of fields that an object can have. 
@@ -140,6 +142,9 @@ You can choose a value between 1 and 8. The value 1 will result in no more than 
 
 <img src="/doc/geofence.gif" width="200" height="200" border="0" alt="Geofence animation" align="left">
 A [geofence](https://en.wikipedia.org/wiki/Geo-fence) is a virtual boundary that can detect when an object enters or exits the area. This boundary can be a radius, bounding box, or a polygon. Tile38 can turn any standard search into a geofence monitor by adding the FENCE keyword to the search. 
+
+*Tile38 also allows for [Webhooks](http://tile38.com/commands/sethook) to be assigned Geofences.*
+
 <br clear="all">
 
 A simple example:
@@ -267,114 +272,13 @@ Will be sent to the client as (without quotes):
 ```
 
 ## Clients
-Currently we have only one native client written in Go. Though is should be trivial to write one in your language of choice.
+Currently we have only one native client written in Go. Though is should be trivial to write a client in your language of choice.
 
 - [Go](https://github.com/tidwall/tile38/tree/master/client)
-
-## Commands
-This is the full list of commands available to Tile38. 
-
-#### Keys
-```md
-GET key id [OBJECT|POINT|BOUNDS|(HASH precision)]
-summary: Get the object of an id
-
-SET key string [FIELD name value ...] (OBJECT geojson)|(POINT lat lon [z])|(BOUNDS minlat minlon maxlat maxlon)|(HASH geohash)
-summary: Sets the value of an id
-
-FSET key id field value
-summary: Set the value for a single field of an id
-
-DEL key id
-summary: Delete an id from a key
-
-DROP key
-summary: Remove a key from the database
-
-KEYS pattern
-summary: Finds all keys matching the given pattern
-
-STATS key [key ...]
-summary: Show stats for one or more keys
-```
-
-#### Search
-```md
-INTERSECTS key [CURSOR start] [LIMIT count] [SPARSE spread] [MATCH pattern] [WHERE field min max ...] [NOFIELDS] [FENCE] [COUNT|IDS|OBJECTS|POINTS|BOUNDS|(HASHES precision)] (GET key id)|(BOUNDS minlat minlon maxlat maxlon)|(OBJECT geojson)|(TILE x y z)|(QUADKEY quadkey)|(HASH precision)
-summary: Searches for ids that are nearby a point
-
-NEARBY key [CURSOR start] [LIMIT count] [SPARSE spread] [MATCH pattern] [WHERE field min max ...] [NOFIELDS] [FENCE] [COUNT|IDS|OBJECTS|POINTS|BOUNDS|(HASHES precision)] POINT lat lon meters
-summary: Searches for ids that are nearby a point
-
-WITHIN key [CURSOR start] [LIMIT count] [SPARSE spread] [MATCH pattern] [WHERE field min max ...] [NOFIELDS] [FENCE] [COUNT|IDS|OBJECTS|POINTS|BOUNDS|(HASHES precision)] (GET key id)|(BOUNDS minlat minlon maxlat maxlon)|(OBJECT geojson)|(TILE x y z)|(QUADKEY quadkey)|(HASH precision)
-summary: Searches for ids that are nearby a point
-
-SCAN key [CURSOR start] [LIMIT count] [MATCH pattern] [WHERE field min max ...] [NOFIELDS] [COUNT|IDS|OBJECTS|POINTS|BOUNDS|(HASHES precision)]
-summary: Incrementally iterate though a key
-```
-
-#### Connection
-
-```md
-AUTH password
-summary: Authenticate to the server
-
-PING
-summary: Ping the server
-
-QUIT
-summary: Close the connection
-```
-
-#### Server
-
-```md
-CONFIG GET parameter
-summary: Get the value of a configuration parameter
-
-CONFIG REWRITE
-summary: Rewrite the configuration file with the in memory configuration
-
-CONFIG SET parameter [value]
-summary: Set a configuration parameter to the given value
-
-FLUSHDB
-summary: Removes all keys
-
-GC
-summary: Forces a garbage collection
-
-READONLY yes|no
-summary: Turns on or off readonly mode
-
-SERVER
-summary: Show server stats and details
-```
-
-#### Replication
-```md
-FOLLOW host port
-summary: Follows a leader host
-
-AOFSHRINK
-summary: Shrinks the aof in the background
-
-AOF pos
-summary: Downloads the AOF start from pos and keeps the connection alive
-
-AOFMD5 pos size
-summary: Performs a checksum on a portion of the aof
-```
 
 ## Contact
 Josh Baker [@tidwall](http://twitter.com/tidwall)
 
 ## License
 
-Tile38 source code is available under the MIT License.
-
-
-
-
-
-
+Tile38 source code is available under the MIT [License](/LICENSE).

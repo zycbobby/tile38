@@ -828,5 +828,57 @@
       }
     ],
     "group": "connection"
+  },
+  "SETHOOK": {
+    "summary": "Creates a webhook which points to geofenced search",
+    "arguments": [
+      {
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "name": "endpoint",
+        "type": "string"
+      },
+      {
+        "enum": ["NEARBY", "WITHIN", "INTERSECTS"]
+      },
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "command": "FENCE",
+        "name": [],
+        "type": []
+      },
+      {
+        "name": "param",
+        "type": "string",
+        "variadic": true
+      }
+
+    ],
+    "group": "webhook"
+  },
+  "DELHOOK": {
+    "summary": "Removes a webhook",
+    "arguments": [
+      {
+        "name": "name",
+        "type": "string"
+      }
+    ],
+    "group": "webhook"
+  },
+  "HOOKS": {
+    "summary": "Finds all hooks matching a pattern",
+    "arguments":[
+      {
+        "name": "pattern",
+        "type": "pattern"
+      }
+    ],
+    "group": "webhook"
   }
 }

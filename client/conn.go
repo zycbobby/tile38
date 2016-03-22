@@ -19,7 +19,7 @@ import (
 const LiveJSON = `{"ok":true,"live":true}`
 
 // MaxMessageSize is maximum accepted message size
-const MaxMessageSize = 16777215 // 0xFFFFFF
+const MaxMessageSize = 0x1FFFFFFF // 536,870,911 bytes
 
 type Proto int
 

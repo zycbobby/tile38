@@ -369,8 +369,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, err = c.cmdIntersects(msg)
 	case "get":
 		res, err = c.cmdGet(msg)
-		// case "keys":
-		// 	err = c.cmdKeys(nline, w)
+	case "keys":
+		res, err = c.cmdKeys(msg)
 		// case "aof":
 		// 	err = c.cmdAOF(nline, w)
 		// case "aofmd5":

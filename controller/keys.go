@@ -2,32 +2,38 @@ package controller
 
 import (
 	"bytes"
-	"io"
 	"strings"
 	"time"
 
 	"github.com/google/btree"
+	"github.com/tidwall/resp"
+	"github.com/tidwall/tile38/controller/server"
 )
 
-func (c *Controller) cmdKeys(line string, w io.Writer) error {
-	var pattern string
-	if line, pattern = token(line); pattern == "" {
-		return errInvalidNumberOfArguments
-	}
-	if line != "" {
-		return errInvalidNumberOfArguments
-	}
+func (c *Controller) cmdKeys(msg *server.Message) (res string, err error) {
 	var start = time.Now()
+	vs := msg.Values[1:]
+
+	var pattern string
+	var ok bool
+	if vs, pattern, ok = tokenval(vs); !ok || pattern == "" {
+		return "", errInvalidNumberOfArguments
+	}
+	if len(vs) != 0 {
+		return "", errInvalidNumberOfArguments
+	}
+
 	var wr = &bytes.Buffer{}
 	var once bool
-	wr.WriteString(`{"ok":true,"keys":[`)
-
+	if msg.OutputType == server.JSON {
+		wr.WriteString(`{"ok":true,"keys":[`)
+	}
 	var everything bool
 	var greater bool
 	var greaterPivot string
+	var vals []resp.Value
 
 	iterator := func(item btree.Item) bool {
-
 		key := item.(*collectionT).Key
 		var match bool
 		if everything {
@@ -42,12 +48,18 @@ func (c *Controller) cmdKeys(line string, w io.Writer) error {
 		}
 		if match {
 			if once {
-				wr.WriteByte(',')
+				if msg.OutputType == server.JSON {
+					wr.WriteByte(',')
+				}
 			} else {
 				once = true
 			}
-			s := jsonString(key)
-			wr.WriteString(s)
+			switch msg.OutputType {
+			case server.JSON:
+				wr.WriteString(jsonString(key))
+			case server.RESP:
+				vals = append(vals, resp.StringValue(key))
+			}
 		}
 		return true
 	}
@@ -73,7 +85,14 @@ func (c *Controller) cmdKeys(line string, w io.Writer) error {
 			c.cols.AscendGreaterOrEqual(&collectionT{Key: greaterPivot}, iterator)
 		}
 	}
-	wr.WriteString(`],"elapsed":"` + time.Now().Sub(start).String() + "\"}")
-	w.Write(wr.Bytes())
-	return nil
+	if msg.OutputType == server.JSON {
+		wr.WriteString(`],"elapsed":"` + time.Now().Sub(start).String() + "\"}")
+	} else {
+		data, err := resp.ArrayValue(vals).MarshalRESP()
+		if err != nil {
+			return "", err
+		}
+		wr.Write(data)
+	}
+	return wr.String(), nil
 }

@@ -6,6 +6,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/tidwall/resp"
 )
 
 const defaultSearchOutput = outputObjects
@@ -27,6 +29,15 @@ func token(line string) (newLine, token string) {
 		}
 	}
 	return "", line
+}
+
+func tokenval(vs []resp.Value) (nvs []resp.Value, token string, ok bool) {
+	if len(vs) > 0 {
+		token = vs[0].String()
+		nvs = vs[1:]
+		ok = true
+	}
+	return
 }
 
 func tokenlc(line string) (newLine, token string) {

@@ -2,14 +2,14 @@ package server
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"strings"
 
-	"github.com/tidwall/tile38/client"
+	//"github.com/tidwall/tile38/client"
+
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/core"
 )
@@ -51,7 +51,7 @@ var errCloseHTTP = errors.New("close http")
 func ListenAndServe(
 	host string, port int,
 	protected func() bool,
-	handler func(conn *Conn, command []byte, rd *bufio.Reader, w io.Writer, websocket bool) error,
+	handler func(conn *Conn, msg *Message, rd *bufio.Reader, w io.Writer, websocket bool) error,
 ) error {
 	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
@@ -68,17 +68,17 @@ func ListenAndServe(
 	}
 }
 
-func writeCommandErr(proto client.Proto, conn *Conn, err error) error {
-	if proto == client.HTTP || proto == client.WebSocket {
-		conn.Write([]byte(`HTTP/1.1 500 ` + err.Error() + "\r\nConnection: close\r\n\r\n"))
-	}
-	return err
-}
+// func writeCommandErr(proto client.Proto, conn *Conn, err error) error {
+// 	if proto == client.HTTP || proto == client.WebSocket {
+// 		conn.Write([]byte(`HTTP/1.1 500 ` + err.Error() + "\r\nConnection: close\r\n\r\n"))
+// 	}
+// 	return err
+// }
 
 func handleConn(
 	conn *Conn,
 	protected func() bool,
-	handler func(conn *Conn, command []byte, rd *bufio.Reader, w io.Writer, websocket bool) error,
+	handler func(conn *Conn, msg *Message, rd *bufio.Reader, w io.Writer, websocket bool) error,
 ) {
 	addr := conn.RemoteAddr().String()
 	if core.ShowDebugMessages {
@@ -96,59 +96,10 @@ func handleConn(
 		}
 	}
 	defer conn.Close()
-	rd := bufio.NewReader(conn)
-	for i := 0; ; i++ {
-		err := func() error {
-			command, proto, auth, err := client.ReadMessage(rd, conn)
-			if err != nil {
-				return err
-			}
-			if len(command) > 0 && (command[0] == 'Q' || command[0] == 'q') && strings.ToLower(string(command)) == "quit" {
-				return io.EOF
-			}
-			var b bytes.Buffer
-			var denied bool
-			if (proto == client.HTTP || proto == client.WebSocket) && auth != "" {
-				if err := handler(conn, []byte("AUTH "+auth), rd, &b, proto == client.WebSocket); err != nil {
-					return writeCommandErr(proto, conn, err)
-				}
-				if strings.HasPrefix(b.String(), `{"ok":false`) {
-					denied = true
-				} else {
-					b.Reset()
-				}
-			}
-			if !denied {
-				if err := handler(conn, command, rd, &b, proto == client.WebSocket); err != nil {
-					return writeCommandErr(proto, conn, err)
-				}
-			}
-			switch proto {
-			case client.Native:
-				if err := client.WriteMessage(conn, b.Bytes()); err != nil {
-					return err
-				}
-			case client.HTTP:
-				if err := client.WriteHTTP(conn, b.Bytes()); err != nil {
-					return err
-				}
-				return errCloseHTTP
-			case client.WebSocket:
-				if err := client.WriteWebSocket(conn, b.Bytes()); err != nil {
-					return err
-				}
-				if _, err := conn.Write([]byte{137, 0}); err != nil {
-					return err
-				}
-				return errCloseHTTP
-			default:
-				b.WriteString("\r\n")
-				if _, err := conn.Write(b.Bytes()); err != nil {
-					return err
-				}
-			}
-			return nil
-		}()
+	rd := NewAnyReaderWriter(conn)
+	brd := rd.rd
+	for {
+		msg, err := rd.ReadMessage()
 		if err != nil {
 			if err == io.EOF {
 				return
@@ -160,5 +111,83 @@ func handleConn(
 			log.Error(err)
 			return
 		}
+		if msg != nil && msg.Command != "" {
+			if msg.Command == "quit" {
+				if msg.OutputType == RESP {
+					io.WriteString(conn, "+OK\r\n")
+				}
+				return
+			}
+			err := handler(conn, msg, brd, conn, msg.ConnType == WebSocket)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+		}
 	}
 }
+
+//err := func() error {
+// command, proto, auth, err := client.ReadMessage(rd, conn)
+// if err != nil {
+// 	return err
+// }
+// if len(command) > 0 && (command[0] == 'Q' || command[0] == 'q') && strings.ToLower(string(command)) == "quit" {
+// 	return io.EOF
+// }
+// var b bytes.Buffer
+// var denied bool
+// if (proto == client.HTTP || proto == client.WebSocket) && auth != "" {
+// 	if err := handler(conn, []byte("AUTH "+auth), rd, &b, proto == client.WebSocket); err != nil {
+// 		return writeCommandErr(proto, conn, err)
+// 	}
+// 	if strings.HasPrefix(b.String(), `{"ok":false`) {
+// 		denied = true
+// 	} else {
+// 		b.Reset()
+// 	}
+// }
+// if !denied {
+// 	if err := handler(conn, command, rd, &b, proto == client.WebSocket); err != nil {
+// 		return writeCommandErr(proto, conn, err)
+// 	}
+// }
+// switch proto {
+// case client.Native:
+// 	if err := client.WriteMessage(conn, b.Bytes()); err != nil {
+// 		return err
+// 	}
+// case client.HTTP:
+// 	if err := client.WriteHTTP(conn, b.Bytes()); err != nil {
+// 		return err
+// 	}
+// 	return errCloseHTTP
+// case client.WebSocket:
+// 	if err := client.WriteWebSocket(conn, b.Bytes()); err != nil {
+// 		return err
+// 	}
+// 	if _, err := conn.Write([]byte{137, 0}); err != nil {
+// 		return err
+// 	}
+// 	return errCloseHTTP
+// default:
+// 	b.WriteString("\r\n")
+// 	if _, err := conn.Write(b.Bytes()); err != nil {
+// 		return err
+// 	}
+// }
+// return nil
+//}()
+// if err != nil {
+// 	if err == io.EOF {
+// 		return
+// 	}
+// 	if err == errCloseHTTP ||
+// 		strings.Contains(err.Error(), "use of closed network connection") {
+// 		return
+// 	}
+// 	log.Error(err)
+// 	return
+// }
+// 	}
+// }

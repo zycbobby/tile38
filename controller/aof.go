@@ -13,10 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/google/btree"
+	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/client"
 	"github.com/tidwall/tile38/controller/log"
+	"github.com/tidwall/tile38/controller/server"
 )
 
 const backwardsBufferSize = 50000
@@ -104,61 +105,36 @@ func (c *Controller) loadAOF() error {
 		ps := float64(count) / (float64(d) / float64(time.Second))
 		log.Infof("AOF loaded %d commands: %s: %.0f/sec", count, d, ps)
 	}()
-	rd := NewAOFReader(c.f)
+	rd := resp.NewReader(c.f)
 	for {
-		buf, err := rd.ReadCommand()
+		v, _, n, err := rd.ReadMultiBulk()
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
-			if err == io.ErrUnexpectedEOF || err == errCorruptedAOF {
-				log.Warnf("aof is corrupted, likely data loss. Truncating to %d", c.aofsz)
-				fname := c.f.Name()
-				c.f.Close()
-				if err := os.Truncate(c.f.Name(), int64(c.aofsz)); err != nil {
-					log.Fatalf("could not truncate aof, possible data loss. %s", err.Error())
-					return err
-				}
-				c.f, err = os.OpenFile(fname, os.O_CREATE|os.O_RDWR, 0600)
-				if err != nil {
-					log.Fatalf("could not create aof, possible data loss. %s", err.Error())
-					return err
-				}
-				if _, err := c.f.Seek(int64(c.aofsz), 0); err != nil {
-					log.Fatalf("could not seek aof, possible data loss. %s", err.Error())
-					return err
-				}
-			}
 			return err
 		}
-		empty := true
-		for i := 0; i < len(buf); i++ {
-			if buf[i] != 0 {
-				empty = false
-				break
-			}
+		values := v.Array()
+		if len(values) == 0 {
+			return errors.New("multibulk missing command component")
 		}
-		if empty {
-			return nil
+		msg := &server.Message{
+			Command: strings.ToLower(values[0].String()),
+			Values:  values,
 		}
-		if _, _, err := c.command(string(buf), nil); err != nil {
+		if _, _, err := c.command(msg, nil); err != nil {
 			return err
 		}
-		c.aofsz += 9 + len(buf)
+		c.aofsz += n
 		count++
 	}
 }
 
-func writeCommand(w io.Writer, line []byte) (n int, err error) {
-	b := make([]byte, len(line)+9)
-	binary.LittleEndian.PutUint32(b, uint32(len(line)))
-	copy(b[4:], line)
-	binary.LittleEndian.PutUint32(b[len(b)-5:], uint32(len(line)))
-	return w.Write(b)
-}
-
-func (c *Controller) writeAOF(line string, d *commandDetailsT) error {
+func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 	if d != nil {
+		if !d.updated {
+			return nil // just ignore writes if the command did not update
+		}
 		// process hooks
 		if hm, ok := c.hookcols[d.key]; ok {
 			for _, hook := range hm {
@@ -168,8 +144,11 @@ func (c *Controller) writeAOF(line string, d *commandDetailsT) error {
 			}
 		}
 	}
-
-	n, err := writeCommand(c.f, []byte(line))
+	data, err := value.MarshalRESP()
+	if err != nil {
+		return err
+	}
+	n, err := c.f.Write(data)
 	if err != nil {
 		return err
 	}
@@ -306,14 +285,18 @@ func (c *Controller) liveAOF(pos int64, conn net.Conn, rd *bufio.Reader) error {
 			if err != nil {
 				return err
 			}
-			rd := NewAOFReader(f)
+			rd := resp.NewReader(f)
 			for {
-				cmd, err := rd.ReadCommand()
+				v, _, err := rd.ReadValue()
 				if err != io.EOF {
 					if err != nil {
 						return err
 					}
-					if _, err := writeCommand(conn, cmd); err != nil {
+					data, err := v.MarshalRESP()
+					if err != nil {
+						return err
+					}
+					if _, err := conn.Write(data); err != nil {
 						return err
 					}
 					continue
@@ -387,413 +370,413 @@ func (k *treeKeyBoolT) Less(item btree.Item) bool {
 //    - Stop shrinking, nothing left to do
 
 func (c *Controller) aofshrink() {
-	c.mu.Lock()
-	c.f.Sync()
-	if c.shrinking {
-		c.mu.Unlock()
-		return
-	}
-	c.shrinking = true
-	endpos := int64(c.aofsz)
-	start := time.Now()
-	log.Infof("aof shrink started at pos %d", endpos)
+	// 	c.mu.Lock()
+	// 	c.f.Sync()
+	// 	if c.shrinking {
+	// 		c.mu.Unlock()
+	// 		return
+	// 	}
+	// 	c.shrinking = true
+	// 	endpos := int64(c.aofsz)
+	// 	start := time.Now()
+	// 	log.Infof("aof shrink started at pos %d", endpos)
 
-	var hooks []string
-	for _, hook := range c.hooks {
-		var orgs []string
-		for _, endpoint := range hook.Endpoints {
-			orgs = append(orgs, endpoint.Original)
-		}
+	// 	var hooks []string
+	// 	for _, hook := range c.hooks {
+	// 		var orgs []string
+	// 		for _, endpoint := range hook.Endpoints {
+	// 			orgs = append(orgs, endpoint.Original)
+	// 		}
 
-		hooks = append(hooks, "SETHOOK "+hook.Name+" "+strings.Join(orgs, ",")+" "+hook.Command)
-	}
+	// 		hooks = append(hooks, "SETHOOK "+hook.Name+" "+strings.Join(orgs, ",")+" "+hook.Command)
+	// 	}
 
-	c.mu.Unlock()
-	var err error
-	defer func() {
-		c.mu.Lock()
-		c.shrinking = false
-		c.mu.Unlock()
-		os.RemoveAll(c.dir + "/shrink.db")
-		os.RemoveAll(c.dir + "/shrink")
-		if err != nil {
-			log.Error("aof shrink failed: " + err.Error())
-		} else {
-			log.Info("aof shrink completed: " + time.Now().Sub(start).String())
-		}
-	}()
-	var db *bolt.DB
-	db, err = bolt.Open(c.dir+"/shrink.db", 0600, nil)
-	if err != nil {
-		return
-	}
-	defer db.Close()
-	var nf *os.File
-	nf, err = os.Create(c.dir + "/shrink")
-	if err != nil {
-		return
-	}
-	defer nf.Close()
-	defer func() {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		if err == nil {
-			c.f.Sync()
-			_, err = nf.Seek(0, 2)
-			if err == nil {
-				var f *os.File
-				f, err = os.Open(c.dir + "/aof")
-				if err != nil {
-					return
-				}
-				defer f.Close()
-				_, err = f.Seek(endpos, 0)
-				if err == nil {
-					_, err = io.Copy(nf, f)
-					if err == nil {
-						f.Close()
-						nf.Close()
-						// At this stage we need to kill all aof followers. To do so we will
-						// write a KILLAOF command to the stream. KILLAOF isn't really a command.
-						// This will cause the followers will close their connection and then
-						// automatically reconnect. The reconnection will force a sync of the aof.
-						err = c.writeAOF("KILLAOF", nil)
-						if err == nil {
-							c.f.Close()
-							err = os.Rename(c.dir+"/shrink", c.dir+"/aof")
-							if err != nil {
-								log.Fatal("shink rename fatal operation")
-							}
-							c.f, err = os.OpenFile(c.dir+"/aof", os.O_CREATE|os.O_RDWR, 0600)
-							if err != nil {
-								log.Fatal("shink openfile fatal operation")
-							}
-							var n int64
-							n, err = c.f.Seek(0, 2)
-							if err != nil {
-								log.Fatal("shink seek end fatal operation")
-							}
-							c.aofsz = int(n)
-						}
-					}
-				}
-			}
-		}
-	}()
-	var f *os.File
-	f, err = os.Open(c.dir + "/aof")
-	if err != nil {
-		return
-	}
-	defer f.Close()
+	// 	c.mu.Unlock()
+	// 	var err error
+	// 	defer func() {
+	// 		c.mu.Lock()
+	// 		c.shrinking = false
+	// 		c.mu.Unlock()
+	// 		os.RemoveAll(c.dir + "/shrink.db")
+	// 		os.RemoveAll(c.dir + "/shrink")
+	// 		if err != nil {
+	// 			log.Error("aof shrink failed: " + err.Error())
+	// 		} else {
+	// 			log.Info("aof shrink completed: " + time.Now().Sub(start).String())
+	// 		}
+	// 	}()
+	// 	var db *bolt.DB
+	// 	db, err = bolt.Open(c.dir+"/shrink.db", 0600, nil)
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	defer db.Close()
+	// 	var nf *os.File
+	// 	nf, err = os.Create(c.dir + "/shrink")
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	defer nf.Close()
+	// 	defer func() {
+	// 		c.mu.Lock()
+	// 		defer c.mu.Unlock()
+	// 		if err == nil {
+	// 			c.f.Sync()
+	// 			_, err = nf.Seek(0, 2)
+	// 			if err == nil {
+	// 				var f *os.File
+	// 				f, err = os.Open(c.dir + "/aof")
+	// 				if err != nil {
+	// 					return
+	// 				}
+	// 				defer f.Close()
+	// 				_, err = f.Seek(endpos, 0)
+	// 				if err == nil {
+	// 					_, err = io.Copy(nf, f)
+	// 					if err == nil {
+	// 						f.Close()
+	// 						nf.Close()
+	// 						// At this stage we need to kill all aof followers. To do so we will
+	// 						// write a KILLAOF command to the stream. KILLAOF isn't really a command.
+	// 						// This will cause the followers will close their connection and then
+	// 						// automatically reconnect. The reconnection will force a sync of the aof.
+	// 						err = c.writeAOF(resp.MultiBulkValue("KILLAOF"), nil)
+	// 						if err == nil {
+	// 							c.f.Close()
+	// 							err = os.Rename(c.dir+"/shrink", c.dir+"/aof")
+	// 							if err != nil {
+	// 								log.Fatal("shink rename fatal operation")
+	// 							}
+	// 							c.f, err = os.OpenFile(c.dir+"/aof", os.O_CREATE|os.O_RDWR, 0600)
+	// 							if err != nil {
+	// 								log.Fatal("shink openfile fatal operation")
+	// 							}
+	// 							var n int64
+	// 							n, err = c.f.Seek(0, 2)
+	// 							if err != nil {
+	// 								log.Fatal("shink seek end fatal operation")
+	// 							}
+	// 							c.aofsz = int(n)
+	// 						}
+	// 					}
+	// 				}
+	// 			}
+	// 		}
+	// 	}()
+	// 	var f *os.File
+	// 	f, err = os.Open(c.dir + "/aof")
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	defer f.Close()
 
-	var buf []byte
-	var pos int64
-	pos, err = f.Seek(endpos, 0)
-	if err != nil {
-		return
-	}
-	var readPreviousCommand func() ([]byte, error)
-	readPreviousCommand = func() ([]byte, error) {
-		if len(buf) >= 5 {
-			if buf[len(buf)-1] != 0 {
-				return nil, errCorruptedAOF
-			}
-			sz2 := int(binary.LittleEndian.Uint32(buf[len(buf)-5:]))
-			if len(buf) >= sz2+9 {
-				sz1 := int(binary.LittleEndian.Uint32(buf[len(buf)-(sz2+9):]))
-				if sz1 != sz2 {
-					return nil, errCorruptedAOF
-				}
-				command := buf[len(buf)-(sz2+5) : len(buf)-5]
-				buf = buf[:len(buf)-(sz2+9)]
-				return command, nil
-			}
-		}
-		if pos == 0 {
-			if len(buf) > 0 {
-				return nil, io.ErrUnexpectedEOF
-			} else {
-				return nil, io.EOF
-			}
-		}
-		sz := int64(backwardsBufferSize)
-		offset := pos - sz
-		if offset < 0 {
-			sz = pos
-			offset = 0
-		}
-		pos, err = f.Seek(offset, 0)
-		if err != nil {
-			return nil, err
-		}
-		nbuf := make([]byte, int(sz))
-		_, err = io.ReadFull(f, nbuf)
-		if err != nil {
-			return nil, err
-		}
-		if len(buf) > 0 {
-			nbuf = append(nbuf, buf...)
-		}
-		buf = nbuf
-		return readPreviousCommand()
-	}
-	var tx *bolt.Tx
-	tx, err = db.Begin(true)
-	if err != nil {
-		return
-	}
-	defer func() {
-		tx.Rollback()
-	}()
-	var keyIgnoreM = map[string]bool{}
-	var keyBucketM = btree.New(16)
-	var cmd, key, id, field string
-	var line string
-	var command []byte
-	var val []byte
-	var b *bolt.Bucket
-reading:
-	for i := 0; ; i++ {
-		if i%500 == 0 {
-			if err = tx.Commit(); err != nil {
-				return
-			}
-			tx, err = db.Begin(true)
-			if err != nil {
-				return
-			}
-		}
-		command, err = readPreviousCommand()
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-				break
-			}
-			return
-		}
-		// quick path
-		if len(command) == 0 {
-			continue // ignore blank commands
-		}
-		line, cmd = token(string(command))
-		cmd = strings.ToLower(cmd)
-		switch cmd {
-		case "flushdb":
-			break reading // all done
-		case "drop":
-			if line, key = token(line); key == "" {
-				err = errors.New("DROP is missing key")
-				return
-			}
-			if !keyIgnoreM[key] {
-				keyIgnoreM[key] = true
-			}
-		case "del":
-			if line, key = token(line); key == "" {
-				err = errors.New("DEL is missing key")
-				return
-			}
-			if keyIgnoreM[key] {
-				continue // ignore
-			}
-			if line, id = token(line); id == "" {
-				err = errors.New("DEL is missing id")
-				return
-			}
-			if keyBucketM.Get(&treeKeyBoolT{key}) == nil {
-				if _, err = tx.CreateBucket([]byte(key + ".ids")); err != nil {
-					return
-				}
-				if _, err = tx.CreateBucket([]byte(key + ".ignore_ids")); err != nil {
-					return
-				}
-				keyBucketM.ReplaceOrInsert(&treeKeyBoolT{key})
-			}
-			b = tx.Bucket([]byte(key + ".ignore_ids"))
-			err = b.Put([]byte(id), []byte("2")) // 2 for hard ignore
-			if err != nil {
-				return
-			}
+	// 	var buf []byte
+	// 	var pos int64
+	// 	pos, err = f.Seek(endpos, 0)
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	var readPreviousCommand func() ([]byte, error)
+	// 	readPreviousCommand = func() ([]byte, error) {
+	// 		if len(buf) >= 5 {
+	// 			if buf[len(buf)-1] != 0 {
+	// 				return nil, errCorruptedAOF
+	// 			}
+	// 			sz2 := int(binary.LittleEndian.Uint32(buf[len(buf)-5:]))
+	// 			if len(buf) >= sz2+9 {
+	// 				sz1 := int(binary.LittleEndian.Uint32(buf[len(buf)-(sz2+9):]))
+	// 				if sz1 != sz2 {
+	// 					return nil, errCorruptedAOF
+	// 				}
+	// 				command := buf[len(buf)-(sz2+5) : len(buf)-5]
+	// 				buf = buf[:len(buf)-(sz2+9)]
+	// 				return command, nil
+	// 			}
+	// 		}
+	// 		if pos == 0 {
+	// 			if len(buf) > 0 {
+	// 				return nil, io.ErrUnexpectedEOF
+	// 			} else {
+	// 				return nil, io.EOF
+	// 			}
+	// 		}
+	// 		sz := int64(backwardsBufferSize)
+	// 		offset := pos - sz
+	// 		if offset < 0 {
+	// 			sz = pos
+	// 			offset = 0
+	// 		}
+	// 		pos, err = f.Seek(offset, 0)
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		nbuf := make([]byte, int(sz))
+	// 		_, err = io.ReadFull(f, nbuf)
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		if len(buf) > 0 {
+	// 			nbuf = append(nbuf, buf...)
+	// 		}
+	// 		buf = nbuf
+	// 		return readPreviousCommand()
+	// 	}
+	// 	var tx *bolt.Tx
+	// 	tx, err = db.Begin(true)
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	defer func() {
+	// 		tx.Rollback()
+	// 	}()
+	// 	var keyIgnoreM = map[string]bool{}
+	// 	var keyBucketM = btree.New(16)
+	// 	var cmd, key, id, field string
+	// 	var line string
+	// 	var command []byte
+	// 	var val []byte
+	// 	var b *bolt.Bucket
+	// reading:
+	// 	for i := 0; ; i++ {
+	// 		if i%500 == 0 {
+	// 			if err = tx.Commit(); err != nil {
+	// 				return
+	// 			}
+	// 			tx, err = db.Begin(true)
+	// 			if err != nil {
+	// 				return
+	// 			}
+	// 		}
+	// 		command, err = readPreviousCommand()
+	// 		if err != nil {
+	// 			if err == io.EOF {
+	// 				err = nil
+	// 				break
+	// 			}
+	// 			return
+	// 		}
+	// 		// quick path
+	// 		if len(command) == 0 {
+	// 			continue // ignore blank commands
+	// 		}
+	// 		line, cmd = token(string(command))
+	// 		cmd = strings.ToLower(cmd)
+	// 		switch cmd {
+	// 		case "flushdb":
+	// 			break reading // all done
+	// 		case "drop":
+	// 			if line, key = token(line); key == "" {
+	// 				err = errors.New("DROP is missing key")
+	// 				return
+	// 			}
+	// 			if !keyIgnoreM[key] {
+	// 				keyIgnoreM[key] = true
+	// 			}
+	// 		case "del":
+	// 			if line, key = token(line); key == "" {
+	// 				err = errors.New("DEL is missing key")
+	// 				return
+	// 			}
+	// 			if keyIgnoreM[key] {
+	// 				continue // ignore
+	// 			}
+	// 			if line, id = token(line); id == "" {
+	// 				err = errors.New("DEL is missing id")
+	// 				return
+	// 			}
+	// 			if keyBucketM.Get(&treeKeyBoolT{key}) == nil {
+	// 				if _, err = tx.CreateBucket([]byte(key + ".ids")); err != nil {
+	// 					return
+	// 				}
+	// 				if _, err = tx.CreateBucket([]byte(key + ".ignore_ids")); err != nil {
+	// 					return
+	// 				}
+	// 				keyBucketM.ReplaceOrInsert(&treeKeyBoolT{key})
+	// 			}
+	// 			b = tx.Bucket([]byte(key + ".ignore_ids"))
+	// 			err = b.Put([]byte(id), []byte("2")) // 2 for hard ignore
+	// 			if err != nil {
+	// 				return
+	// 			}
 
-		case "set":
-			if line, key = token(line); key == "" {
-				err = errors.New("SET is missing key")
-				return
-			}
-			if keyIgnoreM[key] {
-				continue // ignore
-			}
-			if line, id = token(line); id == "" {
-				err = errors.New("SET is missing id")
-				return
-			}
-			if keyBucketM.Get(&treeKeyBoolT{key}) == nil {
-				if _, err = tx.CreateBucket([]byte(key + ".ids")); err != nil {
-					return
-				}
-				if _, err = tx.CreateBucket([]byte(key + ".ignore_ids")); err != nil {
-					return
-				}
-				keyBucketM.ReplaceOrInsert(&treeKeyBoolT{key})
-			}
-			b = tx.Bucket([]byte(key + ".ignore_ids"))
-			val = b.Get([]byte(id))
-			if val == nil {
-				if err = b.Put([]byte(id), []byte("1")); err != nil {
-					return
-				}
-				b = tx.Bucket([]byte(key + ".ids"))
-				if err = b.Put([]byte(id), command); err != nil {
-					return
-				}
-			} else {
-				switch string(val) {
-				default:
-					err = errors.New("invalid ignore")
-				case "1", "2":
-					continue // ignore
-				}
-			}
-		case "fset":
-			if line, key = token(line); key == "" {
-				err = errors.New("FSET is missing key")
-				return
-			}
-			if keyIgnoreM[key] {
-				continue // ignore
-			}
-			if line, id = token(line); id == "" {
-				err = errors.New("FSET is missing id")
-				return
-			}
-			if line, field = token(line); field == "" {
-				err = errors.New("FSET is missing field")
-				return
-			}
-			if keyBucketM.Get(&treeKeyBoolT{key}) == nil {
-				if _, err = tx.CreateBucket([]byte(key + ".ids")); err != nil {
-					return
-				}
-				if _, err = tx.CreateBucket([]byte(key + ".ignore_ids")); err != nil {
-					return
-				}
-				keyBucketM.ReplaceOrInsert(&treeKeyBoolT{key})
-			}
-			b = tx.Bucket([]byte(key + ".ignore_ids"))
-			val = b.Get([]byte(id))
-			if val == nil {
-				b = tx.Bucket([]byte(key + ":" + id + ":0"))
-				if b == nil {
-					if b, err = tx.CreateBucket([]byte(key + ":" + id + ":0")); err != nil {
-						return
-					}
-				}
-				if b.Get([]byte(field)) == nil {
-					if err = b.Put([]byte(field), command); err != nil {
-						return
-					}
-				}
-			} else {
-				switch string(val) {
-				default:
-					err = errors.New("invalid ignore")
-				case "1":
-					b = tx.Bucket([]byte(key + ":" + id + ":1"))
-					if b == nil {
-						if b, err = tx.CreateBucket([]byte(key + ":" + id + ":1")); err != nil {
-							return
-						}
-					}
-					if b.Get([]byte(field)) == nil {
-						if err = b.Put([]byte(field), command); err != nil {
-							return
-						}
-					}
-				case "2":
-					continue // ignore
-				}
-			}
-		}
-	}
-	if err = tx.Commit(); err != nil {
-		return
-	}
-	tx, err = db.Begin(false)
-	if err != nil {
-		return
-	}
-	keyBucketM.Ascend(func(item btree.Item) bool {
-		key := item.(*treeKeyBoolT).key
-		b := tx.Bucket([]byte(key + ".ids"))
-		if b != nil {
-			err = b.ForEach(func(id, command []byte) error {
-				// parse the SET command
-				_, fields, values, etype, eargs, err := c.parseSetArgs(string(command[4:]))
-				if err != nil {
-					return err
-				}
-				// store the fields in a map
-				var fieldm = map[string]float64{}
-				for i, field := range fields {
-					fieldm[field] = values[i]
-				}
-				// append old FSET values. these are FSETs that existed prior to the last SET.
-				f1 := tx.Bucket([]byte(key + ":" + string(id) + ":1"))
-				if f1 != nil {
-					err = f1.ForEach(func(field, command []byte) error {
-						d, err := c.parseFSetArgs(string(command[5:]))
-						if err != nil {
-							return err
-						}
-						if _, ok := fieldm[d.field]; !ok {
-							fieldm[d.field] = d.value
-						}
-						return nil
-					})
-					if err != nil {
-						return err
-					}
-				}
-				// append new FSET values. these are FSETs that were added after the last SET.
-				f0 := tx.Bucket([]byte(key + ":" + string(id) + ":0"))
-				if f0 != nil {
-					f0.ForEach(func(field, command []byte) error {
-						d, err := c.parseFSetArgs(string(command[5:]))
-						if err != nil {
-							return err
-						}
-						fieldm[d.field] = d.value
-						return nil
-					})
-				}
-				// rebuild the SET command
-				ncommand := "set " + key + " " + string(id)
-				for field, value := range fieldm {
-					if value != 0 {
-						ncommand += " field " + field + " " + strconv.FormatFloat(value, 'f', -1, 64)
-					}
-				}
-				ncommand += " " + strings.ToUpper(etype) + " " + eargs
-				_, err = writeCommand(nf, []byte(ncommand))
-				if err != nil {
-					return err
-				}
-				return nil
-			})
-			if err != nil {
-				return false
-			}
-		}
-		return true
-	})
-	if err == nil {
-		// add all of the hooks
-		for _, line := range hooks {
-			_, err = writeCommand(nf, []byte(line))
-			if err != nil {
-				return
-			}
-		}
-	}
+	// 		case "set":
+	// 			if line, key = token(line); key == "" {
+	// 				err = errors.New("SET is missing key")
+	// 				return
+	// 			}
+	// 			if keyIgnoreM[key] {
+	// 				continue // ignore
+	// 			}
+	// 			if line, id = token(line); id == "" {
+	// 				err = errors.New("SET is missing id")
+	// 				return
+	// 			}
+	// 			if keyBucketM.Get(&treeKeyBoolT{key}) == nil {
+	// 				if _, err = tx.CreateBucket([]byte(key + ".ids")); err != nil {
+	// 					return
+	// 				}
+	// 				if _, err = tx.CreateBucket([]byte(key + ".ignore_ids")); err != nil {
+	// 					return
+	// 				}
+	// 				keyBucketM.ReplaceOrInsert(&treeKeyBoolT{key})
+	// 			}
+	// 			b = tx.Bucket([]byte(key + ".ignore_ids"))
+	// 			val = b.Get([]byte(id))
+	// 			if val == nil {
+	// 				if err = b.Put([]byte(id), []byte("1")); err != nil {
+	// 					return
+	// 				}
+	// 				b = tx.Bucket([]byte(key + ".ids"))
+	// 				if err = b.Put([]byte(id), command); err != nil {
+	// 					return
+	// 				}
+	// 			} else {
+	// 				switch string(val) {
+	// 				default:
+	// 					err = errors.New("invalid ignore")
+	// 				case "1", "2":
+	// 					continue // ignore
+	// 				}
+	// 			}
+	// 		case "fset":
+	// 			if line, key = token(line); key == "" {
+	// 				err = errors.New("FSET is missing key")
+	// 				return
+	// 			}
+	// 			if keyIgnoreM[key] {
+	// 				continue // ignore
+	// 			}
+	// 			if line, id = token(line); id == "" {
+	// 				err = errors.New("FSET is missing id")
+	// 				return
+	// 			}
+	// 			if line, field = token(line); field == "" {
+	// 				err = errors.New("FSET is missing field")
+	// 				return
+	// 			}
+	// 			if keyBucketM.Get(&treeKeyBoolT{key}) == nil {
+	// 				if _, err = tx.CreateBucket([]byte(key + ".ids")); err != nil {
+	// 					return
+	// 				}
+	// 				if _, err = tx.CreateBucket([]byte(key + ".ignore_ids")); err != nil {
+	// 					return
+	// 				}
+	// 				keyBucketM.ReplaceOrInsert(&treeKeyBoolT{key})
+	// 			}
+	// 			b = tx.Bucket([]byte(key + ".ignore_ids"))
+	// 			val = b.Get([]byte(id))
+	// 			if val == nil {
+	// 				b = tx.Bucket([]byte(key + ":" + id + ":0"))
+	// 				if b == nil {
+	// 					if b, err = tx.CreateBucket([]byte(key + ":" + id + ":0")); err != nil {
+	// 						return
+	// 					}
+	// 				}
+	// 				if b.Get([]byte(field)) == nil {
+	// 					if err = b.Put([]byte(field), command); err != nil {
+	// 						return
+	// 					}
+	// 				}
+	// 			} else {
+	// 				switch string(val) {
+	// 				default:
+	// 					err = errors.New("invalid ignore")
+	// 				case "1":
+	// 					b = tx.Bucket([]byte(key + ":" + id + ":1"))
+	// 					if b == nil {
+	// 						if b, err = tx.CreateBucket([]byte(key + ":" + id + ":1")); err != nil {
+	// 							return
+	// 						}
+	// 					}
+	// 					if b.Get([]byte(field)) == nil {
+	// 						if err = b.Put([]byte(field), command); err != nil {
+	// 							return
+	// 						}
+	// 					}
+	// 				case "2":
+	// 					continue // ignore
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// 	if err = tx.Commit(); err != nil {
+	// 		return
+	// 	}
+	// 	tx, err = db.Begin(false)
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	keyBucketM.Ascend(func(item btree.Item) bool {
+	// 		key := item.(*treeKeyBoolT).key
+	// 		b := tx.Bucket([]byte(key + ".ids"))
+	// 		if b != nil {
+	// 			err = b.ForEach(func(id, command []byte) error {
+	// 				// parse the SET command
+	// 				_, fields, values, etype, eargs, err := c.parseSetArgs(string(command[4:]))
+	// 				if err != nil {
+	// 					return err
+	// 				}
+	// 				// store the fields in a map
+	// 				var fieldm = map[string]float64{}
+	// 				for i, field := range fields {
+	// 					fieldm[field] = values[i]
+	// 				}
+	// 				// append old FSET values. these are FSETs that existed prior to the last SET.
+	// 				f1 := tx.Bucket([]byte(key + ":" + string(id) + ":1"))
+	// 				if f1 != nil {
+	// 					err = f1.ForEach(func(field, command []byte) error {
+	// 						d, err := c.parseFSetArgs(string(command[5:]))
+	// 						if err != nil {
+	// 							return err
+	// 						}
+	// 						if _, ok := fieldm[d.field]; !ok {
+	// 							fieldm[d.field] = d.value
+	// 						}
+	// 						return nil
+	// 					})
+	// 					if err != nil {
+	// 						return err
+	// 					}
+	// 				}
+	// 				// append new FSET values. these are FSETs that were added after the last SET.
+	// 				f0 := tx.Bucket([]byte(key + ":" + string(id) + ":0"))
+	// 				if f0 != nil {
+	// 					f0.ForEach(func(field, command []byte) error {
+	// 						d, err := c.parseFSetArgs(string(command[5:]))
+	// 						if err != nil {
+	// 							return err
+	// 						}
+	// 						fieldm[d.field] = d.value
+	// 						return nil
+	// 					})
+	// 				}
+	// 				// rebuild the SET command
+	// 				ncommand := "set " + key + " " + string(id)
+	// 				for field, value := range fieldm {
+	// 					if value != 0 {
+	// 						ncommand += " field " + field + " " + strconv.FormatFloat(value, 'f', -1, 64)
+	// 					}
+	// 				}
+	// 				ncommand += " " + strings.ToUpper(etype) + " " + eargs
+	// 				_, err = writeCommand(nf, []byte(ncommand))
+	// 				if err != nil {
+	// 					return err
+	// 				}
+	// 				return nil
+	// 			})
+	// 			if err != nil {
+	// 				return false
+	// 			}
+	// 		}
+	// 		return true
+	// 	})
+	// 	if err == nil {
+	// 		// add all of the hooks
+	// 		for _, line := range hooks {
+	// 			_, err = writeCommand(nf, []byte(line))
+	// 			if err != nil {
+	// 				return
+	// 			}
+	// 		}
+	//	}
 }

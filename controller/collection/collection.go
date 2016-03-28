@@ -151,18 +151,18 @@ func (c *Collection) Get(id string) (obj geojson.Object, fields []float64, ok bo
 
 // SetField set a field value for an object and returns that object.
 // If the object does not exist then the 'ok' return value will be false.
-func (c *Collection) SetField(id, field string, value float64) (obj geojson.Object, fields []float64, ok bool) {
+func (c *Collection) SetField(id, field string, value float64) (obj geojson.Object, fields []float64, updated bool, ok bool) {
 	i := c.items.Get(&itemT{ID: id})
 	if i == nil {
 		ok = false
 		return
 	}
 	item := i.(*itemT)
-	c.setField(item, field, value)
-	return item.Object, item.Fields, true
+	updated = c.setField(item, field, value)
+	return item.Object, item.Fields, updated, true
 }
 
-func (c *Collection) setField(item *itemT, field string, value float64) {
+func (c *Collection) setField(item *itemT, field string, value float64) (updated bool) {
 	idx, ok := c.fieldMap[field]
 	if !ok {
 		idx = len(c.fieldMap)
@@ -173,7 +173,12 @@ func (c *Collection) setField(item *itemT, field string, value float64) {
 		item.Fields = append(item.Fields, math.NaN())
 	}
 	c.weight += len(item.Fields) * 8
+	ovalue := item.Fields[idx]
+	if math.IsNaN(ovalue) {
+		ovalue = 0
+	}
 	item.Fields[idx] = value
+	return ovalue != value
 }
 
 // FieldMap return a maps of the field names.

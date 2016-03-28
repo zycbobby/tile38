@@ -96,16 +96,16 @@ func (c *Controller) cmdFollow(line string) error {
 func (c *Controller) followHandleCommand(line string, followc uint64, w io.Writer) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.followc != followc {
-		return c.aofsz, errNoLongerFollowing
-	}
-	_, d, err := c.command(line, w)
-	if err != nil {
-		return c.aofsz, err
-	}
-	if err := c.writeAOF(line, &d); err != nil {
-		return c.aofsz, err
-	}
+	// if c.followc != followc {
+	// 	return c.aofsz, errNoLongerFollowing
+	// }
+	// _, d, err := c.command(line, w)
+	// if err != nil {
+	// 	return c.aofsz, err
+	// }
+	// if err := c.writeAOF(line, &d); err != nil {
+	// 	return c.aofsz, err
+	// }
 	return c.aofsz, nil
 }
 

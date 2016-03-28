@@ -3,51 +3,121 @@ package controller
 import (
 	"bytes"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/btree"
+	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
+	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/geojson/geohash"
 )
 
-func (c *Controller) cmdGet(line string) (string, error) {
+type fvt struct {
+	field string
+	value float64
+}
+
+type byField []fvt
+
+func (a byField) Len() int {
+	return len(a)
+}
+func (a byField) Less(i, j int) bool {
+	return a[i].field < a[j].field
+}
+func (a byField) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
+func orderFields(fmap map[string]int, fields []float64) []fvt {
+	var fv fvt
+	fvs := make([]fvt, 0, len(fmap))
+	for field, idx := range fmap {
+		if idx < len(fields) {
+			fv.field = field
+			fv.value = fields[idx]
+			if !math.IsNaN(fv.value) && fv.value != 0 {
+				fvs = append(fvs, fv)
+			}
+		}
+	}
+	sort.Sort(byField(fvs))
+	return fvs
+}
+
+func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 	start := time.Now()
+	vs := msg.Values[1:]
+
+	var ok bool
 	var key, id, typ, sprecision string
-	if line, key = token(line); key == "" {
+	if vs, key, ok = tokenval(vs); !ok || key == "" {
 		return "", errInvalidNumberOfArguments
 	}
-	if line, id = token(line); id == "" {
+	if vs, id, ok = tokenval(vs); !ok || id == "" {
 		return "", errInvalidNumberOfArguments
 	}
 	col := c.getCol(key)
 	if col == nil {
+		if msg.OutputType == server.RESP {
+			return "$-1\r\n", nil
+		}
 		return "", errKeyNotFound
 	}
 	o, fields, ok := col.Get(id)
 	if !ok {
+		if msg.OutputType == server.RESP {
+			return "$-1\r\n", nil
+		}
 		return "", errIDNotFound
 	}
+
+	vals := make([]resp.Value, 0, 2)
 	var buf bytes.Buffer
-	buf.WriteString(`{"ok":true`)
-	if line, typ = token(line); typ == "" || strings.ToLower(typ) == "object" {
-		buf.WriteString(`,"object":`)
-		buf.WriteString(o.JSON())
+	if msg.OutputType == server.JSON {
+		buf.WriteString(`{"ok":true`)
+	}
+	if vs, typ, ok = tokenval(vs); !ok || strings.ToLower(typ) == "object" {
+		if msg.OutputType == server.JSON {
+			buf.WriteString(`,"object":`)
+			buf.WriteString(o.JSON())
+		} else {
+			vals = append(vals, resp.ArrayValue([]resp.Value{resp.StringValue(o.JSON())}))
+		}
 	} else {
-		ltyp := strings.ToLower(typ)
-		switch ltyp {
+		switch strings.ToLower(typ) {
 		default:
 			return "", errInvalidArgument(typ)
 		case "point":
-			buf.WriteString(`,"point":`)
-			buf.WriteString(o.CalculatedPoint().ExternalJSON())
+			point := o.CalculatedPoint()
+			if msg.OutputType == server.JSON {
+				buf.WriteString(`,"point":`)
+				buf.WriteString(point.ExternalJSON())
+			} else {
+				if point.Z != 0 {
+					vals = append(vals, resp.ArrayValue([]resp.Value{
+						resp.StringValue(strconv.FormatFloat(point.Y, 'f', -1, 64)),
+						resp.StringValue(strconv.FormatFloat(point.X, 'f', -1, 64)),
+						resp.StringValue(strconv.FormatFloat(point.Z, 'f', -1, 64)),
+					}))
+				} else {
+					vals = append(vals, resp.ArrayValue([]resp.Value{
+						resp.StringValue(strconv.FormatFloat(point.Y, 'f', -1, 64)),
+						resp.StringValue(strconv.FormatFloat(point.X, 'f', -1, 64)),
+					}))
+				}
+			}
 		case "hash":
-			if line, sprecision = token(line); sprecision == "" {
+			if vs, sprecision, ok = tokenval(vs); !ok || sprecision == "" {
 				return "", errInvalidNumberOfArguments
 			}
-			buf.WriteString(`,"hash":`)
+			if msg.OutputType == server.JSON {
+				buf.WriteString(`,"hash":`)
+			}
 			precision, err := strconv.ParseInt(sprecision, 10, 64)
 			if err != nil || precision < 1 || precision > 64 {
 				return "", errInvalidArgument(sprecision)
@@ -56,81 +126,145 @@ func (c *Controller) cmdGet(line string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			buf.WriteString(`"` + p + `"`)
+			if msg.OutputType == server.JSON {
+				buf.WriteString(`"` + p + `"`)
+			} else {
+				vals = append(vals, resp.ArrayValue([]resp.Value{resp.StringValue(p)}))
+			}
 		case "bounds":
-			buf.WriteString(`,"bounds":`)
-			buf.WriteString(o.CalculatedBBox().ExternalJSON())
-		}
-	}
-	if line != "" {
-		return "", errInvalidNumberOfArguments
-	}
-	fmap := col.FieldMap()
-	if len(fmap) > 0 {
-		buf.WriteString(`,"fields":{`)
-		var i int
-		for field, idx := range fmap {
-			if len(fields) > idx {
-				if !math.IsNaN(fields[idx]) {
-					if i > 0 {
-						buf.WriteString(`,`)
-					}
-					buf.WriteString(jsonString(field) + ":" + strconv.FormatFloat(fields[idx], 'f', -1, 64))
-					i++
-				}
+			bbox := o.CalculatedBBox()
+			if msg.OutputType == server.JSON {
+				buf.WriteString(`,"bounds":`)
+				buf.WriteString(bbox.ExternalJSON())
+			} else {
+				vals = append(vals, resp.ArrayValue([]resp.Value{
+					resp.StringValue(strconv.FormatFloat(bbox.Min.Y, 'f', -1, 64)),
+					resp.StringValue(strconv.FormatFloat(bbox.Min.X, 'f', -1, 64)),
+					resp.StringValue(strconv.FormatFloat(bbox.Max.Y, 'f', -1, 64)),
+					resp.StringValue(strconv.FormatFloat(bbox.Max.X, 'f', -1, 64)),
+				}))
 			}
 		}
-		buf.WriteString(`}`)
 	}
-	buf.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
-	return buf.String(), nil
+	if len(vs) != 0 {
+		return "", errInvalidNumberOfArguments
+	}
+
+	fvs := orderFields(col.FieldMap(), fields)
+	if len(fvs) > 0 {
+		fvals := make([]resp.Value, 0, len(fvs)*2)
+		if msg.OutputType == server.JSON {
+			buf.WriteString(`,"fields":{`)
+		}
+		for i, fv := range fvs {
+			if msg.OutputType == server.JSON {
+				if i > 0 {
+					buf.WriteString(`,`)
+				}
+				buf.WriteString(jsonString(fv.field) + ":" + strconv.FormatFloat(fv.value, 'f', -1, 64))
+			} else {
+				fvals = append(fvals, resp.StringValue(fv.field), resp.StringValue(strconv.FormatFloat(fv.value, 'f', -1, 64)))
+			}
+			i++
+		}
+		if msg.OutputType == server.JSON {
+			buf.WriteString(`}`)
+		} else {
+			vals = append(vals, resp.ArrayValue(fvals))
+		}
+	}
+	if msg.OutputType == server.JSON {
+		buf.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
+		return buf.String(), nil
+	}
+	data, err := resp.ArrayValue(vals).MarshalRESP()
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+
 }
 
-func (c *Controller) cmdDel(line string) (d commandDetailsT, err error) {
-	if line, d.key = token(line); d.key == "" {
+func (c *Controller) cmdDel(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	var ok bool
+	if vs, d.key, ok = tokenval(vs); !ok || d.key == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	if line, d.id = token(line); d.id == "" {
+	if vs, d.id, ok = tokenval(vs); !ok || d.id == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	if line != "" {
+	if len(vs) != 0 {
 		err = errInvalidNumberOfArguments
 		return
 	}
+	found := false
 	col := c.getCol(d.key)
 	if col != nil {
-		d.obj, d.fields, _ = col.Remove(d.id)
-		if col.Count() == 0 {
-			c.deleteCol(d.key)
+		d.obj, d.fields, ok = col.Remove(d.id)
+		if ok {
+			if col.Count() == 0 {
+				c.deleteCol(d.key)
+			}
+			found = true
 		}
 	}
 	d.command = "del"
+	d.updated = found
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		if d.updated {
+			res = ":1\r\n"
+		} else {
+			res = ":0\r\n"
+		}
+	}
 	return
 }
 
-func (c *Controller) cmdDrop(line string) (d commandDetailsT, err error) {
-	if line, d.key = token(line); d.key == "" {
+func (c *Controller) cmdDrop(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	var ok bool
+	if vs, d.key, ok = tokenval(vs); !ok || d.key == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	if line != "" {
+	if len(vs) != 0 {
 		err = errInvalidNumberOfArguments
 		return
 	}
 	col := c.getCol(d.key)
 	if col != nil {
 		c.deleteCol(d.key)
+		d.updated = true
 	} else {
 		d.key = "" // ignore the details
+		d.updated = false
 	}
 	d.command = "drop"
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		if d.updated {
+			res = ":1\r\n"
+		} else {
+			res = ":0\r\n"
+		}
+	}
 	return
 }
 
-func (c *Controller) cmdFlushDB(line string) (d commandDetailsT, err error) {
-	if line != "" {
+func (c *Controller) cmdFlushDB(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	if len(vs) != 0 {
 		err = errInvalidNumberOfArguments
 		return
 	}
@@ -139,35 +273,43 @@ func (c *Controller) cmdFlushDB(line string) (d commandDetailsT, err error) {
 	c.hooks = make(map[string]*Hook)
 	c.hookcols = make(map[string]map[string]*Hook)
 	d.command = "flushdb"
+	d.updated = true
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		res = "+OK\r\n"
+	}
 	return
 }
 
-func (c *Controller) parseSetArgs(line string) (d commandDetailsT, fields []string, values []float64, etype, eline string, err error) {
-
+func (c *Controller) parseSetArgs(vs []resp.Value) (d commandDetailsT, fields []string, values []float64, etype string, evs []resp.Value, err error) {
+	var ok bool
 	var typ string
-	if line, d.key = token(line); d.key == "" {
+	if vs, d.key, ok = tokenval(vs); !ok || d.key == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	if line, d.id = token(line); d.id == "" {
+	if vs, d.id, ok = tokenval(vs); !ok || d.id == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
+
 	var arg string
-	var nline string
+	var nvs []resp.Value
 	fields = make([]string, 0, 8)
 	values = make([]float64, 0, 8)
 	for {
-		if nline, arg = token(line); arg == "" {
+		if nvs, arg, ok = tokenval(vs); !ok || arg == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
 		if lc(arg, "field") {
-			line = nline
+			vs = nvs
 			var name string
 			var svalue string
 			var value float64
-			if line, name = token(line); name == "" {
+			if vs, name, ok = tokenval(vs); !ok || name == "" {
 				err = errInvalidNumberOfArguments
 				return
 			}
@@ -175,7 +317,7 @@ func (c *Controller) parseSetArgs(line string) (d commandDetailsT, fields []stri
 				err = errInvalidArgument(name)
 				return
 			}
-			if line, svalue = token(line); svalue == "" {
+			if vs, svalue, ok = tokenval(vs); !ok || svalue == "" {
 				err = errInvalidNumberOfArguments
 				return
 			}
@@ -190,16 +332,16 @@ func (c *Controller) parseSetArgs(line string) (d commandDetailsT, fields []stri
 		}
 		break
 	}
-	if line, typ = token(line); typ == "" {
+	if vs, typ, ok = tokenval(vs); !ok || typ == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	if line == "" {
+	if len(vs) == 0 {
 		err = errInvalidNumberOfArguments
 		return
 	}
 	etype = typ
-	eline = line
+	evs = vs
 
 	switch {
 	default:
@@ -207,16 +349,16 @@ func (c *Controller) parseSetArgs(line string) (d commandDetailsT, fields []stri
 		return
 	case lc(typ, "point"):
 		var slat, slon, sz string
-		if line, slat = token(line); slat == "" {
+		if vs, slat, ok = tokenval(vs); !ok || slat == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, slon = token(line); slon == "" {
+		if vs, slon, ok = tokenval(vs); !ok || slon == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		line, sz = token(line)
-		if sz == "" {
+		vs, sz, ok = tokenval(vs)
+		if !ok || sz == "" {
 			var sp geojson.SimplePoint
 			sp.Y, err = strconv.ParseFloat(slat, 64)
 			if err != nil {
@@ -250,19 +392,19 @@ func (c *Controller) parseSetArgs(line string) (d commandDetailsT, fields []stri
 		}
 	case lc(typ, "bounds"):
 		var sminlat, sminlon, smaxlat, smaxlon string
-		if line, sminlat = token(line); sminlat == "" {
+		if vs, sminlat, ok = tokenval(vs); !ok || sminlat == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, sminlon = token(line); sminlon == "" {
+		if vs, sminlon, ok = tokenval(vs); !ok || sminlon == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, smaxlat = token(line); smaxlat == "" {
+		if vs, smaxlat, ok = tokenval(vs); !ok || smaxlat == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, smaxlon = token(line); smaxlon == "" {
+		if vs, smaxlon, ok = tokenval(vs); !ok || smaxlon == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
@@ -302,7 +444,7 @@ func (c *Controller) parseSetArgs(line string) (d commandDetailsT, fields []stri
 	case lc(typ, "hash"):
 		var sp geojson.SimplePoint
 		var shash string
-		if line, shash = token(line); shash == "" {
+		if vs, shash, ok = tokenval(vs); !ok || shash == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
@@ -315,18 +457,28 @@ func (c *Controller) parseSetArgs(line string) (d commandDetailsT, fields []stri
 		sp.Y = lat
 		d.obj = sp
 	case lc(typ, "object"):
-		d.obj, err = geojson.ObjectJSON(line)
+		var object string
+		if vs, object, ok = tokenval(vs); !ok || object == "" {
+			err = errInvalidNumberOfArguments
+			return
+		}
+		d.obj, err = geojson.ObjectJSON(object)
 		if err != nil {
 			return
 		}
 	}
+	if len(vs) != 0 {
+		err = errInvalidNumberOfArguments
+	}
 	return
 }
 
-func (c *Controller) cmdSet(line string) (d commandDetailsT, err error) {
+func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
 	var fields []string
 	var values []float64
-	d, fields, values, _, _, err = c.parseSetArgs(line)
+	d, fields, values, _, _, err = c.parseSetArgs(vs)
 	if err != nil {
 		return
 	}
@@ -337,20 +489,28 @@ func (c *Controller) cmdSet(line string) (d commandDetailsT, err error) {
 	}
 	d.oldObj, d.oldFields, d.fields = col.ReplaceOrInsert(d.id, d.obj, fields, values)
 	d.command = "set"
+	d.updated = true // perhaps we should do a diff on the previous object?
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		res = "+OK\r\n"
+	}
 	return
 }
 
-func (c *Controller) parseFSetArgs(line string) (d commandDetailsT, err error) {
+func (c *Controller) parseFSetArgs(vs []resp.Value) (d commandDetailsT, err error) {
 	var svalue string
-	if line, d.key = token(line); d.key == "" {
+	var ok bool
+	if vs, d.key, ok = tokenval(vs); !ok || d.key == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	if line, d.id = token(line); d.id == "" {
+	if vs, d.id, ok = tokenval(vs); !ok || d.id == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	if line, d.field = token(line); d.field == "" {
+	if vs, d.field, ok = tokenval(vs); !ok || d.field == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
@@ -358,11 +518,11 @@ func (c *Controller) parseFSetArgs(line string) (d commandDetailsT, err error) {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	if line, svalue = token(line); svalue == "" {
+	if vs, svalue, ok = tokenval(vs); !ok || svalue == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	if line != "" {
+	if len(vs) != 0 {
 		err = errInvalidNumberOfArguments
 		return
 	}
@@ -374,19 +534,33 @@ func (c *Controller) parseFSetArgs(line string) (d commandDetailsT, err error) {
 	return
 }
 
-func (c *Controller) cmdFset(line string) (d commandDetailsT, err error) {
-	d, err = c.parseFSetArgs(line)
+func (c *Controller) cmdFset(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	d, err = c.parseFSetArgs(vs)
 	col := c.getCol(d.key)
 	if col == nil {
 		err = errKeyNotFound
 		return
 	}
 	var ok bool
-	d.obj, d.fields, ok = col.SetField(d.id, d.field, d.value)
+	var updated bool
+	d.obj, d.fields, updated, ok = col.SetField(d.id, d.field, d.value)
 	if !ok {
 		err = errIDNotFound
 		return
 	}
 	d.command = "fset"
+	d.updated = updated
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		if updated {
+			res = ":1\r\n"
+		} else {
+			res = ":0\r\n"
+		}
+	}
 	return
 }

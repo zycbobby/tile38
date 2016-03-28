@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/btree"
+	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/controller/server"
@@ -35,6 +35,7 @@ type commandDetailsT struct {
 	fields    []float64
 	oldObj    geojson.Object
 	oldFields []float64
+	updated   bool
 }
 
 func (col *collectionT) Less(item btree.Item) bool {
@@ -105,8 +106,8 @@ func ListenAndServe(host string, port int, dir string) error {
 		c.mu.Unlock()
 	}()
 	go c.processLives()
-	handler := func(conn *server.Conn, command []byte, rd *bufio.Reader, w io.Writer, websocket bool) error {
-		err := c.handleInputCommand(conn, string(command), w)
+	handler := func(conn *server.Conn, msg *server.Message, rd *bufio.Reader, w io.Writer, websocket bool) error {
+		err := c.handleInputCommand(conn, msg, w)
 		if err != nil {
 			if err.Error() == "going live" {
 				return c.goLive(err, conn, rd, websocket)
@@ -162,55 +163,73 @@ func isReservedFieldName(field string) bool {
 	return false
 }
 
-func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Writer) error {
-	if core.ShowDebugMessages && line != "pInG" {
-		log.Debug(line)
+func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, w io.Writer) error {
+	var words []string
+	for _, v := range msg.Values {
+		words = append(words, v.String())
 	}
+	// line := strings.Join(words, " ")
+
+	// if core.ShowDebugMessages && line != "pInG" {
+	// 	log.Debug(line)
+	// }
 	start := time.Now()
+
 	// Ping. Just send back the response. No need to put through the pipeline.
-	if len(line) == 4 && (line[0] == 'p' || line[0] == 'P') && lc(line, "ping") {
-		w.Write([]byte(`{"ok":true,"ping":"pong","elapsed":"` + time.Now().Sub(start).String() + `"}`))
+	if msg.Command == "ping" {
+		switch msg.OutputType {
+		case server.JSON:
+			w.Write([]byte(`{"ok":true,"ping":"pong","elapsed":"` + time.Now().Sub(start).String() + `"}`))
+		case server.RESP:
+			io.WriteString(w, "+PONG\r\n")
+		}
 		return nil
 	}
 
 	writeErr := func(err error) error {
-		js := `{"ok":false,"err":` + jsonString(err.Error()) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
-		if _, err := w.Write([]byte(js)); err != nil {
-			return err
+		switch msg.OutputType {
+		case server.JSON:
+			io.WriteString(w, `{"ok":false,"err":`+jsonString(err.Error())+`,"elapsed":"`+time.Now().Sub(start).String()+"\"}")
+		case server.RESP:
+			if err == errInvalidNumberOfArguments {
+				io.WriteString(w, "-ERR wrong number of arguments for '"+msg.Command+"' command\r\n")
+			} else {
+				v, _ := resp.ErrorValue(errors.New("ERR " + err.Error())).MarshalRESP()
+				io.WriteString(w, string(v))
+			}
 		}
 		return nil
 	}
 
 	var write bool
-	_, cmd := tokenlc(line)
-	if cmd == "" {
-		return writeErr(errors.New("empty command"))
-	}
 
-	if !conn.Authenticated || cmd == "auth" {
+	if !conn.Authenticated || msg.Command == "auth" {
 		c.mu.RLock()
 		requirePass := c.config.RequirePass
 		c.mu.RUnlock()
 		if requirePass != "" {
 			// This better be an AUTH command.
-			if cmd != "auth" {
+			if msg.Command != "auth" {
 				// Just shut down the pipeline now. The less the client connection knows the better.
 				return writeErr(errors.New("authentication required"))
 			}
-			password, _ := token(line)
+			password := ""
+			if len(msg.Values) > 1 {
+				password = msg.Values[1].String()
+			}
 			if requirePass != strings.TrimSpace(password) {
 				return writeErr(errors.New("invalid password"))
 			}
 			conn.Authenticated = true
 			w.Write([]byte(`{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"))
 			return nil
-		} else if cmd == "auth" {
+		} else if msg.Command == "auth" {
 			return writeErr(errors.New("invalid password"))
 		}
 	}
 
 	// choose the locking strategy
-	switch cmd {
+	switch msg.Command {
 	default:
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -243,7 +262,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Wri
 		// no locks! DEV MODE ONLY
 	}
 
-	resp, d, err := c.command(line, w)
+	res, d, err := c.command(msg, w)
 	if err != nil {
 		if err.Error() == "going live" {
 			return err
@@ -251,7 +270,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Wri
 		return writeErr(err)
 	}
 	if write {
-		if err := c.writeAOF(line, &d); err != nil {
+		if err := c.writeAOF(resp.ArrayValue(msg.Values), &d); err != nil {
 			if _, ok := err.(errAOFHook); ok {
 				return writeErr(err)
 			}
@@ -259,8 +278,8 @@ func (c *Controller) handleInputCommand(conn *server.Conn, line string, w io.Wri
 			return err
 		}
 	}
-	if resp != "" {
-		if _, err := io.WriteString(w, resp); err != nil {
+	if res != "" {
+		if _, err := io.WriteString(w, res); err != nil {
 			return err
 		}
 	}
@@ -284,84 +303,85 @@ func (c *Controller) reset() {
 	c.cols = btree.New(16)
 }
 
-func (c *Controller) command(line string, w io.Writer) (resp string, d commandDetailsT, err error) {
+func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d commandDetailsT, err error) {
 	start := time.Now()
 	okResp := func() string {
-		if w == nil {
-			return ""
+		if w != nil {
+			switch msg.OutputType {
+			case server.JSON:
+				return `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+			case server.RESP:
+				return "+OK\r\n"
+			}
 		}
-		return `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+		return ""
 	}
-	nline, cmd := tokenlc(line)
-	switch cmd {
+	okResp = okResp
+	switch msg.Command {
 	default:
-		err = fmt.Errorf("unknown command '%s'", cmd)
+		err = fmt.Errorf("unknown command '%s'", msg.Values[0])
 		return
 	// lock
 	case "set":
-		d, err = c.cmdSet(nline)
-		resp = okResp()
+		res, d, err = c.cmdSet(msg)
 	case "fset":
-		d, err = c.cmdFset(nline)
-		resp = okResp()
+		res, d, err = c.cmdFset(msg)
 	case "del":
-		d, err = c.cmdDel(nline)
-		resp = okResp()
+		res, d, err = c.cmdDel(msg)
 	case "drop":
-		d, err = c.cmdDrop(nline)
-		resp = okResp()
+		res, d, err = c.cmdDrop(msg)
 	case "flushdb":
-		d, err = c.cmdFlushDB(nline)
-		resp = okResp()
-	case "sethook":
-		err = c.cmdSetHook(nline)
-		resp = okResp()
-	case "delhook":
-		err = c.cmdDelHook(nline)
-		resp = okResp()
-	case "hooks":
-		err = c.cmdHooks(nline, w)
-	case "massinsert":
-		if !core.DevMode {
-			err = fmt.Errorf("unknown command '%s'", cmd)
-			return
-		}
-		err = c.cmdMassInsert(nline)
-		resp = okResp()
-	case "follow":
-		err = c.cmdFollow(nline)
-		resp = okResp()
-	case "config":
-		resp, err = c.cmdConfig(nline)
-	case "readonly":
-		err = c.cmdReadOnly(nline)
-		resp = okResp()
-	case "stats":
-		resp, err = c.cmdStats(nline)
-	case "server":
-		resp, err = c.cmdServer(nline)
-	case "scan":
-		err = c.cmdScan(nline, w)
-	case "nearby":
-		err = c.cmdNearby(nline, w)
-	case "within":
-		err = c.cmdWithin(nline, w)
-	case "intersects":
-		err = c.cmdIntersects(nline, w)
+		res, d, err = c.cmdFlushDB(msg)
+	// case "sethook":
+	// 	err = c.cmdSetHook(nline)
+	// 	resp = okResp()
+	// case "delhook":
+	// 	err = c.cmdDelHook(nline)
+	// 	resp = okResp()
+	// case "hooks":
+	// 	err = c.cmdHooks(nline, w)
+	// case "massinsert":
+	// 	if !core.DevMode {
+	// 		err = fmt.Errorf("unknown command '%s'", cmd)
+	// 		return
+	// 	}
+	// 	err = c.cmdMassInsert(nline)
+	// 	resp = okResp()
+	// case "follow":
+	// 	err = c.cmdFollow(nline)
+	// 	resp = okResp()
+	// case "config":
+	// 	resp, err = c.cmdConfig(nline)
+	// case "readonly":
+	// 	err = c.cmdReadOnly(nline)
+	// 	resp = okResp()
+	// case "stats":
+	// 	resp, err = c.cmdStats(nline)
+	// case "server":
+	// 	resp, err = c.cmdServer(nline)
+	// case "scan":
+	// 	err = c.cmdScan(nline, w)
+	// case "nearby":
+	// 	err = c.cmdNearby(nline, w)
+	// case "within":
+	// 	err = c.cmdWithin(nline, w)
+	// case "intersects":
+	// 	err = c.cmdIntersects(nline, w)
+
 	case "get":
-		resp, err = c.cmdGet(nline)
-	case "keys":
-		err = c.cmdKeys(nline, w)
-	case "aof":
-		err = c.cmdAOF(nline, w)
-	case "aofmd5":
-		resp, err = c.cmdAOFMD5(nline)
-	case "gc":
-		go runtime.GC()
-		resp = okResp()
-	case "aofshrink":
-		go c.aofshrink()
-		resp = okResp()
+		res, err = c.cmdGet(msg)
+		// case "keys":
+		// 	err = c.cmdKeys(nline, w)
+		// case "aof":
+		// 	err = c.cmdAOF(nline, w)
+		// case "aofmd5":
+		// 	resp, err = c.cmdAOFMD5(nline)
+		// case "gc":
+		// 	go runtime.GC()
+		// 	resp = okResp()
+		// case "aofshrink":
+		// 	go c.aofshrink()
+		// 	resp = okResp()
 	}
 	return
 }

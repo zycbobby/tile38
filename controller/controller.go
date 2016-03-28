@@ -355,8 +355,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 	// case "readonly":
 	// 	err = c.cmdReadOnly(nline)
 	// 	resp = okResp()
-	// case "stats":
-	// 	resp, err = c.cmdStats(nline)
+	case "stats":
+		res, err = c.cmdStats(msg)
 	case "server":
 		res, err = c.cmdServer(msg)
 	case "scan":

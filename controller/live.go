@@ -11,6 +11,7 @@ import (
 
 	"github.com/tidwall/tile38/client"
 	"github.com/tidwall/tile38/controller/log"
+	"github.com/tidwall/tile38/controller/server"
 )
 
 type liveBuffer struct {
@@ -74,7 +75,9 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *bufio.Reader, websoc
 		lb.key = s.key
 		lb.fence = &s
 		c.mu.RLock()
-		sw, err = c.newScanWriter(&wr, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
+		var msg *server.Message
+		panic("todo: goLive message must be defined")
+		sw, err = c.newScanWriter(&wr, msg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
 		c.mu.RUnlock()
 	}
 	// everything below if for live SCAN, NEARBY, WITHIN, INTERSECTS

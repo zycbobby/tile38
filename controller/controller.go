@@ -359,15 +359,14 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 	// 	resp, err = c.cmdStats(nline)
 	// case "server":
 	// 	resp, err = c.cmdServer(nline)
-	// case "scan":
-	// 	err = c.cmdScan(nline, w)
-	// case "nearby":
-	// 	err = c.cmdNearby(nline, w)
-	// case "within":
-	// 	err = c.cmdWithin(nline, w)
-	// case "intersects":
-	// 	err = c.cmdIntersects(nline, w)
-
+	case "scan":
+		res, err = c.cmdScan(msg)
+	case "nearby":
+		res, err = c.cmdNearby(msg)
+	case "within":
+		res, err = c.cmdWithin(msg)
+	case "intersects":
+		res, err = c.cmdIntersects(msg)
 	case "get":
 		res, err = c.cmdGet(msg)
 		// case "keys":

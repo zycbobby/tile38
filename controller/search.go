@@ -2,12 +2,13 @@ package controller
 
 import (
 	"bytes"
-	"io"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/bing"
+	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/geojson/geohash"
 )
@@ -25,12 +26,13 @@ func (s liveFenceSwitches) Error() string {
 	return "going live"
 }
 
-func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenceSwitches, err error) {
-	if line, s.searchScanBaseTokens, err = parseSearchScanBaseTokens(cmd, line); err != nil {
+func (c *Controller) cmdSearchArgs(cmd string, vs []resp.Value, types []string) (s liveFenceSwitches, err error) {
+	if vs, s.searchScanBaseTokens, err = parseSearchScanBaseTokens(cmd, vs); err != nil {
 		return
 	}
 	var typ string
-	if line, typ = token(line); typ == "" {
+	var ok bool
+	if vs, typ, ok = tokenval(vs); !ok || typ == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
@@ -39,7 +41,7 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 			if _, err := strconv.ParseFloat(typ, 64); err == nil {
 				// It's likely that the output was not specified, but rather the search bounds.
 				s.searchScanBaseTokens.output = defaultSearchOutput
-				line = typ + " " + line
+				vs = append([]resp.Value{resp.StringValue(typ)}, vs...)
 				typ = "BOUNDS"
 			}
 		}
@@ -58,15 +60,15 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 	switch strings.ToLower(typ) {
 	case "point":
 		var slat, slon, smeters string
-		if line, slat = token(line); slat == "" {
+		if vs, slat, ok = tokenval(vs); !ok || slat == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, slon = token(line); slon == "" {
+		if vs, slon, ok = tokenval(vs); !ok || slon == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, smeters = token(line); smeters == "" {
+		if vs, smeters, ok = tokenval(vs); !ok || smeters == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
@@ -83,30 +85,30 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 			return
 		}
 	case "object":
-		if line == "" {
+		var obj string
+		if vs, obj, ok = tokenval(vs); !ok || obj == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		s.o, err = geojson.ObjectJSON(line)
+		s.o, err = geojson.ObjectJSON(obj)
 		if err != nil {
 			return
 		}
-		line = "" // since we read the remaining bytes
 	case "bounds":
 		var sminLat, sminLon, smaxlat, smaxlon string
-		if line, sminLat = token(line); sminLat == "" {
+		if vs, sminLat, ok = tokenval(vs); !ok || sminLat == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, sminLon = token(line); sminLon == "" {
+		if vs, sminLon, ok = tokenval(vs); !ok || sminLon == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, smaxlat = token(line); smaxlat == "" {
+		if vs, smaxlat, ok = tokenval(vs); !ok || smaxlat == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, smaxlon = token(line); smaxlon == "" {
+		if vs, smaxlon, ok = tokenval(vs); !ok || smaxlon == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
@@ -128,7 +130,7 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 		}
 	case "hash":
 		var hash string
-		if line, hash = token(line); hash == "" {
+		if vs, hash, ok = tokenval(vs); !ok || hash == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
@@ -138,7 +140,7 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 		}
 	case "quadkey":
 		var key string
-		if line, key = token(line); key == "" {
+		if vs, key, ok = tokenval(vs); !ok || key == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
@@ -148,15 +150,15 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 		}
 	case "tile":
 		var sx, sy, sz string
-		if line, sx = token(line); sx == "" {
+		if vs, sx, ok = tokenval(vs); !ok || sx == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, sy = token(line); sy == "" {
+		if vs, sy, ok = tokenval(vs); !ok || sy == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, sz = token(line); sz == "" {
+		if vs, sz, ok = tokenval(vs); !ok || sz == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
@@ -177,11 +179,11 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 		s.minLat, s.minLon, s.maxLat, s.maxLon = bing.TileXYToBounds(x, y, z)
 	case "get":
 		var key, id string
-		if line, key = token(line); key == "" {
+		if vs, key, ok = tokenval(vs); !ok || key == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if line, id = token(line); id == "" {
+		if vs, id, ok = tokenval(vs); !ok || id == "" {
 			err = errInvalidNumberOfArguments
 			return
 		}
@@ -205,7 +207,7 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 			s.o = o
 		}
 	}
-	if line != "" {
+	if len(vs) != 0 {
 		err = errInvalidNumberOfArguments
 		return
 	}
@@ -215,22 +217,25 @@ func (c *Controller) cmdSearchArgs(cmd, line string, types []string) (s liveFenc
 var nearbyTypes = []string{"point"}
 var withinOrIntersectsTypes = []string{"geo", "bounds", "hash", "tile", "quadkey", "get"}
 
-func (c *Controller) cmdNearby(line string, w io.Writer) error {
+func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	start := time.Now()
+	vs := msg.Values[1:]
 	wr := &bytes.Buffer{}
-	s, err := c.cmdSearchArgs("nearby", line, nearbyTypes)
+	s, err := c.cmdSearchArgs("nearby", vs, nearbyTypes)
 	if err != nil {
-		return err
+		return "", err
 	}
 	s.cmd = "nearby"
 	if s.fence {
-		return s
+		return "", s
 	}
-	sw, err := c.newScanWriter(wr, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
 	if err != nil {
-		return err
+		return "", err
 	}
-	wr.WriteString(`{"ok":true`)
+	if msg.OutputType == server.JSON {
+		wr.WriteString(`{"ok":true`)
+	}
 	sw.writeHead()
 	if sw.col != nil {
 		s.cursor = sw.col.Nearby(s.cursor, s.sparse, s.lat, s.lon, s.meters, func(id string, o geojson.Object, fields []float64) bool {
@@ -238,33 +243,36 @@ func (c *Controller) cmdNearby(line string, w io.Writer) error {
 		})
 	}
 	sw.writeFoot(s.cursor)
-	wr.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
-	w.Write(wr.Bytes())
-	return nil
+	if msg.OutputType == server.JSON {
+		wr.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
+	}
+	return string(wr.Bytes()), nil
 }
 
-func (c *Controller) cmdWithin(line string, w io.Writer) error {
-	return c.cmdWithinOrIntersects("within", line, w)
+func (c *Controller) cmdWithin(msg *server.Message) (res string, err error) {
+	return c.cmdWithinOrIntersects("within", msg)
 }
 
-func (c *Controller) cmdIntersects(line string, w io.Writer) error {
-	return c.cmdWithinOrIntersects("intersects", line, w)
+func (c *Controller) cmdIntersects(msg *server.Message) (res string, err error) {
+	return c.cmdWithinOrIntersects("intersects", msg)
 }
 
-func (c *Controller) cmdWithinOrIntersects(cmd string, line string, w io.Writer) error {
+func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res string, err error) {
 	start := time.Now()
+	vs := msg.Values[1:]
+
 	wr := &bytes.Buffer{}
-	s, err := c.cmdSearchArgs(cmd, line, withinOrIntersectsTypes)
+	s, err := c.cmdSearchArgs(cmd, vs, withinOrIntersectsTypes)
 	if err != nil {
-		return err
+		return "", err
 	}
 	s.cmd = cmd
 	if s.fence {
-		return s
+		return "", s
 	}
-	sw, err := c.newScanWriter(wr, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
 	if err != nil {
-		return err
+		return "", err
 	}
 	wr.WriteString(`{"ok":true`)
 	sw.writeHead()
@@ -283,6 +291,5 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, line string, w io.Writer)
 	}
 	sw.writeFoot(s.cursor)
 	wr.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
-	w.Write(wr.Bytes())
-	return nil
+	return string(wr.Bytes()), nil
 }

@@ -138,10 +138,14 @@ func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 				buf.WriteString(bbox.ExternalJSON())
 			} else {
 				vals = append(vals, resp.ArrayValue([]resp.Value{
-					resp.StringValue(strconv.FormatFloat(bbox.Min.Y, 'f', -1, 64)),
-					resp.StringValue(strconv.FormatFloat(bbox.Min.X, 'f', -1, 64)),
-					resp.StringValue(strconv.FormatFloat(bbox.Max.Y, 'f', -1, 64)),
-					resp.StringValue(strconv.FormatFloat(bbox.Max.X, 'f', -1, 64)),
+					resp.ArrayValue([]resp.Value{
+						resp.FloatValue(bbox.Min.Y),
+						resp.FloatValue(bbox.Min.X),
+					}),
+					resp.ArrayValue([]resp.Value{
+						resp.FloatValue(bbox.Max.Y),
+						resp.FloatValue(bbox.Max.X),
+					}),
 				}))
 			}
 		}

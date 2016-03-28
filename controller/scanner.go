@@ -6,7 +6,9 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
+	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 )
 
@@ -27,6 +29,7 @@ const (
 
 type scanWriter struct {
 	wr             *bytes.Buffer
+	msg            *server.Message
 	col            *collection.Collection
 	fmap           map[string]int
 	farr           []string
@@ -44,10 +47,11 @@ type scanWriter struct {
 	globEverything bool
 	globSingle     bool
 	fullFields     bool
+	values         []resp.Value
 }
 
 func (c *Controller) newScanWriter(
-	wr *bytes.Buffer, key string, output outputT, precision uint64, glob string, limit uint64, wheres []whereT, nofields bool,
+	wr *bytes.Buffer, msg *server.Message, key string, output outputT, precision uint64, glob string, limit uint64, wheres []whereT, nofields bool,
 ) (
 	*scanWriter, error,
 ) {
@@ -63,6 +67,7 @@ func (c *Controller) newScanWriter(
 	}
 	sw := &scanWriter{
 		wr:        wr,
+		msg:       msg,
 		output:    output,
 		wheres:    wheres,
 		precision: precision,
@@ -96,29 +101,33 @@ func (sw *scanWriter) hasFieldsOutput() bool {
 }
 
 func (sw *scanWriter) writeHead() {
-	if len(sw.farr) > 0 && sw.hasFieldsOutput() {
-		sw.wr.WriteString(`,"fields":[`)
-		for i, field := range sw.farr {
-			if i > 0 {
-				sw.wr.WriteByte(',')
+	switch sw.msg.OutputType {
+	case server.JSON:
+		if len(sw.farr) > 0 && sw.hasFieldsOutput() {
+			sw.wr.WriteString(`,"fields":[`)
+			for i, field := range sw.farr {
+				if i > 0 {
+					sw.wr.WriteByte(',')
+				}
+				sw.wr.WriteString(jsonString(field))
 			}
-			sw.wr.WriteString(jsonString(field))
+			sw.wr.WriteByte(']')
 		}
-		sw.wr.WriteByte(']')
-	}
-	switch sw.output {
-	case outputIDs:
-		sw.wr.WriteString(`,"ids":[`)
-	case outputObjects:
-		sw.wr.WriteString(`,"objects":[`)
-	case outputPoints:
-		sw.wr.WriteString(`,"points":[`)
-	case outputBounds:
-		sw.wr.WriteString(`,"bounds":[`)
-	case outputHashes:
-		sw.wr.WriteString(`,"hashes":[`)
-	case outputCount:
+		switch sw.output {
+		case outputIDs:
+			sw.wr.WriteString(`,"ids":[`)
+		case outputObjects:
+			sw.wr.WriteString(`,"objects":[`)
+		case outputPoints:
+			sw.wr.WriteString(`,"points":[`)
+		case outputBounds:
+			sw.wr.WriteString(`,"bounds":[`)
+		case outputHashes:
+			sw.wr.WriteString(`,"hashes":[`)
+		case outputCount:
 
+		}
+	case server.RESP:
 	}
 }
 
@@ -126,14 +135,28 @@ func (sw *scanWriter) writeFoot(cursor uint64) {
 	if !sw.hitLimit {
 		cursor = 0
 	}
-	switch sw.output {
-	default:
-		sw.wr.WriteByte(']')
-	case outputCount:
+	switch sw.msg.OutputType {
+	case server.JSON:
+		switch sw.output {
+		default:
+			sw.wr.WriteByte(']')
+		case outputCount:
 
+		}
+		sw.wr.WriteString(`,"count":` + strconv.FormatUint(sw.count, 10))
+		sw.wr.WriteString(`,"cursor":` + strconv.FormatUint(cursor, 10))
+	case server.RESP:
+		sw.wr.Reset()
+		values := []resp.Value{
+			resp.IntegerValue(int(cursor)),
+			resp.ArrayValue(sw.values),
+		}
+		data, err := resp.ArrayValue(values).MarshalRESP()
+		if err != nil {
+			panic("Eek this is bad. Marshal resp should not fail.")
+		}
+		sw.wr.Write(data)
 	}
-	sw.wr.WriteString(`,"count":` + strconv.FormatUint(sw.count, 10))
-	sw.wr.WriteString(`,"cursor":` + strconv.FormatUint(cursor, 10))
 }
 
 func (sw *scanWriter) fieldMatch(fields []float64, o geojson.Object) ([]float64, bool) {
@@ -213,7 +236,6 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64)
 			}
 		}
 	}
-
 	nfields, ok := sw.fieldMatch(fields, o)
 	if !ok {
 		return true
@@ -222,65 +244,124 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64)
 	if sw.output == outputCount {
 		return true
 	}
-	var wr bytes.Buffer
-	if sw.once {
-		wr.WriteByte(',')
-	} else {
-		sw.once = true
-	}
-	var jsfields string
 
-	if sw.hasFieldsOutput() {
-		if sw.fullFields {
-			if len(sw.fmap) > 0 {
-				jsfields = `,"fields":{`
-				var i int
-				for field, idx := range sw.fmap {
-					if len(fields) > idx {
-						if !math.IsNaN(fields[idx]) {
-							if i > 0 {
-								jsfields += `,`
+	switch sw.msg.OutputType {
+	case server.JSON:
+		var wr bytes.Buffer
+		var jsfields string
+		if sw.once {
+			wr.WriteByte(',')
+		} else {
+			sw.once = true
+		}
+		if sw.hasFieldsOutput() {
+			if sw.fullFields {
+				if len(sw.fmap) > 0 {
+					jsfields = `,"fields":{`
+					var i int
+					for field, idx := range sw.fmap {
+						if len(fields) > idx {
+							if !math.IsNaN(fields[idx]) {
+								if i > 0 {
+									jsfields += `,`
+								}
+								jsfields += jsonString(field) + ":" + strconv.FormatFloat(fields[idx], 'f', -1, 64)
+								i++
 							}
-							jsfields += jsonString(field) + ":" + strconv.FormatFloat(fields[idx], 'f', -1, 64)
-							i++
 						}
 					}
+					jsfields += `}`
 				}
-				jsfields += `}`
-			}
-		} else if len(sw.farr) > 0 {
-			jsfields = `,"fields":[`
-			for i, field := range nfields {
-				if i > 0 {
-					jsfields += ","
+
+			} else if len(sw.farr) > 0 {
+				jsfields = `,"fields":[`
+				for i, field := range nfields {
+					if i > 0 {
+						jsfields += ","
+					}
+					jsfields += strconv.FormatFloat(field, 'f', -1, 64)
 				}
-				jsfields += strconv.FormatFloat(field, 'f', -1, 64)
+				jsfields += `]`
 			}
-			jsfields += `]`
+		}
+		if sw.output == outputIDs {
+			wr.WriteString(jsonString(id))
+		} else {
+			wr.WriteString(`{"id":` + jsonString(id))
+			switch sw.output {
+			case outputObjects:
+				wr.WriteString(`,"object":` + o.JSON())
+			case outputPoints:
+				wr.WriteString(`,"point":` + o.CalculatedPoint().ExternalJSON())
+			case outputHashes:
+				p, err := o.Geohash(int(sw.precision))
+				if err != nil {
+					p = ""
+				}
+				wr.WriteString(`,"hash":"` + p + `"`)
+			case outputBounds:
+				wr.WriteString(`,"bounds":` + o.CalculatedBBox().ExternalJSON())
+			}
+			wr.WriteString(jsfields)
+			wr.WriteString(`}`)
+		}
+		sw.wr.Write(wr.Bytes())
+	case server.RESP:
+		vals := make([]resp.Value, 1, 3)
+		vals[0] = resp.StringValue(id)
+		if sw.output == outputIDs {
+			sw.values = append(sw.values, vals[0])
+		} else {
+			switch sw.output {
+			case outputObjects:
+				vals = append(vals, resp.StringValue(o.JSON()))
+			case outputPoints:
+				point := o.CalculatedPoint()
+				if point.Z != 0 {
+					vals = append(vals, resp.ArrayValue([]resp.Value{
+						resp.FloatValue(point.Y),
+						resp.FloatValue(point.X),
+						resp.FloatValue(point.Z),
+					}))
+				} else {
+					vals = append(vals, resp.ArrayValue([]resp.Value{
+						resp.FloatValue(point.Y),
+						resp.FloatValue(point.X),
+					}))
+				}
+			case outputHashes:
+				p, err := o.Geohash(int(sw.precision))
+				if err != nil {
+					p = ""
+				}
+				vals = append(vals, resp.StringValue(p))
+			case outputBounds:
+				bbox := o.CalculatedBBox()
+				vals = append(vals, resp.ArrayValue([]resp.Value{
+					resp.ArrayValue([]resp.Value{
+						resp.FloatValue(bbox.Min.Y),
+						resp.FloatValue(bbox.Min.X),
+					}),
+					resp.ArrayValue([]resp.Value{
+						resp.FloatValue(bbox.Max.Y),
+						resp.FloatValue(bbox.Max.X),
+					}),
+				}))
+			}
+
+			fvs := orderFields(sw.fmap, fields)
+			if len(fvs) > 0 {
+				fvals := make([]resp.Value, 0, len(fvs)*2)
+				for i, fv := range fvs {
+					fvals = append(fvals, resp.StringValue(fv.field), resp.StringValue(strconv.FormatFloat(fv.value, 'f', -1, 64)))
+					i++
+				}
+				vals = append(vals, resp.ArrayValue(fvals))
+			}
+
+			sw.values = append(sw.values, resp.ArrayValue(vals))
 		}
 	}
-	if sw.output == outputIDs {
-		wr.WriteString(jsonString(id))
-	} else {
-		wr.WriteString(`{"id":` + jsonString(id))
-		switch sw.output {
-		case outputObjects:
-			wr.WriteString(`,"object":` + o.JSON())
-		case outputPoints:
-			wr.WriteString(`,"point":` + o.CalculatedPoint().ExternalJSON())
-		case outputHashes:
-			p, err := o.Geohash(int(sw.precision))
-			if err != nil {
-				p = ""
-			}
-			wr.WriteString(`,"hash":"` + p + `"`)
-		case outputBounds:
-			wr.WriteString(`,"bounds":` + o.CalculatedBBox().ExternalJSON())
-		}
-		wr.WriteString(jsfields)
-		wr.WriteString(`}`)
-	}
-	sw.wr.Write(wr.Bytes())
 	sw.numberItems++
 	if sw.numberItems == sw.limit {
 		sw.hitLimit = true

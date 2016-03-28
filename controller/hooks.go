@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/log"
+	"github.com/tidwall/tile38/controller/server"
 )
 
 type EndpointProtocol string
@@ -186,7 +188,9 @@ func (c *Controller) cmdSetHook(line string) (err error) {
 	case "within", "intersects":
 		types = withinOrIntersectsTypes
 	}
-	s, err := c.cmdSearchArgs(cmdlc, line, types)
+	var vs []resp.Value
+	panic("todo: assign vs correctly")
+	s, err := c.cmdSearchArgs(cmdlc, vs, types)
 	if err != nil {
 		return err
 	}
@@ -202,7 +206,9 @@ func (c *Controller) cmdSetHook(line string) (err error) {
 		Command:   command,
 	}
 	var wr bytes.Buffer
-	hook.ScanWriter, err = c.newScanWriter(&wr, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
+	var msg *server.Message
+	panic("todo: cmdSetHook message must be defined")
+	hook.ScanWriter, err = c.newScanWriter(&wr, msg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
 	if err != nil {
 		return err
 	}

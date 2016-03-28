@@ -131,8 +131,9 @@ type searchScanBaseTokens struct {
 	sparse    uint8
 }
 
-func parseSearchScanBaseTokens(cmd, line string) (lineout string, t searchScanBaseTokens, err error) {
-	if line, t.key = token(line); t.key == "" {
+func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value, t searchScanBaseTokens, err error) {
+	var ok bool
+	if vs, t.key, ok = tokenval(vs); !ok || t.key == "" {
 		err = errInvalidNumberOfArguments
 		return
 	}
@@ -140,31 +141,31 @@ func parseSearchScanBaseTokens(cmd, line string) (lineout string, t searchScanBa
 	var ssparse string
 	var scursor string
 	for {
-		nline, wtok := token(line)
-		if len(wtok) > 0 {
+		nvs, wtok, ok := tokenval(vs)
+		if ok && len(wtok) > 0 {
 			if (wtok[0] == 'C' || wtok[0] == 'c') && strings.ToLower(wtok) == "cursor" {
-				line = nline
+				vs = nvs
 				if scursor != "" {
 					err = errDuplicateArgument(strings.ToUpper(wtok))
 					return
 				}
-				if line, scursor = token(line); scursor == "" {
+				if vs, scursor, ok = tokenval(vs); !ok || scursor == "" {
 					err = errInvalidNumberOfArguments
 					return
 				}
 				continue
 			} else if (wtok[0] == 'W' || wtok[0] == 'w') && strings.ToLower(wtok) == "where" {
-				line = nline
+				vs = nvs
 				var field, smin, smax string
-				if line, field = token(line); field == "" {
+				if vs, field, ok = tokenval(vs); !ok || field == "" {
 					err = errInvalidNumberOfArguments
 					return
 				}
-				if line, smin = token(line); smin == "" {
+				if vs, smin, ok = tokenval(vs); !ok || smin == "" {
 					err = errInvalidNumberOfArguments
 					return
 				}
-				if line, smax = token(line); smax == "" {
+				if vs, smax, ok = tokenval(vs); !ok || smax == "" {
 					err = errInvalidNumberOfArguments
 					return
 				}
@@ -199,7 +200,7 @@ func parseSearchScanBaseTokens(cmd, line string) (lineout string, t searchScanBa
 				t.wheres = append(t.wheres, whereT{field, minx, min, maxx, max})
 				continue
 			} else if (wtok[0] == 'N' || wtok[0] == 'n') && strings.ToLower(wtok) == "nofields" {
-				line = nline
+				vs = nvs
 				if t.nofields {
 					err = errDuplicateArgument(strings.ToUpper(wtok))
 					return
@@ -207,29 +208,29 @@ func parseSearchScanBaseTokens(cmd, line string) (lineout string, t searchScanBa
 				t.nofields = true
 				continue
 			} else if (wtok[0] == 'L' || wtok[0] == 'l') && strings.ToLower(wtok) == "limit" {
-				line = nline
+				vs = nvs
 				if slimit != "" {
 					err = errDuplicateArgument(strings.ToUpper(wtok))
 					return
 				}
-				if line, slimit = token(line); slimit == "" {
+				if vs, slimit, ok = tokenval(vs); !ok || slimit == "" {
 					err = errInvalidNumberOfArguments
 					return
 				}
 				continue
 			} else if (wtok[0] == 'S' || wtok[0] == 's') && strings.ToLower(wtok) == "sparse" {
-				line = nline
+				vs = nvs
 				if ssparse != "" {
 					err = errDuplicateArgument(strings.ToUpper(wtok))
 					return
 				}
-				if line, ssparse = token(line); ssparse == "" {
+				if vs, ssparse, ok = tokenval(vs); !ok || ssparse == "" {
 					err = errInvalidNumberOfArguments
 					return
 				}
 				continue
 			} else if (wtok[0] == 'F' || wtok[0] == 'f') && strings.ToLower(wtok) == "fence" {
-				line = nline
+				vs = nvs
 				if t.fence {
 					err = errDuplicateArgument(strings.ToUpper(wtok))
 					return
@@ -237,12 +238,12 @@ func parseSearchScanBaseTokens(cmd, line string) (lineout string, t searchScanBa
 				t.fence = true
 				continue
 			} else if (wtok[0] == 'M' || wtok[0] == 'm') && strings.ToLower(wtok) == "match" {
-				line = nline
+				vs = nvs
 				if t.glob != "" {
 					err = errDuplicateArgument(strings.ToUpper(wtok))
 					return
 				}
-				if line, t.glob = token(line); t.glob == "" {
+				if vs, t.glob, ok = tokenval(vs); !ok || t.glob == "" {
 					err = errInvalidNumberOfArguments
 					return
 				}
@@ -277,10 +278,10 @@ func parseSearchScanBaseTokens(cmd, line string) (lineout string, t searchScanBa
 	}
 
 	t.output = defaultSearchOutput
-	var nline string
+	var nvs []resp.Value
 	var sprecision string
 	var which string
-	if nline, which = token(line); which != "" {
+	if nvs, which, ok = tokenval(vs); ok && which != "" {
 		updline := true
 		switch strings.ToLower(which) {
 		default:
@@ -297,7 +298,7 @@ func parseSearchScanBaseTokens(cmd, line string) (lineout string, t searchScanBa
 			t.output = outputPoints
 		case "hashes":
 			t.output = outputHashes
-			if nline, sprecision = token(nline); sprecision == "" {
+			if nvs, sprecision, ok = tokenval(nvs); !ok || sprecision == "" {
 				err = errInvalidNumberOfArguments
 				return
 			}
@@ -307,7 +308,7 @@ func parseSearchScanBaseTokens(cmd, line string) (lineout string, t searchScanBa
 			t.output = outputIDs
 		}
 		if updline {
-			line = nline
+			vs = nvs
 		}
 	}
 
@@ -338,6 +339,6 @@ func parseSearchScanBaseTokens(cmd, line string) (lineout string, t searchScanBa
 		t.sparse = uint8(sparse)
 		t.limit = math.MaxUint64
 	}
-	lineout = line
+	vsout = vs
 	return
 }

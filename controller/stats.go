@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"sort"
 	"time"
 
 	"github.com/google/btree"
+	"github.com/tidwall/resp"
+	"github.com/tidwall/tile38/controller/server"
 )
 
 func (c *Controller) cmdStats(line string) (string, error) {
@@ -36,9 +39,9 @@ func (c *Controller) cmdStats(line string) (string, error) {
 	}
 	return `{"ok":true,"stats":` + string(data) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}", nil
 }
-func (c *Controller) cmdServer(line string) (string, error) {
+func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 	start := time.Now()
-	if line != "" {
+	if len(msg.Values) != 1 {
 		return "", errInvalidNumberOfArguments
 	}
 	m := make(map[string]interface{})
@@ -77,11 +80,35 @@ func (c *Controller) cmdServer(line string) (string, error) {
 	m["pointer_size"] = (32 << uintptr(uint64(^uintptr(0))>>63)) / 8
 	m["read_only"] = c.config.ReadOnly
 
-	data, err := json.Marshal(m)
-	if err != nil {
-		return "", err
+	switch msg.OutputType {
+	case server.JSON:
+		data, err := json.Marshal(m)
+		if err != nil {
+			return "", err
+		}
+		res = `{"ok":true,"stats":` + string(data) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		var keys []string
+		for key, _ := range m {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		var vals []resp.Value
+
+		for _, key := range keys {
+			val := m[key]
+			vals = append(vals, resp.StringValue(key))
+			vals = append(vals, resp.StringValue(fmt.Sprintf("%v", val)))
+		}
+		data, err := resp.ArrayValue(vals).MarshalRESP()
+		if err != nil {
+			return "", err
+		}
+		res = string(data)
 	}
-	return `{"ok":true,"stats":` + string(data) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}", nil
+
+	return res, nil
 }
 func (c *Controller) statsCollections(line string) (string, error) {
 	start := time.Now()

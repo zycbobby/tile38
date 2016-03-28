@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -316,7 +317,6 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		}
 		return ""
 	}
-	okResp = okResp
 	switch msg.Command {
 	default:
 		err = fmt.Errorf("unknown command '%s'", msg.Values[0])
@@ -357,8 +357,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 	// 	resp = okResp()
 	// case "stats":
 	// 	resp, err = c.cmdStats(nline)
-	// case "server":
-	// 	resp, err = c.cmdServer(nline)
+	case "server":
+		res, err = c.cmdServer(msg)
 	case "scan":
 		res, err = c.cmdScan(msg)
 	case "nearby":
@@ -371,12 +371,13 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, err = c.cmdGet(msg)
 	case "keys":
 		res, err = c.cmdKeys(msg)
-		// case "aof":
-		// 	err = c.cmdAOF(nline, w)
-		// case "aofmd5":
-		// 	resp, err = c.cmdAOFMD5(nline)
-		// case "gc":
-		// 	go runtime.GC()
+	// case "aof":
+	// 	err = c.cmdAOF(nline, w)
+	// case "aofmd5":
+	// 	resp, err = c.cmdAOFMD5(nline)
+	case "gc":
+		go runtime.GC()
+		res = okResp()
 		// 	resp = okResp()
 		// case "aofshrink":
 		// 	go c.aofshrink()

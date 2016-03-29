@@ -169,20 +169,29 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 	for _, v := range msg.Values {
 		words = append(words, v.String())
 	}
-	// line := strings.Join(words, " ")
 
-	// if core.ShowDebugMessages && line != "pInG" {
-	// 	log.Debug(line)
-	// }
 	start := time.Now()
+
+	writeOutput := func(res string) error {
+		switch msg.ConnType {
+		default:
+			panic(fmt.Sprintf("unsupported conn type: %v", msg.ConnType))
+		case server.RESP:
+			_, err := io.WriteString(w, res)
+			return err
+		case server.Native:
+			_, err := fmt.Fprintf(w, "$%d %s\r\n", len(res), res)
+			return err
+		}
+	}
 
 	// Ping. Just send back the response. No need to put through the pipeline.
 	if msg.Command == "ping" {
 		switch msg.OutputType {
 		case server.JSON:
-			w.Write([]byte(`{"ok":true,"ping":"pong","elapsed":"` + time.Now().Sub(start).String() + `"}`))
+			return writeOutput(`{"ok":true,"ping":"pong","elapsed":"` + time.Now().Sub(start).String() + `"}`)
 		case server.RESP:
-			io.WriteString(w, "+PONG\r\n")
+			return writeOutput("+PONG\r\n")
 		}
 		return nil
 	}
@@ -190,13 +199,13 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 	writeErr := func(err error) error {
 		switch msg.OutputType {
 		case server.JSON:
-			io.WriteString(w, `{"ok":false,"err":`+jsonString(err.Error())+`,"elapsed":"`+time.Now().Sub(start).String()+"\"}")
+			return writeOutput(`{"ok":false,"err":` + jsonString(err.Error()) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
 		case server.RESP:
 			if err == errInvalidNumberOfArguments {
-				io.WriteString(w, "-ERR wrong number of arguments for '"+msg.Command+"' command\r\n")
+				return writeOutput("-ERR wrong number of arguments for '" + msg.Command + "' command\r\n")
 			} else {
 				v, _ := resp.ErrorValue(errors.New("ERR " + err.Error())).MarshalRESP()
-				io.WriteString(w, string(v))
+				return writeOutput(string(v))
 			}
 		}
 		return nil
@@ -280,7 +289,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		}
 	}
 	if res != "" {
-		if _, err := io.WriteString(w, res); err != nil {
+		if err := writeOutput(res); err != nil {
 			return err
 		}
 	}

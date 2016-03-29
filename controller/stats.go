@@ -51,6 +51,7 @@ func (c *Controller) cmdStats(msg *server.Message) (res string, err error) {
 	}
 	switch msg.OutputType {
 	case server.JSON:
+
 		data, err := json.Marshal(ms)
 		if err != nil {
 			return "", err

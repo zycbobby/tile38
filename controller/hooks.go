@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -42,7 +41,7 @@ type Hook struct {
 	Key        string
 	Name       string
 	Endpoints  []Endpoint
-	Command    string
+	Message    *server.Message
 	Fence      *liveFenceSwitches
 	ScanWriter *scanWriter
 }
@@ -156,70 +155,96 @@ func parseEndpoint(s string) (Endpoint, error) {
 	return endpoint, nil
 }
 
-func (c *Controller) cmdSetHook(line string) (err error) {
-	//start := time.Now()
+func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+
+	vs := msg.Values[1:]
 	var name, values, cmd string
-	if line, name = token(line); name == "" {
-		return errInvalidNumberOfArguments
+	var ok bool
+	if vs, name, ok = tokenval(vs); !ok || name == "" {
+		return "", d, errInvalidNumberOfArguments
 	}
-	if line, values = token(line); values == "" {
-		return errInvalidNumberOfArguments
+	if vs, values, ok = tokenval(vs); !ok || values == "" {
+		return "", d, errInvalidNumberOfArguments
 	}
 	var endpoints []Endpoint
 	for _, value := range strings.Split(values, ",") {
 		endpoint, err := parseEndpoint(value)
 		if err != nil {
 			log.Errorf("sethook: %v", err)
-			return errInvalidArgument(value)
+			return "", d, errInvalidArgument(value)
 		}
 		endpoints = append(endpoints, endpoint)
 	}
-	command := line
-	if line, cmd = token(line); cmd == "" {
-		return errInvalidNumberOfArguments
+	commandvs := vs
+	if vs, cmd, ok = tokenval(vs); !ok || cmd == "" {
+		return "", d, errInvalidNumberOfArguments
 	}
 	cmdlc := strings.ToLower(cmd)
 	var types []string
 	switch cmdlc {
 	default:
-		return errInvalidArgument(cmd)
+		return "", d, errInvalidArgument(cmd)
 	case "nearby":
 		types = nearbyTypes
 	case "within", "intersects":
 		types = withinOrIntersectsTypes
 	}
-	var vs []resp.Value
-	panic("todo: assign vs correctly")
 	s, err := c.cmdSearchArgs(cmdlc, vs, types)
 	if err != nil {
-		return err
+		return "", d, err
 	}
 	if !s.fence {
-		return errors.New("missing FENCE argument")
+		return "", d, errors.New("missing FENCE argument")
 	}
 	s.cmd = cmdlc
+
+	cmsg := &server.Message{}
+	*cmsg = *msg
+	cmsg.Values = commandvs
+	cmsg.Command = strings.ToLower(cmsg.Values[0].String())
+
 	hook := &Hook{
 		Key:       s.key,
 		Name:      name,
 		Endpoints: endpoints,
 		Fence:     &s,
-		Command:   command,
+		Message:   cmsg,
 	}
 	var wr bytes.Buffer
-	var msg *server.Message
-	panic("todo: cmdSetHook message must be defined")
-	hook.ScanWriter, err = c.newScanWriter(&wr, msg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
+	hook.ScanWriter, err = c.newScanWriter(&wr, cmsg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
 	if err != nil {
-		return err
+		return "", d, err
 	}
 
 	// delete the previous hook
 	if h, ok := c.hooks[name]; ok {
+		// lets see if the previous hook matches the new hook
+		if h.Key == hook.Key && h.Name == hook.Name {
+			if len(h.Endpoints) == len(hook.Endpoints) {
+				match := true
+				for i, endpoint := range h.Endpoints {
+					if endpoint.Original != hook.Endpoints[i].Original {
+						match = false
+						break
+					}
+				}
+				if match && resp.ArrayValue(h.Message.Values).Equals(resp.ArrayValue(hook.Message.Values)) {
+					switch msg.OutputType {
+					case server.JSON:
+						return server.OKMessage(msg, start), d, nil
+					case server.RESP:
+						return ":0\r\n", d, nil
+					}
+				}
+			}
+		}
 		if hm, ok := c.hookcols[h.Key]; ok {
 			delete(hm, h.Name)
 		}
 		delete(c.hooks, h.Name)
 	}
+	d.updated = true
 	c.hooks[name] = hook
 	hm, ok := c.hookcols[hook.Key]
 	if !ok {
@@ -227,70 +252,121 @@ func (c *Controller) cmdSetHook(line string) (err error) {
 		c.hookcols[hook.Key] = hm
 	}
 	hm[name] = hook
-	return nil
+	switch msg.OutputType {
+	case server.JSON:
+		return server.OKMessage(msg, start), d, nil
+	case server.RESP:
+		return ":1\r\n", d, nil
+	}
+	return "", d, nil
 }
 
-func (c *Controller) cmdDelHook(line string) (err error) {
+func (c *Controller) cmdDelHook(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+
 	var name string
-	if line, name = token(line); name == "" {
-		return errInvalidNumberOfArguments
+	var ok bool
+	if vs, name, ok = tokenval(vs); !ok || name == "" {
+		return "", d, errInvalidNumberOfArguments
 	}
-	if line != "" {
-		return errInvalidNumberOfArguments
+	if len(vs) != 0 {
+		return "", d, errInvalidNumberOfArguments
 	}
 	if h, ok := c.hooks[name]; ok {
 		if hm, ok := c.hookcols[h.Key]; ok {
 			delete(hm, h.Name)
 		}
 		delete(c.hooks, h.Name)
+		d.updated = true
+	}
+
+	switch msg.OutputType {
+	case server.JSON:
+		return server.OKMessage(msg, start), d, nil
+	case server.RESP:
+		if d.updated {
+			return ":1\r\n", d, nil
+		} else {
+			return ":0\r\n", d, nil
+		}
 	}
 	return
 }
 
-func (c *Controller) cmdHooks(line string, w io.Writer) (err error) {
+func (c *Controller) cmdHooks(msg *server.Message) (res string, err error) {
 	start := time.Now()
+	vs := msg.Values[1:]
 
 	var pattern string
-	if line, pattern = token(line); pattern == "" {
-		return errInvalidNumberOfArguments
+	var ok bool
+	if vs, pattern, ok = tokenval(vs); !ok || pattern == "" {
+		return "", errInvalidNumberOfArguments
 	}
-	if line != "" {
-		return errInvalidNumberOfArguments
+	if len(vs) != 0 {
+		return "", errInvalidNumberOfArguments
 	}
 
 	var hooks []*Hook
 	for name, hook := range c.hooks {
-		if ok, err := globMatch(pattern, name); err == nil && ok {
+		match, _ := globMatch(pattern, name)
+		if match {
 			hooks = append(hooks, hook)
-		} else if err != nil {
-			return errInvalidArgument(pattern)
 		}
 	}
 	sort.Sort(hooksByName(hooks))
 
-	buf := &bytes.Buffer{}
-	buf.WriteString(`{"ok":true,"hooks":[`)
-	for i, hook := range hooks {
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-		buf.WriteString(`{`)
-		buf.WriteString(`"name":` + jsonString(hook.Name))
-		buf.WriteString(`,"key":` + jsonString(hook.Key))
-		buf.WriteString(`,"endpoints":[`)
-		for i, endpoint := range hook.Endpoints {
+	switch msg.OutputType {
+	case server.JSON:
+		buf := &bytes.Buffer{}
+		buf.WriteString(`{"ok":true,"hooks":[`)
+		for i, hook := range hooks {
 			if i > 0 {
 				buf.WriteByte(',')
 			}
-			buf.WriteString(jsonString(endpoint.Original))
-		}
-		buf.WriteString(`],"command":` + jsonString(hook.Command))
-		buf.WriteString(`}`)
-	}
-	buf.WriteString(`],"elapsed":"` + time.Now().Sub(start).String() + "\"}")
+			buf.WriteString(`{`)
+			buf.WriteString(`"name":` + jsonString(hook.Name))
+			buf.WriteString(`,"key":` + jsonString(hook.Key))
+			buf.WriteString(`,"endpoints":[`)
+			for i, endpoint := range hook.Endpoints {
+				if i > 0 {
+					buf.WriteByte(',')
+				}
+				buf.WriteString(jsonString(endpoint.Original))
+			}
+			buf.WriteString(`],"command":[`)
+			for i, v := range hook.Message.Values {
+				if i > 0 {
+					buf.WriteString(`,`)
+				}
+				buf.WriteString(jsonString(v.String()))
+			}
 
-	w.Write(buf.Bytes())
-	return
+			buf.WriteString(`]}`)
+		}
+		buf.WriteString(`],"elapsed":"` + time.Now().Sub(start).String() + "\"}")
+		return buf.String(), nil
+	case server.RESP:
+		var vals []resp.Value
+		for _, hook := range hooks {
+			var hvals []resp.Value
+			hvals = append(hvals, resp.StringValue(hook.Name))
+			hvals = append(hvals, resp.StringValue(hook.Key))
+			var evals []resp.Value
+			for _, endpoint := range hook.Endpoints {
+				evals = append(evals, resp.StringValue(endpoint.Original))
+			}
+			hvals = append(hvals, resp.ArrayValue(evals))
+			hvals = append(hvals, resp.ArrayValue(hook.Message.Values))
+			vals = append(vals, resp.ArrayValue(hvals))
+		}
+		data, err := resp.ArrayValue(vals).MarshalRESP()
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
+	}
+	return "", nil
 }
 
 func (c *Controller) sendHTTPMessage(endpoint Endpoint, msg []byte) error {

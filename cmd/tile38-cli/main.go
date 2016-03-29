@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/peterh/liner"
+	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/client"
 	"github.com/tidwall/tile38/core"
 )
@@ -39,9 +41,11 @@ type connError struct {
 
 var (
 	hostname   = "127.0.0.1"
+	output     = "json"
 	port       = 9851
 	oneCommand string
 	tokml      bool
+	raw        bool
 )
 
 func showHelp() bool {
@@ -54,8 +58,10 @@ func showHelp() bool {
 	}
 	fmt.Fprintf(os.Stdout, "tile38-cli %s%s\n\n", core.Version, gitsha)
 	fmt.Fprintf(os.Stdout, "Usage: tile38-cli [OPTIONS] [cmd [arg [arg ...]]]\n")
-	fmt.Fprintf(os.Stdout, " -h <hostname>      Server hostname (default: %s).\n", hostname)
-	fmt.Fprintf(os.Stdout, " -p <port>          Server port (default: %d).\n", port)
+	fmt.Fprintf(os.Stdout, " --raw              Use raw formatting for replies (default when STDOUT is not a tty)\n")
+	fmt.Fprintf(os.Stdout, " --resp             Use RESP output formatting (default is JSON output)\n")
+	fmt.Fprintf(os.Stdout, " -h <hostname>      Server hostname (default: %s)\n", hostname)
+	fmt.Fprintf(os.Stdout, " -p <port>          Server port (default: %d)\n", port)
 	fmt.Fprintf(os.Stdout, "\n")
 	return false
 }
@@ -82,9 +88,10 @@ func parseArgs() bool {
 		fmt.Fprintf(os.Stderr, "Unrecognized option or bad number of args for: '%s'\n", arg)
 		return false
 	}
+
 	for len(args) > 0 {
 		arg := readArg("")
-		if arg == "--help" {
+		if arg == "--help" || arg == "-?" {
 			return showHelp()
 		}
 		if !strings.HasPrefix(arg, "-") {
@@ -96,6 +103,10 @@ func parseArgs() bool {
 			return badArg(arg)
 		case "-kml":
 			tokml = true
+		case "--raw":
+			raw = true
+		case "--resp":
+			output = "resp"
 		case "-h":
 			hostname = readArg(arg)
 		case "-p":
@@ -119,6 +130,15 @@ var groupsM = make(map[string][]string)
 func main() {
 	if !parseArgs() {
 		return
+	}
+
+	if !raw {
+		fi, err := os.Stdout.Stat()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			return
+		}
+		raw = (fi.Mode() & os.ModeCharDevice) == 0
 	}
 	if len(oneCommand) > 0 && (oneCommand[0] == 'h' || oneCommand[0] == 'H') && strings.Split(strings.ToLower(oneCommand), " ")[0] == "help" {
 		showHelp()
@@ -222,7 +242,13 @@ func main() {
 			f.Close()
 		}
 	}()
-	var raw bool
+	if output == "resp" {
+		_, err := conn.Do("output resp")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			return
+		}
+	}
 	for {
 		var command string
 		var err error
@@ -254,21 +280,11 @@ func main() {
 				if (command[0] == 'q' || command[0] == 'Q') && strings.ToLower(command) == "quit" {
 					return
 				}
-				if (command[0] == 'r' || command[0] == 'R') && strings.ToLower(command) == "raw" {
-					raw = true
-					fmt.Fprintln(os.Stderr, "raw mode is ON")
-					continue
-				}
 				if (command[0] == 'h' || command[0] == 'H') && (strings.ToLower(command) == "help" || strings.HasPrefix(strings.ToLower(command), "help")) {
 					err = help(strings.TrimSpace(command[4:]))
 					if err != nil {
 						return
 					}
-					continue
-				}
-				if (command[0] == 'p' || command[0] == 'P') && strings.ToLower(command) == "pretty" {
-					raw = false
-					fmt.Fprintln(os.Stderr, "raw mode is OFF")
 					continue
 				}
 				aof = (command[0] == 'a' || command[0] == 'A') && strings.HasPrefix(strings.ToLower(command), "aof ")
@@ -296,11 +312,18 @@ func main() {
 				if mustOutput {
 					if tokml {
 						msg = convert2kml(msg)
-					}
-					if raw {
+						fmt.Fprintln(os.Stdout, string(msg))
+					} else if output == "resp" {
+						if !raw {
+							msg = convert2termresp(msg)
+						}
 						fmt.Fprintln(os.Stdout, string(msg))
 					} else {
-						fmt.Fprintln(os.Stdout, string(msg))
+						if raw {
+							fmt.Fprintln(os.Stdout, string(msg))
+						} else {
+							fmt.Fprintln(os.Stdout, string(msg))
+						}
 					}
 				}
 			}
@@ -313,6 +336,67 @@ func main() {
 			return
 		}
 	}
+}
+
+func convert2termresp(msg []byte) []byte {
+	rd := resp.NewReader(bytes.NewBuffer(msg))
+	out := ""
+	for {
+		v, _, err := rd.ReadValue()
+		if err != nil {
+			break
+		}
+		out += convert2termrespval(v, 0)
+	}
+	return []byte(strings.TrimSpace(out))
+}
+
+func convert2termrespval(v resp.Value, spaces int) string {
+	switch v.Type() {
+	default:
+		return v.String()
+	case resp.BulkString:
+		if v.IsNull() {
+			return "(nil)"
+		} else {
+			return "\"" + v.String() + "\""
+		}
+	case resp.Integer:
+		return "(integer) " + v.String()
+	case resp.Error:
+		return "(error) " + v.String()
+	case resp.Array:
+		arr := v.Array()
+		if len(arr) == 0 {
+			return "(empty list or set)"
+		}
+		out := ""
+		nspaces := spaces + numlen(len(arr))
+		for i, v := range arr {
+			if i > 0 {
+				out += strings.Repeat(" ", spaces)
+			}
+			iout := strings.TrimSpace(convert2termrespval(v, nspaces+2))
+			out += fmt.Sprintf("%d) %s\n", i+1, iout)
+		}
+		return out
+	}
+}
+
+func numlen(n int) int {
+	l := 1
+	if n < 0 {
+		l++
+		n = n * -1
+	}
+	for i := 0; i < 1000; i++ {
+		if n < 10 {
+			break
+		}
+		l++
+		n = n / 10
+	}
+	return l
 }
 
 func convert2kml(msg []byte) []byte {

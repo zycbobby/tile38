@@ -98,6 +98,7 @@ func handleConn(
 		}
 	}
 	defer conn.Close()
+	outputType := Null
 	rd := NewAnyReaderWriter(conn)
 	brd := rd.rd
 	for {
@@ -114,6 +115,9 @@ func handleConn(
 			return
 		}
 		if msg != nil && msg.Command != "" {
+			if outputType != Null {
+				msg.OutputType = outputType
+			}
 			if msg.Command == "quit" {
 				if msg.OutputType == RESP {
 					io.WriteString(conn, "+OK\r\n")
@@ -125,6 +129,7 @@ func handleConn(
 				log.Error(err)
 				return
 			}
+			outputType = msg.OutputType
 		} else {
 			conn.Write([]byte("HTTP/1.1 500 Bad Request\r\nConnection: close\r\n\r\n"))
 			return
@@ -132,6 +137,7 @@ func handleConn(
 		if msg.ConnType == HTTP || msg.ConnType == WebSocket {
 			return
 		}
+
 	}
 }
 

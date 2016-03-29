@@ -190,7 +190,12 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 			_, err = io.WriteString(w, res+"\r\n")
 			return err
 		case server.RESP:
-			_, err := io.WriteString(w, res)
+			var err error
+			if msg.OutputType == server.JSON {
+				_, err = fmt.Fprintf(w, "$%d\r\n%s\r\n", len(res), res)
+			} else {
+				_, err = io.WriteString(w, res)
+			}
 			return err
 		case server.Native:
 			_, err := fmt.Fprintf(w, "$%d %s\r\n", len(res), res)
@@ -278,6 +283,8 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		// does not write to aof, but requires a write lock.
 		c.mu.Lock()
 		defer c.mu.Unlock()
+	case "output":
+		// this is local connection operation. Locks not needed.
 	case "massinsert":
 		// dev operation
 		// ** danger zone **
@@ -340,14 +347,12 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, d, err = c.cmdDrop(msg)
 	case "flushdb":
 		res, d, err = c.cmdFlushDB(msg)
-	// case "sethook":
-	// 	err = c.cmdSetHook(nline)
-	// 	resp = okResp()
-	// case "delhook":
-	// 	err = c.cmdDelHook(nline)
-	// 	resp = okResp()
-	// case "hooks":
-	// 	err = c.cmdHooks(nline, w)
+	case "sethook":
+		res, d, err = c.cmdSetHook(msg)
+	case "delhook":
+		res, d, err = c.cmdDelHook(msg)
+	case "hooks":
+		res, err = c.cmdHooks(msg)
 	// case "massinsert":
 	// 	if !core.DevMode {
 	// 		err = fmt.Errorf("unknown command '%s'", cmd)
@@ -376,6 +381,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, err = c.cmdGet(msg)
 	case "keys":
 		res, err = c.cmdKeys(msg)
+	case "output":
+		res, err = c.cmdOutput(msg)
 	// case "aof":
 	// 	err = c.cmdAOF(nline, w)
 	// case "aofmd5":

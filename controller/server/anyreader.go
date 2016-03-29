@@ -288,7 +288,7 @@ func (ar *AnyReaderWriter) readHTTPMessage() (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	msg.OutputType = nmsg.OutputType
+	msg.OutputType = JSON
 	msg.Values = nmsg.Values
 	msg.Command = commandValues(nmsg.Values)
 	return msg, nil

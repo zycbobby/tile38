@@ -169,13 +169,26 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 	for _, v := range msg.Values {
 		words = append(words, v.String())
 	}
-
 	start := time.Now()
-
 	writeOutput := func(res string) error {
 		switch msg.ConnType {
 		default:
-			panic(fmt.Sprintf("unsupported conn type: %v", msg.ConnType))
+			err := fmt.Errorf("unsupported conn type: %v", msg.ConnType)
+			log.Error(err)
+			return err
+		case server.WebSocket:
+			return server.WriteWebSocketMessage(w, []byte(res))
+		case server.HTTP:
+			_, err := fmt.Fprintf(w, "HTTP/1.1 200 OK\r\n"+
+				"Connection: close\r\n"+
+				"Content-Length: %d\r\n"+
+				"Content-Type: application/json charset=utf-8\r\n"+
+				"\r\n", len(res)+2)
+			if err != nil {
+				return err
+			}
+			_, err = io.WriteString(w, res+"\r\n")
+			return err
 		case server.RESP:
 			_, err := io.WriteString(w, res)
 			return err
@@ -184,7 +197,6 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 			return err
 		}
 	}
-
 	// Ping. Just send back the response. No need to put through the pipeline.
 	if msg.Command == "ping" {
 		switch msg.OutputType {
@@ -314,22 +326,9 @@ func (c *Controller) reset() {
 }
 
 func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d commandDetailsT, err error) {
-	start := time.Now()
-	okResp := func() string {
-		if w != nil {
-			switch msg.OutputType {
-			case server.JSON:
-				return `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
-			case server.RESP:
-				return "+OK\r\n"
-			}
-		}
-		return ""
-	}
 	switch msg.Command {
 	default:
 		err = fmt.Errorf("unknown command '%s'", msg.Values[0])
-		return
 	// lock
 	case "set":
 		res, d, err = c.cmdSet(msg)
@@ -359,11 +358,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 	// case "follow":
 	// 	err = c.cmdFollow(nline)
 	// 	resp = okResp()
-	// case "config":
-	// 	resp, err = c.cmdConfig(nline)
-	// case "readonly":
-	// 	err = c.cmdReadOnly(nline)
-	// 	resp = okResp()
+	case "readonly":
+		res, err = c.cmdReadOnly(msg)
 	case "stats":
 		res, err = c.cmdStats(msg)
 	case "server":
@@ -385,12 +381,28 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 	// case "aofmd5":
 	// 	resp, err = c.cmdAOFMD5(nline)
 	case "gc":
+		start := time.Now()
 		go runtime.GC()
-		res = okResp()
-		// 	resp = okResp()
-		// case "aofshrink":
-		// 	go c.aofshrink()
-		// 	resp = okResp()
+		res = server.OKMessage(msg, start)
+	// case "aofshrink":
+	// 	go c.aofshrink()
+	// 	resp = okResp()
+
+	case "config get":
+		res, err = c.cmdConfigGet(msg)
+	case "config set":
+		res, err = c.cmdConfigSet(msg)
+	case "config rewrite":
+		res, err = c.cmdConfigRewrite(msg)
+	case "config":
+		err = fmt.Errorf("unknown command '%s'", msg.Values[0])
+		if len(msg.Values) > 1 {
+			command := msg.Values[0].String() + " " + msg.Values[1].String()
+			msg.Values[1] = resp.StringValue(command)
+			msg.Values = msg.Values[1:]
+			msg.Command = strings.ToLower(command)
+			return c.command(msg, w)
+		}
 	}
 	return
 }

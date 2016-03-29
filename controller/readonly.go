@@ -2,39 +2,47 @@ package controller
 
 import (
 	"strings"
+	"time"
 
 	"github.com/tidwall/tile38/controller/log"
+	"github.com/tidwall/tile38/controller/server"
 )
 
-func (c *Controller) cmdReadOnly(line string) error {
+func (c *Controller) cmdReadOnly(msg *server.Message) (res string, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
 	var arg string
-	if line, arg = token(line); arg == "" {
-		return errInvalidNumberOfArguments
+	var ok bool
+	if vs, arg, ok = tokenval(vs); !ok || arg == "" {
+		return "", errInvalidNumberOfArguments
 	}
-	if line != "" {
-		return errInvalidNumberOfArguments
+	if len(vs) != 0 {
+		return "", errInvalidNumberOfArguments
 	}
+	update := false
 	backup := c.config
 	switch strings.ToLower(arg) {
 	default:
-		return errInvalidArgument(arg)
+		return "", errInvalidArgument(arg)
 	case "yes":
-		if c.config.ReadOnly {
-			return nil
-		}
-		c.config.ReadOnly = true
-		log.Info("read only")
-	case "no":
 		if !c.config.ReadOnly {
-			return nil
+			update = true
+			c.config.ReadOnly = true
+			log.Info("read only")
 		}
-		c.config.ReadOnly = false
-		log.Info("read write")
+	case "no":
+		if c.config.ReadOnly {
+			update = true
+			c.config.ReadOnly = false
+			log.Info("read write")
+		}
 	}
-	err := c.writeConfig(false)
-	if err != nil {
-		c.config = backup
-		return err
+	if update {
+		err := c.writeConfig(false)
+		if err != nil {
+			c.config = backup
+			return "", err
+		}
 	}
-	return nil
+	return server.OKMessage(msg, start), nil
 }

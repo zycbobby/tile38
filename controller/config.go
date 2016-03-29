@@ -1,14 +1,18 @@
 package controller
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/tidwall/resp"
+	"github.com/tidwall/tile38/controller/server"
 )
+
+var validProperties = []string{"requirepass", "leaderauth", "protected-mode"}
 
 // Config is a tile38 config
 type Config struct {
@@ -82,6 +86,16 @@ func (c *Controller) setConfigProperty(name, value string, fromLoad bool) error 
 	return nil
 }
 
+func (c *Controller) getConfigProperties(pattern string) map[string]interface{} {
+	m := make(map[string]interface{})
+	for _, name := range validProperties {
+		matched, _ := globMatch(pattern, name)
+		if matched {
+			m[name] = c.getConfigProperty(name)
+		}
+	}
+	return m
+}
 func (c *Controller) getConfigProperty(name string) string {
 	switch name {
 	default:
@@ -127,36 +141,63 @@ func (c *Controller) writeConfig(writeProperties bool) error {
 	return nil
 }
 
-func (c *Controller) cmdConfig(line string) (string, error) {
-	var start = time.Now()
-	var cmd, name, value string
-	if line, cmd = token(line); cmd == "" {
+func (c *Controller) cmdConfigGet(msg *server.Message) (res string, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	var ok bool
+	var name string
+	if vs, name, ok = tokenval(vs); !ok {
 		return "", errInvalidNumberOfArguments
 	}
-	var buf bytes.Buffer
-	buf.WriteString(`{"ok":true`)
-	switch strings.ToLower(cmd) {
-	default:
-		return "", errInvalidArgument(cmd)
-	case "get":
-		if line, name = token(line); name == "" || line != "" {
-			return "", errInvalidNumberOfArguments
-		}
-		value = c.getConfigProperty(name)
-		buf.WriteString(`,"value":` + jsonString(value))
-	case "set":
-		if line, name = token(line); name == "" {
-			return "", errInvalidNumberOfArguments
-		}
-		value = strings.TrimSpace(line)
-		if err := c.setConfigProperty(name, value, false); err != nil {
-			return "", err
-		}
-	case "rewrite":
-		if err := c.writeConfig(true); err != nil {
-			return "", err
-		}
+	if len(vs) != 0 {
+		return "", errInvalidNumberOfArguments
 	}
-	buf.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
-	return buf.String(), nil
+	m := c.getConfigProperties(name)
+	switch msg.OutputType {
+	case server.JSON:
+		data, err := json.Marshal(m)
+		if err != nil {
+			return "", err
+		}
+		res = `{"ok":true,"properties":` + string(data) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		vals := respValuesSimpleMap(m)
+		data, err := resp.ArrayValue(vals).MarshalRESP()
+		if err != nil {
+			return "", err
+		}
+		res = string(data)
+	}
+	return
+}
+func (c *Controller) cmdConfigSet(msg *server.Message) (res string, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	var ok bool
+	var name string
+	if vs, name, ok = tokenval(vs); !ok {
+		return "", errInvalidNumberOfArguments
+	}
+	var value string
+	if vs, value, ok = tokenval(vs); !ok {
+		return "", errInvalidNumberOfArguments
+	}
+	if len(vs) != 0 {
+		return "", errInvalidNumberOfArguments
+	}
+	if err := c.setConfigProperty(name, value, false); err != nil {
+		return "", err
+	}
+	return server.OKMessage(msg, start), nil
+}
+func (c *Controller) cmdConfigRewrite(msg *server.Message) (res string, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	if len(vs) != 0 {
+		return "", errInvalidNumberOfArguments
+	}
+	if err := c.writeConfig(true); err != nil {
+		return "", err
+	}
+	return server.OKMessage(msg, start), nil
 }

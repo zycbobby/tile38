@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 )
 
@@ -26,6 +27,7 @@ func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenc
 	match = false
 	detect := "outside"
 	if fence != nil {
+
 		match1 := fenceMatchObject(fence, details.oldObj)
 		match2 := fenceMatchObject(fence, details.obj)
 		if match1 && match2 {
@@ -83,6 +85,7 @@ func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenc
 	}
 	sw.fmap = fmap
 	sw.fullFields = true
+	sw.msg.OutputType = server.JSON
 	sw.writeObject(details.id, details.obj, details.fields)
 	if sw.wr.Len() == 0 {
 		return nil

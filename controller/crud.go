@@ -2,7 +2,6 @@ package controller
 
 import (
 	"bytes"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,7 +39,7 @@ func orderFields(fmap map[string]int, fields []float64) []fvt {
 		if idx < len(fields) {
 			fv.field = field
 			fv.value = fields[idx]
-			if !math.IsNaN(fv.value) && fv.value != 0 {
+			if fv.value != 0 {
 				fvs = append(fvs, fv)
 			}
 		}
@@ -212,6 +211,14 @@ func (c *Controller) cmdDel(msg *server.Message) (res string, d commandDetailsT,
 		if ok {
 			if col.Count() == 0 {
 				c.deleteCol(d.key)
+				d.revert = func() {
+					c.setCol(d.key, col)
+					col.ReplaceOrInsert(d.id, d.obj, nil, d.fields)
+				}
+			} else {
+				d.revert = func() {
+					col.ReplaceOrInsert(d.id, d.obj, nil, d.fields)
+				}
 			}
 			found = true
 		}
@@ -246,6 +253,9 @@ func (c *Controller) cmdDrop(msg *server.Message) (res string, d commandDetailsT
 	col := c.getCol(d.key)
 	if col != nil {
 		c.deleteCol(d.key)
+		d.revert = func() {
+			c.setCol(d.key, col)
+		}
 		d.updated = true
 	} else {
 		d.key = "" // ignore the details
@@ -273,7 +283,6 @@ func (c *Controller) cmdFlushDB(msg *server.Message) (res string, d commandDetai
 		return
 	}
 	c.cols = btree.New(16)
-	c.colsm = make(map[string]*collection.Collection)
 	c.hooks = make(map[string]*Hook)
 	c.hookcols = make(map[string]map[string]*Hook)
 	d.command = "flushdb"
@@ -486,12 +495,23 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 	if err != nil {
 		return
 	}
+	addedcol := false
 	col := c.getCol(d.key)
 	if col == nil {
 		col = collection.New()
 		c.setCol(d.key, col)
+		addedcol = true
 	}
 	d.oldObj, d.oldFields, d.fields = col.ReplaceOrInsert(d.id, d.obj, fields, values)
+	d.revert = func() {
+		if addedcol {
+			c.deleteCol(d.key)
+		} else if d.oldObj != nil {
+			col.ReplaceOrInsert(d.id, d.oldObj, nil, d.oldFields)
+		} else {
+			col.Remove(d.id)
+		}
+	}
 	d.command = "set"
 	d.updated = true // perhaps we should do a diff on the previous object?
 	switch msg.OutputType {

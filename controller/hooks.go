@@ -47,22 +47,32 @@ type Hook struct {
 }
 
 func (c *Controller) DoHook(hook *Hook, details *commandDetailsT) error {
+	var lerrs []error
 	msgs := c.FenceMatch(hook.Name, hook.ScanWriter, hook.Fence, details, false)
 	for _, msg := range msgs {
 		for _, endpoint := range hook.Endpoints {
 			switch endpoint.Protocol {
 			case HTTP:
 				if err := c.sendHTTPMessage(endpoint, msg); err != nil {
-					return err
+					lerrs = append(lerrs, err)
+					continue
 				}
 				return nil //sent
 			case Disque:
 				if err := c.sendDisqueMessage(endpoint, msg); err != nil {
-					return err
+					lerrs = append(lerrs, err)
+					continue
 				}
 				return nil // sent
 			}
 		}
+	}
+	var errmsgs []string
+	for _, err := range lerrs {
+		errmsgs = append(errmsgs, err.Error())
+	}
+	if len(errmsgs) > 0 {
+		return errors.New("not sent: " + strings.Join(errmsgs, ","))
 	}
 	return errors.New("not sent")
 }

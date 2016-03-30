@@ -1,8 +1,6 @@
 package collection
 
 import (
-	"math"
-
 	"github.com/google/btree"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/index"
@@ -94,8 +92,17 @@ func (c *Collection) ReplaceOrInsert(id string, obj geojson.Object, fields []str
 		nitem.Fields = oldFields
 		c.weight += len(nitem.Fields) * 8
 	}
-	for i, field := range fields {
-		c.setField(nitem, field, values[i])
+	if fields == nil && len(values) > 0 {
+		// directly set the field values, update weight
+		c.weight -= len(nitem.Fields) * 8
+		nitem.Fields = values
+		c.weight += len(nitem.Fields) * 8
+
+	} else {
+		// map field name to value
+		for i, field := range fields {
+			c.setField(nitem, field, values[i])
+		}
 	}
 	return oldObject, oldFields, nitem.Fields
 }
@@ -170,13 +177,10 @@ func (c *Collection) setField(item *itemT, field string, value float64) (updated
 	}
 	c.weight -= len(item.Fields) * 8
 	for idx >= len(item.Fields) {
-		item.Fields = append(item.Fields, math.NaN())
+		item.Fields = append(item.Fields, 0)
 	}
 	c.weight += len(item.Fields) * 8
 	ovalue := item.Fields[idx]
-	if math.IsNaN(ovalue) {
-		ovalue = 0
-	}
 	item.Fields[idx] = value
 	return ovalue != value
 }

@@ -3,7 +3,6 @@ package controller
 import (
 	"bytes"
 	"errors"
-	"math"
 	"strconv"
 
 	"github.com/tidwall/resp"
@@ -178,9 +177,6 @@ func (sw *scanWriter) fieldMatch(fields []float64, o geojson.Object) ([]float64,
 			if ok {
 				if len(fields) > idx {
 					value = fields[idx]
-					if math.IsNaN(value) {
-						value = 0
-					}
 				}
 			}
 			if !where.match(value) {
@@ -192,9 +188,6 @@ func (sw *scanWriter) fieldMatch(fields []float64, o geojson.Object) ([]float64,
 			var value float64
 			if len(fields) > idx {
 				value = fields[idx]
-				if math.IsNaN(value) {
-					value = 0
-				}
 			}
 			sw.fvals[idx] = value
 		}
@@ -261,7 +254,7 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64)
 					var i int
 					for field, idx := range sw.fmap {
 						if len(fields) > idx {
-							if !math.IsNaN(fields[idx]) {
+							if fields[idx] != 0 {
 								if i > 0 {
 									jsfields += `,`
 								}

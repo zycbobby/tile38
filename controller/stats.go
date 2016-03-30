@@ -79,6 +79,7 @@ func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 	}
 	m["aof_size"] = c.aofsz
 	m["num_collections"] = c.cols.Len()
+	m["num_hooks"] = len(c.hooks)
 	sz := 0
 	c.cols.Ascend(func(item btree.Item) bool {
 		col := item.(*collectionT).Collection

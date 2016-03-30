@@ -2,7 +2,6 @@ package controller
 
 import (
 	"bufio"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -19,81 +18,12 @@ import (
 	"github.com/tidwall/tile38/controller/server"
 )
 
-const backwardsBufferSize = 50000
-
-var errCorruptedAOF = errors.New("corrupted aof file")
-
-type AOFReader struct {
-	r     io.Reader // reader
-	rerr  error     // read error
-	chunk []byte    // chunk buffer
-	buf   []byte    // main buffer
-	l     int       // length of valid data in buffer
-	p     int       // pointer
-}
-
 type errAOFHook struct {
 	err error
 }
 
 func (err errAOFHook) Error() string {
 	return fmt.Sprintf("hook: %v", err.err)
-}
-
-func (rd *AOFReader) ReadCommand() ([]byte, error) {
-	if rd.l >= 4 {
-		sz1 := int(binary.LittleEndian.Uint32(rd.buf[rd.p:]))
-		if rd.l >= sz1+9 {
-			// we have enough data for a record
-			sz2 := int(binary.LittleEndian.Uint32(rd.buf[rd.p+4+sz1:]))
-			if sz2 != sz1 || rd.buf[rd.p+4+sz1+4] != 0 {
-				return nil, errCorruptedAOF
-			}
-			buf := rd.buf[rd.p+4 : rd.p+4+sz1]
-			rd.p += sz1 + 9
-			rd.l -= sz1 + 9
-			return buf, nil
-		}
-	}
-	// need more data
-	if rd.rerr != nil {
-		if rd.rerr == io.EOF {
-			rd.rerr = nil // we want to return EOF, but we want to be able to try again
-			if rd.l != 0 {
-				return nil, io.ErrUnexpectedEOF
-			}
-			return nil, io.EOF
-		}
-		return nil, rd.rerr
-	}
-	if rd.p != 0 {
-		// move p to the beginning
-		copy(rd.buf, rd.buf[rd.p:rd.p+rd.l])
-		rd.p = 0
-	}
-	var n int
-	n, rd.rerr = rd.r.Read(rd.chunk)
-	if n > 0 {
-		cbuf := rd.chunk[:n]
-		if len(rd.buf)-rd.l < n {
-			if len(rd.buf) == 0 {
-				rd.buf = make([]byte, len(cbuf))
-				copy(rd.buf, cbuf)
-			} else {
-				copy(rd.buf[rd.l:], cbuf[:len(rd.buf)-rd.l])
-				rd.buf = append(rd.buf, cbuf[len(rd.buf)-rd.l:]...)
-			}
-		} else {
-			copy(rd.buf[rd.l:], cbuf)
-		}
-		rd.l += n
-	}
-	return rd.ReadCommand()
-}
-
-func NewAOFReader(r io.Reader) *AOFReader {
-	rd := &AOFReader{r: r, chunk: make([]byte, 0xFFFF)}
-	return rd
 }
 
 func (c *Controller) loadAOF() error {

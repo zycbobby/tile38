@@ -14,6 +14,8 @@ import (
 	"github.com/tidwall/tile38/core"
 )
 
+const backwardsBufferSize = 50000
+
 // checksum performs a simple md5 checksum on the aof file
 func (c *Controller) checksum(pos, size int64) (sum string, err error) {
 	if pos+size > int64(c.aofsz) {

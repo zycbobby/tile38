@@ -193,7 +193,7 @@ func (c *Controller) followStep(host string, port int, followc uint64) error {
 		log.Info("caught up")
 	}
 	nullw := ioutil.Discard
-	rd := NewAOFReader(conn.Reader())
+	rd := NewLegacyAOFReader(conn.Reader())
 	for {
 		buf, err := rd.ReadCommand()
 		if err != nil {

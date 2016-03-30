@@ -102,11 +102,11 @@ func (c *Controller) aofshrink() {
 		// swap files
 		f.Close()
 		c.f.Close()
-		err = os.Rename(path.Join(c.dir, "shrink"), path.Join(c.dir, "aof"))
+		err = os.Rename(path.Join(c.dir, "shrink"), path.Join(c.dir, "appendonly.aof"))
 		if err != nil {
 			log.Fatal("shink rename fatal operation")
 		}
-		c.f, err = os.OpenFile(path.Join(c.dir, "aof"), os.O_CREATE|os.O_RDWR, 0600)
+		c.f, err = os.OpenFile(path.Join(c.dir, "appendonly.aof"), os.O_CREATE|os.O_RDWR, 0600)
 		if err != nil {
 			log.Fatal("shink openfile fatal operation")
 		}

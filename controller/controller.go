@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"runtime"
 	"strings"
 	"sync"
@@ -87,7 +88,10 @@ func ListenAndServe(host string, port int, dir string) error {
 	if err := c.loadConfig(); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(dir+"/aof", os.O_CREATE|os.O_RDWR, 0600)
+	if err := c.migrateAOF(); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path.Join(dir, "appendonly.aof"), os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}

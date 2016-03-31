@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/rand"
 	"errors"
@@ -110,11 +109,11 @@ func ListenAndServe(host string, port int, dir string) error {
 		c.mu.Unlock()
 	}()
 	go c.processLives()
-	handler := func(conn *server.Conn, msg *server.Message, rd *bufio.Reader, w io.Writer, websocket bool) error {
+	handler := func(conn *server.Conn, msg *server.Message, rd *server.AnyReaderWriter, w io.Writer, websocket bool) error {
 		err := c.handleInputCommand(conn, msg, w)
 		if err != nil {
 			if err.Error() == "going live" {
-				return c.goLive(err, conn, rd, websocket)
+				return c.goLive(err, conn, rd, msg, websocket)
 			}
 			return err
 		}
@@ -341,6 +340,7 @@ func (c *Controller) reset() {
 }
 
 func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d commandDetailsT, err error) {
+
 	switch msg.Command {
 	default:
 		err = fmt.Errorf("unknown command '%s'", msg.Values[0])
@@ -367,9 +367,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 			return
 		}
 		res, err = c.cmdMassInsert(msg)
-	// case "follow":
-	// 	err = c.cmdFollow(nline)
-	// 	resp = okResp()
+	case "follow":
+		res, err = c.cmdFollow(msg)
 	case "readonly":
 		res, err = c.cmdReadOnly(msg)
 	case "stats":
@@ -390,10 +389,10 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, err = c.cmdKeys(msg)
 	case "output":
 		res, err = c.cmdOutput(msg)
-	// case "aof":
-	// 	err = c.cmdAOF(nline, w)
-	// case "aofmd5":
-	// 	resp, err = c.cmdAOFMD5(nline)
+	case "aof":
+		res, err = c.cmdAOF(msg)
+	case "aofmd5":
+		res, err = c.cmdAOFMD5(msg)
 	case "gc":
 		go runtime.GC()
 		res = server.OKMessage(msg, time.Now())

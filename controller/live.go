@@ -1,12 +1,10 @@
 package controller
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"io"
 	"net"
-	"strings"
 	"sync"
 
 	"github.com/tidwall/tile38/client"
@@ -52,14 +50,14 @@ func writeMessage(conn net.Conn, message []byte, websocket bool) error {
 	return client.WriteMessage(conn, message)
 }
 
-func (c *Controller) goLive(inerr error, conn net.Conn, rd *bufio.Reader, websocket bool) error {
+func (c *Controller) goLive(inerr error, conn net.Conn, rd *server.AnyReaderWriter, msg *server.Message, websocket bool) error {
 	addr := conn.RemoteAddr().String()
 	log.Info("live " + addr)
 	defer func() {
 		log.Info("not live " + addr)
 	}()
 	if s, ok := inerr.(liveAOFSwitches); ok {
-		return c.liveAOF(s.pos, conn, rd)
+		return c.liveAOF(s.pos, conn, rd, msg)
 	}
 	lb := &liveBuffer{
 		cond: sync.NewCond(&sync.Mutex{}),
@@ -104,14 +102,14 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *bufio.Reader, websoc
 			conn.Close()
 		}()
 		for {
-			command, _, _, err := client.ReadMessage(rd, nil)
+			v, err := rd.ReadMessage()
 			if err != nil {
 				if err != io.EOF {
 					log.Error(err)
 				}
 				return
 			}
-			switch strings.ToLower(string(command)) {
+			switch v.Command {
 			default:
 				log.Error("received a live command that was not QUIT")
 				return

@@ -3,13 +3,12 @@ package controller
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"time"
 
-	"github.com/tidwall/tile38/client"
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/core"
 )
@@ -27,7 +26,7 @@ func (c *Controller) checksum(pos, size int64) (sum string, err error) {
 		return
 	}
 	defer f.Close()
-	data := make([]byte, size)
+	sumr := md5.New()
 	err = func() error {
 		if size == 0 {
 			n, err := f.Seek(int64(c.aofsz), 0)
@@ -43,7 +42,7 @@ func (c *Controller) checksum(pos, size int64) (sum string, err error) {
 		if err != nil {
 			return err
 		}
-		_, err = io.ReadFull(f, data)
+		_, err = io.CopyN(sumr, f, size)
 		if err != nil {
 			return err
 		}
@@ -55,37 +54,25 @@ func (c *Controller) checksum(pos, size int64) (sum string, err error) {
 		}
 		return "", err
 	}
-	return fmt.Sprintf("%x", md5.Sum(data)), nil
+	return fmt.Sprintf("%x", sumr.Sum(nil)), nil
 }
 
-func connAOFMD5(conn *client.Conn, pos, size int64) (sum string, err error) {
-	type md5resT struct {
-		OK  bool   `json:"ok"`
-		MD5 string `json:"md5"`
-		Err string `json:"err"`
-	}
-	msg, err := conn.Do(fmt.Sprintf("aofmd5 %d %d", pos, size))
+func connAOFMD5(conn *Conn, pos, size int64) (sum string, err error) {
+	v, err := conn.Do("aofmd5", pos, size)
 	if err != nil {
 		return "", err
 	}
-	var res md5resT
-	if err := json.Unmarshal(msg, &res); err != nil {
-		return "", err
+	if v.Error() != nil {
+		return "", v.Error()
 	}
-	if !res.OK || len(res.MD5) != 32 {
-		if res.Err != "" {
-			if res.Err == "EOF" {
-				return "", io.EOF
-			}
-			return "", errors.New(res.Err)
-		}
+	sum = v.String()
+	if len(sum) != 32 {
 		return "", errors.New("checksum not ok")
 	}
-	sum = res.MD5
-	return
+	return sum, nil
 }
 
-func (c *Controller) matchChecksums(conn *client.Conn, pos, size int64) (match bool, err error) {
+func (c *Controller) matchChecksums(conn *Conn, pos, size int64) (match bool, err error) {
 	sum, err := c.checksum(pos, size)
 	if err != nil {
 		if err == io.EOF {
@@ -117,11 +104,13 @@ func (c *Controller) followCheckSome(addr string, followc uint64) (pos int64, er
 	if c.aofsz < checksumsz {
 		return 0, nil
 	}
-	conn, err := client.Dial(addr)
+
+	conn, err := DialTimeout(addr, time.Second*2)
 	if err != nil {
 		return 0, err
 	}
 	defer conn.Close()
+
 	min := int64(0)
 	max := int64(c.aofsz) - checksumsz
 	limit := int64(c.aofsz)

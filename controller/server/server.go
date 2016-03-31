@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -53,7 +52,7 @@ var errCloseHTTP = errors.New("close http")
 func ListenAndServe(
 	host string, port int,
 	protected func() bool,
-	handler func(conn *Conn, msg *Message, rd *bufio.Reader, w io.Writer, websocket bool) error,
+	handler func(conn *Conn, msg *Message, rd *AnyReaderWriter, w io.Writer, websocket bool) error,
 ) error {
 	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
@@ -80,7 +79,7 @@ func ListenAndServe(
 func handleConn(
 	conn *Conn,
 	protected func() bool,
-	handler func(conn *Conn, msg *Message, rd *bufio.Reader, w io.Writer, websocket bool) error,
+	handler func(conn *Conn, msg *Message, rd *AnyReaderWriter, w io.Writer, websocket bool) error,
 ) {
 	addr := conn.RemoteAddr().String()
 	if core.ShowDebugMessages {
@@ -100,7 +99,6 @@ func handleConn(
 	defer conn.Close()
 	outputType := Null
 	rd := NewAnyReaderWriter(conn)
-	brd := rd.rd
 	for {
 		msg, err := rd.ReadMessage()
 		if err != nil {
@@ -124,7 +122,7 @@ func handleConn(
 				}
 				return
 			}
-			err := handler(conn, msg, brd, conn, msg.ConnType == WebSocket)
+			err := handler(conn, msg, rd, conn, msg.ConnType == WebSocket)
 			if err != nil {
 				log.Error(err)
 				return

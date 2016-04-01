@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path"
 	"runtime"
@@ -64,6 +65,7 @@ type Controller struct {
 	shrinking bool                        // aof shrinking flag
 	hooks     map[string]*Hook            // hook name
 	hookcols  map[string]map[string]*Hook // col key
+	aofconnM  map[net.Conn]bool
 }
 
 // ListenAndServe starts a new tile38 server
@@ -80,6 +82,7 @@ func ListenAndServe(host string, port int, dir string) error {
 		lcond:    sync.NewCond(&sync.Mutex{}),
 		hooks:    make(map[string]*Hook),
 		hookcols: make(map[string]map[string]*Hook),
+		aofconnM: make(map[net.Conn]bool),
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err

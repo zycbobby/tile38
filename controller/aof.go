@@ -209,7 +209,16 @@ func (c *Controller) cmdAOF(msg *server.Message) (res string, err error) {
 }
 
 func (c *Controller) liveAOF(pos int64, conn net.Conn, rd *server.AnyReaderWriter, msg *server.Message) error {
-	defer conn.Close()
+	c.mu.Lock()
+	c.aofconnM[conn] = true
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		delete(c.aofconnM, conn)
+		c.mu.Unlock()
+		conn.Close()
+	}()
+
 	if _, err := conn.Write([]byte("+OK\r\n")); err != nil {
 		return err
 	}

@@ -51,7 +51,6 @@ func (c *Controller) aofshrink() {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		c.shrinking = false
-
 		defer func() {
 			if ferr != nil {
 				log.Errorf("aof shrink failed: %s\n", ferr.Error())
@@ -116,7 +115,10 @@ func (c *Controller) aofshrink() {
 			log.Fatal("shink seek end fatal operation")
 		}
 		c.aofsz = int(n)
-
+		// kill all followers connections
+		for conn, _ := range c.aofconnM {
+			conn.Close()
+		}
 	}()
 	log.Infof("aof shrink started at pos %d", endpos)
 

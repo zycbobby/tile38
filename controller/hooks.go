@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/controller/server"
@@ -393,7 +392,7 @@ func (c *Controller) sendHTTPMessage(endpoint Endpoint, msg []byte) error {
 
 func (c *Controller) sendDisqueMessage(endpoint Endpoint, msg []byte) error {
 	addr := fmt.Sprintf("%s:%d", endpoint.Disque.Host, endpoint.Disque.Port)
-	conn, err := redis.DialTimeout("tcp", addr, time.Second/4, time.Second/4, time.Second/4)
+	conn, err := DialTimeout(addr, time.Second/4)
 	if err != nil {
 		return err
 	}
@@ -404,10 +403,14 @@ func (c *Controller) sendDisqueMessage(endpoint Endpoint, msg []byte) error {
 		options = append(options, "REPLICATE")
 		options = append(options, endpoint.Disque.Options.Replicate)
 	}
-	id, err := redis.String(conn.Do("ADDJOB", options...))
+	v, err := conn.Do("ADDJOB", options...)
 	if err != nil {
 		return err
 	}
+	if v.Error() != nil {
+		return v.Error()
+	}
+	id := v.String()
 	p := strings.Split(id, "-")
 	if len(p) != 4 {
 		return errors.New("invalid disque reply")

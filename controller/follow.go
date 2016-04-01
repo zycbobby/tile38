@@ -231,6 +231,7 @@ func (c *Controller) followStep(host string, port int, followc uint64) error {
 		if telnet || v.Type() != resp.Array {
 			return errors.New("invalid multibulk")
 		}
+
 		aofsz, err := c.followHandleCommand(vals, followc, nullw)
 		if err != nil {
 			return err

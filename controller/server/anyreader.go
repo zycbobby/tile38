@@ -2,7 +2,6 @@ package server
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"errors"
@@ -27,6 +26,27 @@ const (
 	WebSocket
 	JSON
 )
+
+func (t Type) String() string {
+	switch t {
+	default:
+		return "Unknown"
+	case Null:
+		return "Null"
+	case RESP:
+		return "RESP"
+	case Telnet:
+		return "Telnet"
+	case Native:
+		return "Native"
+	case HTTP:
+		return "HTTP"
+	case WebSocket:
+		return "WebSocket"
+	case JSON:
+		return "JSON"
+	}
+}
 
 type errRESPProtocolError struct {
 	msg string
@@ -123,6 +143,30 @@ func (ar *AnyReaderWriter) ReadMessage() (*Message, error) {
 	return ar.readMultiBulkMessage()
 }
 
+func readNativeMessageLine(line []byte) (*Message, error) {
+	values := make([]resp.Value, 0, 16)
+reading:
+	for len(line) != 0 {
+		if line[0] == '{' {
+			// The native protocol cannot understand json boundaries so it assumes that
+			// a json element must be at the end of the line.
+			values = append(values, resp.StringValue(string(line)))
+			break
+		}
+		i := 0
+		for ; i < len(line); i++ {
+			if line[i] == ' ' {
+				values = append(values, resp.StringValue(string(line[:i])))
+				line = line[i+1:]
+				continue reading
+			}
+		}
+		values = append(values, resp.StringValue(string(line)))
+		break
+	}
+	return &Message{Command: commandValues(values), Values: values, ConnType: Native, OutputType: JSON}, nil
+}
+
 func (ar *AnyReaderWriter) readNativeMessage() (*Message, error) {
 	b, err := ar.rd.ReadBytes(' ')
 	if err != nil {
@@ -145,28 +189,8 @@ func (ar *AnyReaderWriter) readNativeMessage() (*Message, error) {
 	if b[len(b)-2] != '\r' || b[len(b)-1] != '\n' {
 		return nil, errors.New("expecting crlf")
 	}
-	values := make([]resp.Value, 0, 16)
-	line := b[:len(b)-2]
-reading:
-	for len(line) != 0 {
-		if line[0] == '{' {
-			// The native protocol cannot understand json boundaries so it assumes that
-			// a json element must be at the end of the line.
-			values = append(values, resp.StringValue(string(line)))
-			break
-		}
-		i := 0
-		for ; i < len(line); i++ {
-			if line[i] == ' ' {
-				values = append(values, resp.StringValue(string(line[:i])))
-				line = line[i+1:]
-				continue reading
-			}
-		}
-		values = append(values, resp.StringValue(string(line)))
-		break
-	}
-	return &Message{Command: commandValues(values), Values: values, ConnType: Native, OutputType: JSON}, nil
+
+	return readNativeMessageLine(b[:len(b)-2])
 }
 
 func commandValues(values []resp.Value) string {
@@ -283,8 +307,8 @@ func (ar *AnyReaderWriter) readHTTPMessage() (*Message, error) {
 	if !strings.HasSuffix(path, "\r\n") {
 		path += "\r\n"
 	}
-	rd := NewAnyReaderWriter(bytes.NewBufferString(path))
-	nmsg, err := rd.ReadMessage()
+
+	nmsg, err := readNativeMessageLine([]byte(path))
 	if err != nil {
 		return nil, err
 	}

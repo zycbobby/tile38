@@ -8,10 +8,10 @@ import (
 	"github.com/tidwall/tile38/geojson"
 )
 
-func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT, mustLock bool) [][]byte {
+func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT, mustLock bool) []string {
 	glob := fence.glob
 	if details.command == "drop" {
-		return [][]byte{[]byte(`{"cmd":"drop"}`)}
+		return []string{`{"cmd":"drop"}`}
 	}
 	match := true
 	if glob != "" && glob != "*" {
@@ -27,7 +27,6 @@ func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenc
 	match = false
 	detect := "outside"
 	if fence != nil {
-
 		match1 := fenceMatchObject(fence, details.oldObj)
 		match2 := fenceMatchObject(fence, details.obj)
 		if match1 && match2 {
@@ -67,7 +66,7 @@ func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenc
 		}
 	}
 	if details.command == "del" {
-		return [][]byte{[]byte(`{"command":"del","id":` + jsonString(details.id) + `}`)}
+		return []string{`{"command":"del","id":` + jsonString(details.id) + `}`}
 	}
 	var fmap map[string]int
 	if mustLock {
@@ -101,15 +100,23 @@ func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenc
 	jskey := jsonString(details.key)
 	jstime := time.Now().Format("2006-01-02T15:04:05.999999999Z07:00")
 	jshookName := jsonString(hookName)
-	if strings.HasPrefix(res, "{") {
-		res = `{"command":"` + details.command + `","detect":"` + detect + `","hook":` + jshookName + `,"time":"` + jstime + `","key":` + jskey + `,` + res[1:]
+	ores := res
+	msgs := make([]string, 0, 2)
+	if fence.detect == nil || fence.detect[detect] {
+		if strings.HasPrefix(ores, "{") {
+			res = `{"command":"` + details.command + `","detect":"` + detect + `","hook":` + jshookName + `,"time":"` + jstime + `","key":` + jskey + `,` + ores[1:]
+		}
+		msgs = append(msgs, res)
 	}
-	msgs := [][]byte{[]byte(res)}
 	switch detect {
 	case "enter":
-		msgs = append(msgs, []byte(`{"command":"`+details.command+`","detect":"inside","hook":`+jshookName+`,"time":"`+jstime+`","key":`+jskey+`,`+res[1:]))
+		if fence.detect == nil || fence.detect["inside"] {
+			msgs = append(msgs, `{"command":"`+details.command+`","detect":"inside","hook":`+jshookName+`,"time":"`+jstime+`","key":`+jskey+`,`+ores[1:])
+		}
 	case "exit", "cross":
-		msgs = append(msgs, []byte(`{"command":"`+details.command+`","detect":"outside","hook":`+jshookName+`,"time":"`+jstime+`","key":`+jskey+`,`+res[1:]))
+		if fence.detect == nil || fence.detect["outside"] {
+			msgs = append(msgs, `{"command":"`+details.command+`","detect":"outside","hook":`+jshookName+`,"time":"`+jstime+`","key":`+jskey+`,`+ores[1:])
+		}
 	}
 	return msgs
 }

@@ -60,6 +60,13 @@ func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 	if vs, id, ok = tokenval(vs); !ok || id == "" {
 		return "", errInvalidNumberOfArguments
 	}
+
+	withfields := false
+	if _, peek, ok := tokenval(vs); ok && strings.ToLower(peek) == "withfields" {
+		withfields = true
+		vs = vs[1:]
+	}
+
 	col := c.getCol(key)
 	if col == nil {
 		if msg.OutputType == server.RESP {
@@ -85,7 +92,7 @@ func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 			buf.WriteString(`,"object":`)
 			buf.WriteString(o.JSON())
 		} else {
-			vals = append(vals, resp.ArrayValue([]resp.Value{resp.StringValue(o.JSON())}))
+			vals = append(vals, resp.StringValue(o.JSON()))
 		}
 	} else {
 		switch strings.ToLower(typ) {
@@ -128,7 +135,7 @@ func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 			if msg.OutputType == server.JSON {
 				buf.WriteString(`"` + p + `"`)
 			} else {
-				vals = append(vals, resp.ArrayValue([]resp.Value{resp.StringValue(p)}))
+				vals = append(vals, resp.StringValue(p))
 			}
 		case "bounds":
 			bbox := o.CalculatedBBox()
@@ -152,40 +159,49 @@ func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 	if len(vs) != 0 {
 		return "", errInvalidNumberOfArguments
 	}
-
-	fvs := orderFields(col.FieldMap(), fields)
-	if len(fvs) > 0 {
-		fvals := make([]resp.Value, 0, len(fvs)*2)
-		if msg.OutputType == server.JSON {
-			buf.WriteString(`,"fields":{`)
-		}
-		for i, fv := range fvs {
+	if withfields {
+		fvs := orderFields(col.FieldMap(), fields)
+		if len(fvs) > 0 {
+			fvals := make([]resp.Value, 0, len(fvs)*2)
 			if msg.OutputType == server.JSON {
-				if i > 0 {
-					buf.WriteString(`,`)
-				}
-				buf.WriteString(jsonString(fv.field) + ":" + strconv.FormatFloat(fv.value, 'f', -1, 64))
-			} else {
-				fvals = append(fvals, resp.StringValue(fv.field), resp.StringValue(strconv.FormatFloat(fv.value, 'f', -1, 64)))
+				buf.WriteString(`,"fields":{`)
 			}
-			i++
-		}
-		if msg.OutputType == server.JSON {
-			buf.WriteString(`}`)
-		} else {
-			vals = append(vals, resp.ArrayValue(fvals))
+			for i, fv := range fvs {
+				if msg.OutputType == server.JSON {
+					if i > 0 {
+						buf.WriteString(`,`)
+					}
+					buf.WriteString(jsonString(fv.field) + ":" + strconv.FormatFloat(fv.value, 'f', -1, 64))
+				} else {
+					fvals = append(fvals, resp.StringValue(fv.field), resp.StringValue(strconv.FormatFloat(fv.value, 'f', -1, 64)))
+				}
+				i++
+			}
+			if msg.OutputType == server.JSON {
+				buf.WriteString(`}`)
+			} else {
+				vals = append(vals, resp.ArrayValue(fvals))
+			}
 		}
 	}
-	if msg.OutputType == server.JSON {
+	switch msg.OutputType {
+	case server.JSON:
 		buf.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
 		return buf.String(), nil
+	case server.RESP:
+		var oval resp.Value
+		if withfields {
+			oval = resp.ArrayValue(vals)
+		} else {
+			oval = vals[0]
+		}
+		data, err := oval.MarshalRESP()
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
 	}
-	data, err := resp.ArrayValue(vals).MarshalRESP()
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-
+	return "", nil
 }
 
 func (c *Controller) cmdDel(msg *server.Message) (res string, d commandDetailsT, err error) {

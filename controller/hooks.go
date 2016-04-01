@@ -48,23 +48,28 @@ type Hook struct {
 func (c *Controller) DoHook(hook *Hook, details *commandDetailsT) error {
 	var lerrs []error
 	msgs := c.FenceMatch(hook.Name, hook.ScanWriter, hook.Fence, details, false)
+nextMessage:
 	for _, msg := range msgs {
+	nextEndpoint:
 		for _, endpoint := range hook.Endpoints {
 			switch endpoint.Protocol {
 			case HTTP:
-				if err := c.sendHTTPMessage(endpoint, msg); err != nil {
+				if err := c.sendHTTPMessage(endpoint, []byte(msg)); err != nil {
 					lerrs = append(lerrs, err)
-					continue
+					continue nextEndpoint
 				}
-				return nil //sent
+				continue nextMessage // sent
 			case Disque:
-				if err := c.sendDisqueMessage(endpoint, msg); err != nil {
+				if err := c.sendDisqueMessage(endpoint, []byte(msg)); err != nil {
 					lerrs = append(lerrs, err)
-					continue
+					continue nextEndpoint
 				}
-				return nil // sent
+				continue nextMessage // sent
 			}
 		}
+	}
+	if len(lerrs) == 0 {
+		return nil
 	}
 	var errmsgs []string
 	for _, err := range lerrs {
@@ -185,10 +190,12 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 		}
 		endpoints = append(endpoints, endpoint)
 	}
+
 	commandvs := vs
 	if vs, cmd, ok = tokenval(vs); !ok || cmd == "" {
 		return "", d, errInvalidNumberOfArguments
 	}
+
 	cmdlc := strings.ToLower(cmd)
 	var types []string
 	switch cmdlc {
@@ -226,7 +233,6 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 		return "", d, err
 	}
 
-	// delete the previous hook
 	if h, ok := c.hooks[name]; ok {
 		// lets see if the previous hook matches the new hook
 		if h.Key == hook.Key && h.Name == hook.Name {
@@ -248,6 +254,8 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 				}
 			}
 		}
+
+		// delete the previous hook
 		if hm, ok := c.hookcols[h.Key]; ok {
 			delete(hm, h.Name)
 		}

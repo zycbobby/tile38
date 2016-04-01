@@ -245,21 +245,24 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		requirePass := c.config.RequirePass
 		c.mu.RUnlock()
 		if requirePass != "" {
-			// This better be an AUTH command.
-			if msg.Command != "auth" {
+			password := ""
+			// This better be an AUTH command or the Message should contain an Auth
+			if msg.Command != "auth" && msg.Auth == "" {
 				// Just shut down the pipeline now. The less the client connection knows the better.
 				return writeErr(errors.New("authentication required"))
 			}
-			password := ""
-			if len(msg.Values) > 1 {
-				password = msg.Values[1].String()
+			if msg.Auth != "" {
+				password = msg.Auth
+			} else {
+				if len(msg.Values) > 1 {
+					password = msg.Values[1].String()
+				}
 			}
 			if requirePass != strings.TrimSpace(password) {
 				return writeErr(errors.New("invalid password"))
 			}
 			conn.Authenticated = true
-			w.Write([]byte(`{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"))
-			return nil
+			return writeOutput(server.OKMessage(msg, start))
 		} else if msg.Command == "auth" {
 			return writeErr(errors.New("invalid password"))
 		}

@@ -274,6 +274,12 @@ var commandsJSON = `{
         "type": "string"
       },
       {
+        "command": "WITHFIELDS",
+        "name": [],
+        "type": [],
+        "optional": true
+      },
+      {
         "name": "type",
         "optional": true,
         "enumargs": [

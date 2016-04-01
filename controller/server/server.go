@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	//"github.com/tidwall/tile38/client"
-
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/core"
 )
@@ -171,68 +169,3 @@ func OKMessage(msg *Message, start time.Time) string {
 	}
 	return ""
 }
-
-//err := func() error {
-// command, proto, auth, err := client.ReadMessage(rd, conn)
-// if err != nil {
-// 	return err
-// }
-// if len(command) > 0 && (command[0] == 'Q' || command[0] == 'q') && strings.ToLower(string(command)) == "quit" {
-// 	return io.EOF
-// }
-// var b bytes.Buffer
-// var denied bool
-// if (proto == client.HTTP || proto == client.WebSocket) && auth != "" {
-// 	if err := handler(conn, []byte("AUTH "+auth), rd, &b, proto == client.WebSocket); err != nil {
-// 		return writeCommandErr(proto, conn, err)
-// 	}
-// 	if strings.HasPrefix(b.String(), `{"ok":false`) {
-// 		denied = true
-// 	} else {
-// 		b.Reset()
-// 	}
-// }
-// if !denied {
-// 	if err := handler(conn, command, rd, &b, proto == client.WebSocket); err != nil {
-// 		return writeCommandErr(proto, conn, err)
-// 	}
-// }
-// switch proto {
-// case client.Native:
-// 	if err := client.WriteMessage(conn, b.Bytes()); err != nil {
-// 		return err
-// 	}
-// case client.HTTP:
-// 	if err := client.WriteHTTP(conn, b.Bytes()); err != nil {
-// 		return err
-// 	}
-// 	return errCloseHTTP
-// case client.WebSocket:
-// 	if err := client.WriteWebSocket(conn, b.Bytes()); err != nil {
-// 		return err
-// 	}
-// 	if _, err := conn.Write([]byte{137, 0}); err != nil {
-// 		return err
-// 	}
-// 	return errCloseHTTP
-// default:
-// 	b.WriteString("\r\n")
-// 	if _, err := conn.Write(b.Bytes()); err != nil {
-// 		return err
-// 	}
-// }
-// return nil
-//}()
-// if err != nil {
-// 	if err == io.EOF {
-// 		return
-// 	}
-// 	if err == errCloseHTTP ||
-// 		strings.Contains(err.Error(), "use of closed network connection") {
-// 		return
-// 	}
-// 	log.Error(err)
-// 	return
-// }
-// 	}
-// }

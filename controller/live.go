@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -43,11 +44,25 @@ func (c *Controller) processLives() {
 	}
 }
 
-func writeMessage(conn net.Conn, message []byte, websocket bool) error {
-	if websocket {
-		return client.WriteWebSocket(conn, message)
+func writeMessage(conn net.Conn, message []byte, wrapRESP bool, connType server.Type, websocket bool) error {
+	if len(message) == 0 {
+		return nil
 	}
-	return client.WriteMessage(conn, message)
+	if websocket {
+		return server.WriteWebSocketMessage(conn, message)
+	}
+	var err error
+	switch connType {
+	case server.RESP:
+		if wrapRESP {
+			_, err = fmt.Fprintf(conn, "$%d\r\n%s\r\n", len(message), string(message))
+		} else {
+			_, err = conn.Write(message)
+		}
+	case server.Native:
+		_, err = fmt.Fprintf(conn, "$%d\r\n%s\r\n", len(message), string(message))
+	}
+	return err
 }
 
 func (c *Controller) goLive(inerr error, conn net.Conn, rd *server.AnyReaderWriter, msg *server.Message, websocket bool) error {
@@ -73,8 +88,6 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *server.AnyReaderWrit
 		lb.key = s.key
 		lb.fence = &s
 		c.mu.RLock()
-		var msg *server.Message
-		panic("todo: goLive message must be defined")
 		sw, err = c.newScanWriter(&wr, msg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
 		c.mu.RUnlock()
 	}
@@ -118,7 +131,19 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *server.AnyReaderWrit
 			}
 		}
 	}()
-	if err := writeMessage(conn, []byte(client.LiveJSON), websocket); err != nil {
+	outputType := msg.OutputType
+	connType := msg.ConnType
+	if websocket {
+		outputType = server.JSON
+	}
+	var livemsg []byte
+	switch outputType {
+	case server.JSON:
+		livemsg = []byte(client.LiveJSON)
+	case server.RESP:
+		livemsg = []byte("+OK\r\n")
+	}
+	if err := writeMessage(conn, livemsg, false, connType, websocket); err != nil {
 		return nil // nil return is fine here
 	}
 	for {
@@ -137,7 +162,7 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *server.AnyReaderWrit
 			lb.cond.L.Unlock()
 			msgs := c.FenceMatch("", sw, fence, details, true)
 			for _, msg := range msgs {
-				if err := writeMessage(conn, msg, websocket); err != nil {
+				if err := writeMessage(conn, []byte(msg), true, connType, websocket); err != nil {
 					return nil // nil return is fine here
 				}
 			}

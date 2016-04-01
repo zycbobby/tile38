@@ -124,6 +124,7 @@ type searchScanBaseTokens struct {
 	precision uint64
 	lineout   string
 	fence     bool
+	detect    map[string]bool
 	glob      string
 	wheres    []whereT
 	nofields  bool
@@ -237,6 +238,43 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 				}
 				t.fence = true
 				continue
+			} else if (wtok[0] == 'D' || wtok[0] == 'd') && strings.ToLower(wtok) == "detect" {
+				vs = nvs
+				if t.detect != nil {
+					err = errDuplicateArgument(strings.ToUpper(wtok))
+					return
+				}
+				t.detect = make(map[string]bool)
+				var peek string
+				if vs, peek, ok = tokenval(vs); !ok || peek == "" {
+					err = errInvalidNumberOfArguments
+					return
+				}
+				for _, s := range strings.Split(peek, ",") {
+					part := strings.TrimSpace(strings.ToLower(s))
+					switch part {
+					default:
+						err = errInvalidArgument(peek)
+						return
+					case "inside", "outside", "enter", "exit", "cross":
+					}
+					if t.detect[part] {
+						err = errDuplicateArgument(s)
+						return
+					}
+					t.detect[part] = true
+				}
+				if len(t.detect) == 0 {
+					t.detect = map[string]bool{
+						"inside":  true,
+						"outside": true,
+						"enter":   true,
+						"exit":    true,
+						"cross":   true,
+					}
+				}
+
+				continue
 			} else if (wtok[0] == 'M' || wtok[0] == 'm') && strings.ToLower(wtok) == "match" {
 				vs = nvs
 				if t.glob != "" {
@@ -274,6 +312,10 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 	}
 	if scursor != "" && t.fence {
 		err = errors.New("CURSOR is not allowed when FENCE is specified")
+		return
+	}
+	if t.detect != nil && !t.fence {
+		err = errors.New("DETECT is not allowed when FENCE is not specified")
 		return
 	}
 

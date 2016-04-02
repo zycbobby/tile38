@@ -486,6 +486,12 @@ var commandsJSON = `{
         "optional": true
       },
       {
+        "command": "DETECT",
+        "name": ["what"],
+        "type": ["string"],
+        "optional": true
+      },
+      {
         "name": "type",
         "optional": true,
         "enumargs": [
@@ -573,6 +579,12 @@ var commandsJSON = `{
         "command": "FENCE",
         "name": [],
         "type": [],
+        "optional": true
+      },
+      {
+        "command": "DETECT",
+        "name": ["what"],
+        "type": ["string"],
         "optional": true
       },
       {
@@ -741,6 +753,12 @@ var commandsJSON = `{
         "command": "FENCE",
         "name": [],
         "type": [],
+        "optional": true
+      },
+      {
+        "command": "DETECT",
+        "name": ["what"],
+        "type": ["string"],
         "optional": true
       },
       {
@@ -1010,6 +1028,12 @@ var commandsJSON = `{
         "command": "FENCE",
         "name": [],
         "type": []
+      },
+      {
+        "command": "DETECT",
+        "name": ["what"],
+        "type": ["string"],
+        "optional": true
       },
       {
         "name": "param",

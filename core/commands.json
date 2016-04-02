@@ -333,6 +333,12 @@
         "optional": true
       },
       {
+        "command": "DETECT",
+        "name": ["what"],
+        "type": ["string"],
+        "optional": true
+      },
+      {
         "name": "type",
         "optional": true,
         "enumargs": [
@@ -420,6 +426,12 @@
         "command": "FENCE",
         "name": [],
         "type": [],
+        "optional": true
+      },
+      {
+        "command": "DETECT",
+        "name": ["what"],
+        "type": ["string"],
         "optional": true
       },
       {
@@ -588,6 +600,12 @@
         "command": "FENCE",
         "name": [],
         "type": [],
+        "optional": true
+      },
+      {
+        "command": "DETECT",
+        "name": ["what"],
+        "type": ["string"],
         "optional": true
       },
       {
@@ -857,6 +875,12 @@
         "command": "FENCE",
         "name": [],
         "type": []
+      },
+      {
+        "command": "DETECT",
+        "name": ["what"],
+        "type": ["string"],
+        "optional": true
       },
       {
         "name": "param",

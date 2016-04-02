@@ -123,7 +123,6 @@ You can choose a value between 1 and 8. The value 1 will result in no more than 
 <td>Sparse 3<img src="/doc/sparse-3.png" width="100" height="100" border="0" alt="Search Within"></td>
 <td>Sparse 4<img src="/doc/sparse-4.png" width="100" height="100" border="0" alt="Search Within"></td>
 <td>Sparse 5<img src="/doc/sparse-5.png" width="100" height="100" border="0" alt="Search Within"></td>
-<td>Sparse 6<img src="/doc/sparse-6.png" width="100" height="100" border="0" alt="Search Within"></td>
 </table>
 *Please note that the higher the sparse value, the slower the performance. Also, LIMIT and CURSOR are not available when using SPARSE.* 
 

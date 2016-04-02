@@ -241,6 +241,7 @@ func (c *Controller) cmdDel(msg *server.Message) (res string, d commandDetailsT,
 	}
 	d.command = "del"
 	d.updated = found
+	d.timestamp = time.Now()
 	switch msg.OutputType {
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
@@ -278,6 +279,7 @@ func (c *Controller) cmdDrop(msg *server.Message) (res string, d commandDetailsT
 		d.updated = false
 	}
 	d.command = "drop"
+	d.timestamp = time.Now()
 	switch msg.OutputType {
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
@@ -303,6 +305,7 @@ func (c *Controller) cmdFlushDB(msg *server.Message) (res string, d commandDetai
 	c.hookcols = make(map[string]map[string]*Hook)
 	d.command = "flushdb"
 	d.updated = true
+	d.timestamp = time.Now()
 	switch msg.OutputType {
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
@@ -530,6 +533,12 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 	}
 	d.command = "set"
 	d.updated = true // perhaps we should do a diff on the previous object?
+	fmap := col.FieldMap()
+	d.fmap = make(map[string]int)
+	for key, idx := range fmap {
+		d.fmap[key] = idx
+	}
+	d.timestamp = time.Now()
 	switch msg.OutputType {
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
@@ -584,19 +593,24 @@ func (c *Controller) cmdFset(msg *server.Message) (res string, d commandDetailsT
 		return
 	}
 	var ok bool
-	var updated bool
-	d.obj, d.fields, updated, ok = col.SetField(d.id, d.field, d.value)
+	d.obj, d.fields, d.updated, ok = col.SetField(d.id, d.field, d.value)
 	if !ok {
 		err = errIDNotFound
 		return
 	}
 	d.command = "fset"
-	d.updated = updated
+	d.timestamp = time.Now()
+	fmap := col.FieldMap()
+	d.fmap = make(map[string]int)
+	for key, idx := range fmap {
+		d.fmap[key] = idx
+	}
+
 	switch msg.OutputType {
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
 	case server.RESP:
-		if updated {
+		if d.updated {
 			res = ":1\r\n"
 		} else {
 			res = ":0\r\n"

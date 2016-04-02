@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"strconv"
+	"sync"
 
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
@@ -27,6 +28,7 @@ const (
 )
 
 type scanWriter struct {
+	mu             sync.Mutex
 	wr             *bytes.Buffer
 	msg            *server.Message
 	col            *collection.Collection
@@ -100,6 +102,8 @@ func (sw *scanWriter) hasFieldsOutput() bool {
 }
 
 func (sw *scanWriter) writeHead() {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
 	switch sw.msg.OutputType {
 	case server.JSON:
 		if len(sw.farr) > 0 && sw.hasFieldsOutput() {
@@ -131,6 +135,8 @@ func (sw *scanWriter) writeHead() {
 }
 
 func (sw *scanWriter) writeFoot(cursor uint64) {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
 	if !sw.hitLimit {
 		cursor = 0
 	}
@@ -215,6 +221,8 @@ func (sw *scanWriter) fieldMatch(fields []float64, o geojson.Object) ([]float64,
 }
 
 func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64) bool {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
 	keepGoing := true
 	if !sw.globEverything {
 		if sw.globSingle {

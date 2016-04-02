@@ -16,6 +16,8 @@ import (
 	"github.com/tidwall/tile38/controller/server"
 )
 
+const AsyncHooks = true
+
 type errAOFHook struct {
 	err error
 }
@@ -92,16 +94,7 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 		}
 		if c.config.FollowHost == "" {
 			// process hooks, for leader only
-			if hm, ok := c.hookcols[d.key]; ok {
-				for _, hook := range hm {
-					if err := c.DoHook(hook, d); err != nil {
-						if d.revert != nil {
-							d.revert()
-						}
-						return errAOFHook{err}
-					}
-				}
-			}
+			return c.processHooks(d)
 		}
 	}
 	data, err := value.MarshalRESP()
@@ -126,7 +119,24 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 		c.lcond.Broadcast()
 		c.lcond.L.Unlock()
 	}
+	return nil
+}
 
+func (c *Controller) processHooks(d *commandDetailsT) error {
+	if hm, ok := c.hookcols[d.key]; ok {
+		for _, hook := range hm {
+			if AsyncHooks {
+				go hook.Do(d)
+			} else {
+				if err := hook.Do(d); err != nil {
+					if d.revert != nil {
+						d.revert()
+					}
+					return errAOFHook{err}
+				}
+			}
+		}
+	}
 	return nil
 }
 

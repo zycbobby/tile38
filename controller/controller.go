@@ -35,10 +35,12 @@ type commandDetailsT struct {
 	value     float64
 	obj       geojson.Object
 	fields    []float64
+	fmap      map[string]int
 	oldObj    geojson.Object
 	oldFields []float64
 	updated   bool
 	revert    func()
+	timestamp time.Time
 }
 
 func (col *collectionT) Less(item btree.Item) bool {

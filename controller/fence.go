@@ -2,16 +2,17 @@ package controller
 
 import (
 	"strings"
-	"time"
 
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 )
 
-func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT, mustLock bool) []string {
+var tmfmt = "2006-01-02T15:04:05.999999999Z07:00"
+
+func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) []string {
 	glob := fence.glob
 	if details.command == "drop" {
-		return []string{`{"cmd":"drop"}`}
+		return []string{`{"cmd":"drop","time":` + details.timestamp.Format(tmfmt) + `}`}
 	}
 	match := true
 	if glob != "" && glob != "*" {
@@ -38,51 +39,45 @@ func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenc
 		} else if !match1 && match2 {
 			match = true
 			detect = "enter"
+			if details.command == "fset" {
+				detect = "inside"
+			}
 		} else {
-			// Maybe the old object and new object create a line that crosses the fence.
-			// Must detect for that possibility.
-			if details.oldObj != nil {
-				ls := geojson.LineString{
-					Coordinates: []geojson.Position{
-						details.oldObj.CalculatedPoint(),
-						details.obj.CalculatedPoint(),
-					},
-				}
-				temp := false
-				if fence.cmd == "within" {
-					// because we are testing if the line croses the area we need to use
-					// "intersects" instead of "within".
-					fence.cmd = "intersects"
-					temp = true
-				}
-				if fenceMatchObject(fence, ls) {
-					match = true
-					detect = "cross"
-				}
-				if temp {
-					fence.cmd = "within"
+			if details.command != "fset" {
+				// Maybe the old object and new object create a line that crosses the fence.
+				// Must detect for that possibility.
+				if details.oldObj != nil {
+					ls := geojson.LineString{
+						Coordinates: []geojson.Position{
+							details.oldObj.CalculatedPoint(),
+							details.obj.CalculatedPoint(),
+						},
+					}
+					temp := false
+					if fence.cmd == "within" {
+						// because we are testing if the line croses the area we need to use
+						// "intersects" instead of "within".
+						fence.cmd = "intersects"
+						temp = true
+					}
+					if fenceMatchObject(fence, ls) {
+						match = true
+						detect = "cross"
+					}
+					if temp {
+						fence.cmd = "within"
+					}
 				}
 			}
 		}
 	}
 	if details.command == "del" {
-		return []string{`{"command":"del","id":` + jsonString(details.id) + `}`}
+		return []string{`{"command":"del","id":` + jsonString(details.id) + `,"time":` + details.timestamp.Format(tmfmt) + `}`}
 	}
-	var fmap map[string]int
-	if mustLock {
-		c.mu.RLock()
-	}
-	col := c.getCol(details.key)
-	if col != nil {
-		fmap = col.FieldMap()
-	}
-	if mustLock {
-		c.mu.RUnlock()
-	}
-	if fmap == nil {
+	if details.fmap == nil {
 		return nil
 	}
-	sw.fmap = fmap
+	sw.fmap = details.fmap
 	sw.fullFields = true
 	sw.msg.OutputType = server.JSON
 	sw.writeObject(details.id, details.obj, details.fields)
@@ -98,24 +93,24 @@ func (c *Controller) FenceMatch(hookName string, sw *scanWriter, fence *liveFenc
 		res = `{"id":` + res + `}`
 	}
 	jskey := jsonString(details.key)
-	jstime := time.Now().Format("2006-01-02T15:04:05.999999999Z07:00")
+
 	jshookName := jsonString(hookName)
 	ores := res
 	msgs := make([]string, 0, 2)
 	if fence.detect == nil || fence.detect[detect] {
 		if strings.HasPrefix(ores, "{") {
-			res = `{"command":"` + details.command + `","detect":"` + detect + `","hook":` + jshookName + `,"time":"` + jstime + `","key":` + jskey + `,` + ores[1:]
+			res = `{"command":"` + details.command + `","detect":"` + detect + `","hook":` + jshookName + `,"time":"` + details.timestamp.Format(tmfmt) + `","key":` + jskey + `,` + ores[1:]
 		}
 		msgs = append(msgs, res)
 	}
 	switch detect {
 	case "enter":
 		if fence.detect == nil || fence.detect["inside"] {
-			msgs = append(msgs, `{"command":"`+details.command+`","detect":"inside","hook":`+jshookName+`,"time":"`+jstime+`","key":`+jskey+`,`+ores[1:])
+			msgs = append(msgs, `{"command":"`+details.command+`","detect":"inside","hook":`+jshookName+`,"time":"`+details.timestamp.Format(tmfmt)+`","key":`+jskey+`,`+ores[1:])
 		}
 	case "exit", "cross":
 		if fence.detect == nil || fence.detect["outside"] {
-			msgs = append(msgs, `{"command":"`+details.command+`","detect":"outside","hook":`+jshookName+`,"time":"`+jstime+`","key":`+jskey+`,`+ores[1:])
+			msgs = append(msgs, `{"command":"`+details.command+`","detect":"outside","hook":`+jshookName+`,"time":"`+details.timestamp.Format(tmfmt)+`","key":`+jskey+`,`+ores[1:])
 		}
 	}
 	return msgs

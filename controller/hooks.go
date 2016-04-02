@@ -45,22 +45,22 @@ type Hook struct {
 	ScanWriter *scanWriter
 }
 
-func (c *Controller) DoHook(hook *Hook, details *commandDetailsT) error {
+func (hook *Hook) Do(details *commandDetailsT) error {
 	var lerrs []error
-	msgs := c.FenceMatch(hook.Name, hook.ScanWriter, hook.Fence, details, false)
+	msgs := FenceMatch(hook.Name, hook.ScanWriter, hook.Fence, details)
 nextMessage:
 	for _, msg := range msgs {
 	nextEndpoint:
 		for _, endpoint := range hook.Endpoints {
 			switch endpoint.Protocol {
 			case HTTP:
-				if err := c.sendHTTPMessage(endpoint, []byte(msg)); err != nil {
+				if err := sendHTTPMessage(endpoint, []byte(msg)); err != nil {
 					lerrs = append(lerrs, err)
 					continue nextEndpoint
 				}
 				continue nextMessage // sent
 			case Disque:
-				if err := c.sendDisqueMessage(endpoint, []byte(msg)); err != nil {
+				if err := sendDisqueMessage(endpoint, []byte(msg)); err != nil {
 					lerrs = append(lerrs, err)
 					continue nextEndpoint
 				}
@@ -262,6 +262,7 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 		delete(c.hooks, h.Name)
 	}
 	d.updated = true
+	d.timestamp = time.Now()
 	c.hooks[name] = hook
 	hm, ok := c.hookcols[hook.Key]
 	if !ok {
@@ -297,6 +298,7 @@ func (c *Controller) cmdDelHook(msg *server.Message) (res string, d commandDetai
 		delete(c.hooks, h.Name)
 		d.updated = true
 	}
+	d.timestamp = time.Now()
 
 	switch msg.OutputType {
 	case server.JSON:
@@ -386,7 +388,7 @@ func (c *Controller) cmdHooks(msg *server.Message) (res string, err error) {
 	return "", nil
 }
 
-func (c *Controller) sendHTTPMessage(endpoint Endpoint, msg []byte) error {
+func sendHTTPMessage(endpoint Endpoint, msg []byte) error {
 	resp, err := http.Post(endpoint.Original, "application/json", bytes.NewBuffer(msg))
 	if err != nil {
 		return err
@@ -398,7 +400,7 @@ func (c *Controller) sendHTTPMessage(endpoint Endpoint, msg []byte) error {
 	return nil
 }
 
-func (c *Controller) sendDisqueMessage(endpoint Endpoint, msg []byte) error {
+func sendDisqueMessage(endpoint Endpoint, msg []byte) error {
 	addr := fmt.Sprintf("%s:%d", endpoint.Disque.Host, endpoint.Disque.Port)
 	conn, err := DialTimeout(addr, time.Second/4)
 	if err != nil {

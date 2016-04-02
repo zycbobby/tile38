@@ -59,16 +59,16 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 				greaterGlob := sw.glob[:len(sw.glob)-1]
 				if globIsGlob(greaterGlob) {
 					s.cursor = sw.col.Scan(s.cursor, func(id string, o geojson.Object, fields []float64) bool {
-						return sw.writeObject(id, o, fields)
+						return sw.writeObject(id, o, fields, false)
 					})
 				} else {
 					s.cursor = sw.col.ScanGreaterOrEqual(sw.glob, s.cursor, func(id string, o geojson.Object, fields []float64) bool {
-						return sw.writeObject(id, o, fields)
+						return sw.writeObject(id, o, fields, false)
 					})
 				}
 			} else {
 				s.cursor = sw.col.Scan(s.cursor, func(id string, o geojson.Object, fields []float64) bool {
-					return sw.writeObject(id, o, fields)
+					return sw.writeObject(id, o, fields, false)
 				})
 			}
 		}

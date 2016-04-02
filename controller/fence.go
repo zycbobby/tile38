@@ -10,9 +10,11 @@ import (
 var tmfmt = "2006-01-02T15:04:05.999999999Z07:00"
 
 func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) []string {
+	jshookName := jsonString(hookName)
+	jstime := jsonString(details.timestamp.Format(tmfmt))
 	glob := fence.glob
 	if details.command == "drop" {
-		return []string{`{"cmd":"drop","time":` + details.timestamp.Format(tmfmt) + `}`}
+		return []string{`{"cmd":"drop","hook":` + jshookName + `,"time":` + jstime + `}`}
 	}
 	match := true
 	if glob != "" && glob != "*" {
@@ -22,7 +24,11 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 		return nil
 	}
 
-	if details.obj == nil || (details.command == "fset" && sw.nofields) {
+	sw.mu.Lock()
+	nofields := sw.nofields
+	sw.mu.Unlock()
+
+	if details.obj == nil || (details.command == "fset" && nofields) {
 		return nil
 	}
 	match = false
@@ -72,45 +78,51 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 		}
 	}
 	if details.command == "del" {
-		return []string{`{"command":"del","id":` + jsonString(details.id) + `,"time":` + details.timestamp.Format(tmfmt) + `}`}
+		return []string{`{"command":"del","hook":` + jshookName + `,"id":` + jsonString(details.id) + `,"time":` + jstime + `}`}
 	}
 	if details.fmap == nil {
 		return nil
 	}
+	sw.mu.Lock()
 	sw.fmap = details.fmap
 	sw.fullFields = true
 	sw.msg.OutputType = server.JSON
-	sw.writeObject(details.id, details.obj, details.fields)
+	sw.writeObject(details.id, details.obj, details.fields, true)
 	if sw.wr.Len() == 0 {
+		sw.mu.Unlock()
 		return nil
 	}
 	res := sw.wr.String()
+	resb := make([]byte, len(res))
+	copy(resb, res)
+	res = string(resb)
 	sw.wr.Reset()
-	if strings.HasPrefix(res, ",") {
-		res = res[1:]
-	}
 	if sw.output == outputIDs {
 		res = `{"id":` + res + `}`
 	}
-	jskey := jsonString(details.key)
+	sw.mu.Unlock()
 
-	jshookName := jsonString(hookName)
+	if strings.HasPrefix(res, ",") {
+		res = res[1:]
+	}
+
+	jskey := jsonString(details.key)
 	ores := res
 	msgs := make([]string, 0, 2)
 	if fence.detect == nil || fence.detect[detect] {
 		if strings.HasPrefix(ores, "{") {
-			res = `{"command":"` + details.command + `","detect":"` + detect + `","hook":` + jshookName + `,"time":"` + details.timestamp.Format(tmfmt) + `","key":` + jskey + `,` + ores[1:]
+			res = `{"command":"` + details.command + `","detect":"` + detect + `","hook":` + jshookName + `,"key":` + jskey + `,"time":` + jstime + `,` + ores[1:]
 		}
 		msgs = append(msgs, res)
 	}
 	switch detect {
 	case "enter":
 		if fence.detect == nil || fence.detect["inside"] {
-			msgs = append(msgs, `{"command":"`+details.command+`","detect":"inside","hook":`+jshookName+`,"time":"`+details.timestamp.Format(tmfmt)+`","key":`+jskey+`,`+ores[1:])
+			msgs = append(msgs, `{"command":"`+details.command+`","detect":"inside","hook":`+jshookName+`,"key":`+jskey+`,"time":`+jstime+`,`+ores[1:])
 		}
 	case "exit", "cross":
 		if fence.detect == nil || fence.detect["outside"] {
-			msgs = append(msgs, `{"command":"`+details.command+`","detect":"outside","hook":`+jshookName+`,"time":"`+details.timestamp.Format(tmfmt)+`","key":`+jskey+`,`+ores[1:])
+			msgs = append(msgs, `{"command":"`+details.command+`","detect":"outside","hook":`+jshookName+`,"key":`+jskey+`,"time":`+jstime+`,`+ores[1:])
 		}
 	}
 	return msgs

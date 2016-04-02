@@ -94,7 +94,9 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 		}
 		if c.config.FollowHost == "" {
 			// process hooks, for leader only
-			return c.processHooks(d)
+			if err := c.processHooks(d); err != nil {
+				return err
+			}
 		}
 	}
 	data, err := value.MarshalRESP()

@@ -220,9 +220,11 @@ func (sw *scanWriter) fieldMatch(fields []float64, o geojson.Object) ([]float64,
 	return sw.fvals, true
 }
 
-func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64) bool {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
+func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64, noLock bool) bool {
+	if !noLock {
+		sw.mu.Lock()
+		defer sw.mu.Unlock()
+	}
 	keepGoing := true
 	if !sw.globEverything {
 		if sw.globSingle {

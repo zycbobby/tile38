@@ -3,8 +3,6 @@ package controller
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
@@ -69,16 +67,16 @@ nextMessage:
 		}
 	}
 	if len(lerrs) == 0 {
+		//	log.Notice("YAY")
 		return nil
 	}
 	var errmsgs []string
 	for _, err := range lerrs {
 		errmsgs = append(errmsgs, err.Error())
 	}
-	if len(errmsgs) > 0 {
-		return errors.New("not sent: " + strings.Join(errmsgs, ","))
-	}
-	return errors.New("not sent")
+	err := errors.New("not sent: " + strings.Join(errmsgs, ","))
+	log.Error(err)
+	return err
 }
 
 type hooksByName []*Hook
@@ -386,44 +384,4 @@ func (c *Controller) cmdHooks(msg *server.Message) (res string, err error) {
 		return string(data), nil
 	}
 	return "", nil
-}
-
-func sendHTTPMessage(endpoint Endpoint, msg []byte) error {
-	resp, err := http.Post(endpoint.Original, "application/json", bytes.NewBuffer(msg))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("enpoint returned status code %d", resp.StatusCode)
-	}
-	return nil
-}
-
-func sendDisqueMessage(endpoint Endpoint, msg []byte) error {
-	addr := fmt.Sprintf("%s:%d", endpoint.Disque.Host, endpoint.Disque.Port)
-	conn, err := DialTimeout(addr, time.Second/4)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	options := []interface{}{endpoint.Disque.QueueName, msg, 0}
-	replicate := endpoint.Disque.Options.Replicate
-	if replicate > 0 {
-		options = append(options, "REPLICATE")
-		options = append(options, endpoint.Disque.Options.Replicate)
-	}
-	v, err := conn.Do("ADDJOB", options...)
-	if err != nil {
-		return err
-	}
-	if v.Error() != nil {
-		return v.Error()
-	}
-	id := v.String()
-	p := strings.Split(id, "-")
-	if len(p) != 4 {
-		return errors.New("invalid disque reply")
-	}
-	return nil
 }

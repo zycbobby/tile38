@@ -8,7 +8,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/tidwall/tile38/client"
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/controller/server"
 )
@@ -139,7 +138,7 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *server.AnyReaderWrit
 	var livemsg []byte
 	switch outputType {
 	case server.JSON:
-		livemsg = []byte(client.LiveJSON)
+		livemsg = []byte(`{"ok":true,"live":true}`)
 	case server.RESP:
 		livemsg = []byte("+OK\r\n")
 	}

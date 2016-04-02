@@ -239,7 +239,7 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	sw.writeHead()
 	if sw.col != nil {
 		s.cursor = sw.col.Nearby(s.cursor, s.sparse, s.lat, s.lon, s.meters, func(id string, o geojson.Object, fields []float64) bool {
-			return sw.writeObject(id, o, fields)
+			return sw.writeObject(id, o, fields, false)
 		})
 	}
 	sw.writeFoot(s.cursor)
@@ -279,13 +279,13 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 	if cmd == "within" {
 		s.cursor = sw.col.Within(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon,
 			func(id string, o geojson.Object, fields []float64) bool {
-				return sw.writeObject(id, o, fields)
+				return sw.writeObject(id, o, fields, false)
 			},
 		)
 	} else if cmd == "intersects" {
 		s.cursor = sw.col.Intersects(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon,
 			func(id string, o geojson.Object, fields []float64) bool {
-				return sw.writeObject(id, o, fields)
+				return sw.writeObject(id, o, fields, false)
 			},
 		)
 	}

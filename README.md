@@ -12,9 +12,10 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 
 - Spatial index with [search](#searching) methods such as Nearby, Within, and Intersects.
 - Realtime [geofencing](#geofencing) through persistent sockets or [webhooks](http://tile38.com/commands/sethook).
-- Variety of client protocols, including [http](#http) (curl), [websockets](#websockets), [telnet](#telnet), and a [native interface](#native-interface).
 - Object types of [lat/lon](#latlon-point), [bbox](#bounding-box), [Geohash](#geohash), [GeoJSON](#geojson), [QuadKey](#quadkey), and [XYZ tile](#xyz-tile).
-- Server responses are in json.
+- Excellent support for lots of [Clients Libraries](#client-libraries) written in many different langauges.
+- Variety of protocols, including [http](#http) (curl), [websockets](#websockets), [telnet](#telnet), and the Redis [RESP protocol)](http://redis.io/topics/protocol).
+- Server responses are [RESP](http://redis.io/topics/protocol) or [JSON](http://www.json.org).
 - Full [command line interface](#cli).
 - Leader / follower [replication](#replication).
 - In-memory database that persists on disk.
@@ -219,7 +220,7 @@ A QuadKey used the same coordinate system as an XYZ tile except that the string 
 
 ## Network protocols
 
-It's recommended to use the [native interface](#native-interface), but there are times when only HTTP is available or when you need to test from a remote terminal. In those cases we provide an HTTP and telnet options.
+It's recommended to use a [client library](#client-libraries) or the [Tile38 CLI](#running), but there are times when only HTTP is available or when you need to test from a remote terminal. In those cases we provide an HTTP and telnet options.
 
 #### HTTP
 One of the simplest ways to call a tile38 command is to use HTTP. From the command line you can use [curl](https://curl.haxx.se/). For example:
@@ -236,44 +237,41 @@ curl localhost:9851/set+fleet+truck3+point+33.4762+-112.10923
 Websockets can be used when you need to Geofence and keep the connection alive. It works just like the HTTP example above, with the exception that the connection stays alive and the data is sent from the server as text websocket messages.
 
 #### Telnet
-There is the option to use a plain telnet connection.
+There is the option to use a plain telnet connection. The default output through telnet is [RESP](http://redis.io/topics/protocol).
 
 ```
 telnet localhost 9851
 set fleet truck3 point 33.4762 -112.10923
-{"ok":true,"elapsed":"18.73µs"}
++OK
+
 ```
 
-#### Native interface
-The native interface is very simple. A single message is composed of a '$' + TEXT_DATA_SIZE + SPACE + DATA + CRLF.
+The server will respond in [JSON](http://json.org) or [RESP](http://redis.io/topics/protocol) depending on which protocol is used when initiating the first command.
 
-So the request message:
-```
-get fleet truck1
-```
-
-Should be sent to the server as (without quotes):
-
-```c
-"$16 get fleet truck1\r\n"
-```
-
-The server will always respond in JSON, and will include the top level member `ok`. When `ok` is `false` there will also be an accompanied `err` member describing the problem. In nearly every response there will also be an `elapsed` member that is the duration of time that it took to process the request on the server. For more information on this string please refer to the [time.Duration](https://golang.org/pkg/time/#Duration) Go documentation.
-
-So the response message:
-```json
-{"ok":true,"elapsed":"37.829µs"}
-```
-Will be sent to the client as (without quotes):
-
-```c
-"$32 {"ok":true,"elapsed":"37.829µs"}\r\n"
-```
+- HTTP and Websockets use JSON. 
+- Telnet and RESP clients use RESP.
 
 ## Clients
-Currently we have only one native client written in Go. Though is should be trivial to write a client in your language of choice.
 
-- [Go](https://github.com/tidwall/tile38/tree/master/client)
+Tile38 uses the [Redis RESP](http://redis.io/topics/protocol) protocol natively. Therefore all clients that support basic Redis commands will in turn support Tile38. Below are a few of the popular clients. For a more complete list, please see the [Redis Clients](http://redis.io/clients) page.
+
+- C: [hiredis](https://github.com/redis/hiredis)
+- C#: [StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis)
+- C++: [redox](https://github.com/hmartiro/redox)
+- Clojure: [carmine](https://github.com/ptaoussanis/carmine)
+- Common Lisp: [CL-Redis](https://github.com/vseloved/cl-redis)
+- Erlang: [Eredis](https://github.com/wooga/eredis)
+- Go: [Redigo](https://github.com/garyburd/redigo)
+- Haskell: [hedis](https://github.com/informatikr/hedis)
+- Java: [lettuce](https://github.com/mp911de/lettuce)
+- Node.js: [node_redis](https://github.com/NodeRedis/node_redis) 
+- Perl: [perl-redis](https://github.com/PerlRedis/perl-redis)
+- PHP: [phpredis](https://github.com/phpredis/phpredis)
+- Python: [redis-py](https://github.com/andymccurdy/redis-py)
+- Ruby: [redis-rb](https://github.com/redis/redis-rb)
+- Rust: [redis-rs](https://github.com/mitsuhiko/redis-rs)
+- Scala: [scala-redis](https://github.com/debasishg/scala-redis)
+- Swift: [Redbird](https://github.com/czechboy0/Redbird)
 
 ## Contact
 Josh Baker [@tidwall](http://twitter.com/tidwall)

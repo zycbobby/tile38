@@ -189,6 +189,9 @@ func insertRectRec(rect rectT, item Item, node *nodeT, newNode **nodeT, level in
 	var branch branchT
 	var otherNode *nodeT
 	// Still above level for insertion, go down tree recursively
+	if node == nil {
+		return false
+	}
 	if node.level > level {
 		index = pickBranch(rect, node)
 		if !insertRectRec(rect, item, node.branch[index].child, &otherNode, level) {
@@ -198,6 +201,9 @@ func insertRectRec(rect rectT, item Item, node *nodeT, newNode **nodeT, level in
 		} // Child was split
 		node.branch[index].rect = nodeCover(node.branch[index].child)
 		branch.child = otherNode
+		if branch.child == nil {
+			println(">> child assigned is nil")
+		}
 		branch.rect = nodeCover(otherNode)
 		return addBranch(&branch, node, newNode)
 	} else if node.level == level { // Have reached level for insertion. Add rect, split if necessary
@@ -221,14 +227,23 @@ func insertRect(rect rectT, item Item, root **nodeT, level int) bool {
 	var newRoot *nodeT
 	var newNode *nodeT
 	var branch branchT
+	if *root == nil {
+		println(">> root is nil")
+	}
 	if insertRectRec(rect, item, *root, &newNode, level) { // Root split
 		newRoot = &nodeT{} // Grow tree taller and new root
 		newRoot.level = (*root).level + 1
 		branch.rect = nodeCover(*root)
 		branch.child = *root
+		if branch.child == nil {
+			println(">> child assigned is nil 2")
+		}
 		addBranch(&branch, newRoot, nil)
 		branch.rect = nodeCover(newNode)
 		branch.child = newNode
+		if branch.child == nil {
+			println(">> child assigned is nil 3")
+		}
 		addBranch(&branch, newRoot, nil)
 		*root = newRoot
 		return true
@@ -549,6 +564,9 @@ func removeRect(rect rectT, item Item, root **nodeT) bool {
 // merges branches on the way back up.
 // Returns 1 if record not found, 0 if success.
 func removeRectRec(rect rectT, item Item, node *nodeT, listNode **listNodeT) bool {
+	if node == nil {
+		return true
+	}
 	if node.isInternalNode() { // not a leaf node
 		for index := 0; index < node.count; index++ {
 			if overlap(rect, node.branch[index].rect) {
@@ -599,6 +617,9 @@ func reInsert(node *nodeT, listNode **listNodeT) {
 
 // Search in an index tree or subtree for all data retangles that overlap the argument rectangle.
 func search(node *nodeT, rect rectT, iterator func(item Item) bool) bool {
+	if node == nil {
+		return true
+	}
 	if node.isInternalNode() { // This is an internal node in the tree
 		for index := 0; index < node.count; index++ {
 			nrect := node.branch[index].rect

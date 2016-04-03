@@ -5,6 +5,8 @@ clean:
 	rm -f tile38-cli
 test:
 	@./build.sh test
+cover:
+	@./build.sh cover
 install: all
 	cp tile38-server /usr/local/bin
 	cp tile38-cli /usr/local/bin

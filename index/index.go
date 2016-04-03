@@ -201,8 +201,6 @@ func (ix *Index) Search(cursor uint64, swLat, swLon, neLat, neLon float64, itera
 								idm[iitm] = true
 								active = iterator(iitm)
 							}
-						} else {
-							active = iterator(iitm)
 						}
 					}
 					idx++
@@ -217,12 +215,14 @@ func (ix *Index) Search(cursor uint64, swLat, swLon, neLat, neLon float64, itera
 					if idx >= cursor {
 						iitm := ix.getRTreeItem(item)
 						if iitm != nil {
-							if !idm[iitm] {
-								idm[iitm] = true
+							if ix.mulm[iitm] {
+								if !idm[iitm] {
+									idm[iitm] = true
+									active = iterator(iitm)
+								}
+							} else {
 								active = iterator(iitm)
 							}
-						} else {
-							active = iterator(iitm)
 						}
 					}
 					idx++

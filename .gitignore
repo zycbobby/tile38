@@ -2,3 +2,4 @@
 tile38-*
 !cmd/tile38-*
 data*/
+coverage.out 

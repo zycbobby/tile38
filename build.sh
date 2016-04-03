@@ -108,3 +108,14 @@ if [ "$1" == "test" ]; then
 	go test $(go list ./... | grep -v /vendor/)
 fi
 
+# cover if requested
+if [ "$1" == "cover" ]; then
+	$OD/tile38-server -p 9876 -d "$TMP" -q &
+	PID=$!
+	function testend {
+		kill $PID &
+	}
+	trap testend EXIT
+	go test -cover $(go list ./... | grep -v /vendor/)
+fi
+

@@ -67,7 +67,7 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 						temp = true
 					}
 					if fenceMatchObject(fence, ls) {
-						match = true
+						//match = true
 						detect = "cross"
 					}
 					if temp {

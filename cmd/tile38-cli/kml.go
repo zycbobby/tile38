@@ -12,18 +12,22 @@ type pointT struct {
 	point geojson.SimplePoint
 }
 
+// KML represents a KML object.
 type KML struct {
 	points []pointT
 }
 
+// NewKML returns a new KML object.
 func NewKML() *KML {
 	return &KML{}
 }
 
+// AddPoint adds a point to a KML object.
 func (kml *KML) AddPoint(name string, lat, lon float64) {
 	kml.points = append(kml.points, pointT{name: name, point: geojson.SimplePoint{X: lon, Y: lat}})
 }
 
+// Bytes returns the xml of the KML.
 func (kml *KML) Bytes() []byte {
 	var buf bytes.Buffer
 	buf.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")

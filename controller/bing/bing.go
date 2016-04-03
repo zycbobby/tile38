@@ -5,13 +5,13 @@ package bing
 import "math"
 
 const (
-	EarthRadius      = 6378137.0
-	MinLatitude      = -85.05112878
-	MaxLatitude      = 85.05112878
-	MinLongitude     = -180.0
-	MaxLongitude     = 180.0
-	TileSize         = 256
-	MaxLevelOfDetail = 38
+	EarthRadius      = 6378137.0    // The radius of the earth
+	MinLatitude      = -85.05112878 // The min lat
+	MaxLatitude      = 85.05112878  // The max lat
+	MinLongitude     = -180.0       // The min lon
+	MaxLongitude     = 180.0        // The max lon
+	TileSize         = 256          // The size of a tile
+	MaxLevelOfDetail = 38           // The max level of detail
 )
 
 // Clips a number to the specified minimum and maximum values.
@@ -29,7 +29,7 @@ func clip(n, minValue, maxValue float64) float64 {
 	return n
 }
 
-// Determines the map width and height (in pixels) at a specified level of detail.
+// MapSize determines the map width and height (in pixels) at a specified level of detail.
 // Param 'levelOfDetail' is the level of detail, from 1 (lowest detail) to N (highest detail).
 // Returns the map width and height in pixels.
 func MapSize(levelOfDetail uint64) uint64 {
@@ -54,7 +54,7 @@ func MapSize(levelOfDetail uint64) uint64 {
 // 	return GroundResolution(latitude, levelOfDetail) * float64(screenDpi) / 0.0254
 // }
 
-// Converts a point from latitude/longitude WGS-84 coordinates (in degrees) into pixel XY coordinates at a specified level of detail.
+// LatLongToPixelXY converts a point from latitude/longitude WGS-84 coordinates (in degrees) into pixel XY coordinates at a specified level of detail.
 // Param 'latitude' is the latitude of the point, in degrees.
 // Param 'longitude' is the longitude of the point, in degrees.
 // Param 'levelOfDetail' is the level of detail, from 1 (lowest detail) to N (highest detail).
@@ -72,7 +72,7 @@ func LatLongToPixelXY(latitude, longitude float64, levelOfDetail uint64) (pixelX
 	return
 }
 
-// Converts a pixel from pixel XY coordinates at a specified level of detail into latitude/longitude WGS-84 coordinates (in degrees).
+// PixelXYToLatLong converts a pixel from pixel XY coordinates at a specified level of detail into latitude/longitude WGS-84 coordinates (in degrees).
 // Param 'pixelX' is the X coordinate of the point, in pixels.
 // Param 'pixelY' is the Y coordinates of the point, in pixels.
 // Param 'levelOfDetail' is the level of detail, from 1 (lowest detail) to N (highest detail).
@@ -87,7 +87,7 @@ func PixelXYToLatLong(pixelX, pixelY int64, levelOfDetail uint64) (latitude, lon
 	return
 }
 
-// Converts pixel XY coordinates into tile XY coordinates of the tile containing the specified pixel.
+// PixelXYToTileXY converts pixel XY coordinates into tile XY coordinates of the tile containing the specified pixel.
 // Param 'pixelX' is the pixel X coordinate.
 // Param 'pixelY' is the pixel Y coordinate.
 // Return value 'tileX' is the output parameter receiving the tile X coordinate.
@@ -96,7 +96,7 @@ func PixelXYToTileXY(pixelX, pixelY int64) (tileX, tileY int64) {
 	return pixelX >> 8, pixelY >> 8
 }
 
-// Converts tile XY coordinates into pixel XY coordinates of the upper-left pixel of the specified tile.
+// TileXYToPixelXY converts tile XY coordinates into pixel XY coordinates of the upper-left pixel of the specified tile.
 // Param 'tileX' is the tile X coordinate.
 // Param 'tileY' is the tile Y coordinate.
 // Return value 'pixelX' is the output parameter receiving the pixel X coordinate.
@@ -105,7 +105,7 @@ func TileXYToPixelXY(tileX, tileY int64) (pixelX, pixelY int64) {
 	return tileX << 8, tileY << 8
 }
 
-/// Converts tile XY coordinates into a QuadKey at a specified level of detail.
+/// TileXYToQuadKey converts tile XY coordinates into a QuadKey at a specified level of detail.
 /// Param 'tileX' is the tile X coordinate.
 /// Param 'tileY' is the tile Y coordinate.
 /// Param 'levelOfDetail' is the Level of detail, from 1 (lowest detail) to N (highest detail).
@@ -129,7 +129,7 @@ func TileXYToQuadKey(tileX, tileY int64, levelOfDetail uint64) string {
 	return string(quadKey)
 }
 
-/// Converts a QuadKey into tile XY coordinates.
+/// QuadKeyToTileXY converts a QuadKey into tile XY coordinates.
 /// Param 'quadKey' is the quadKey of the tile.
 /// Return value 'tileX' is the output parameter receiving the tile X coordinate.
 /// Return value 'tileY is the output parameter receiving the tile Y coordinate.

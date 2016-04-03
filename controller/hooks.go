@@ -14,13 +14,15 @@ import (
 	"github.com/tidwall/tile38/controller/server"
 )
 
+// EndpointProtocol is the type of protocol that the endpoint represents.
 type EndpointProtocol string
 
 const (
-	HTTP   = EndpointProtocol("http")
-	Disque = EndpointProtocol("disque")
+	HTTP   = EndpointProtocol("http")   // HTTP
+	Disque = EndpointProtocol("disque") // Disque
 )
 
+// Endpoint represents an endpoint.
 type Endpoint struct {
 	Protocol EndpointProtocol
 	Original string
@@ -34,6 +36,7 @@ type Endpoint struct {
 	}
 }
 
+// Hook represents a hook.
 type Hook struct {
 	Key        string
 	Name       string
@@ -43,6 +46,7 @@ type Hook struct {
 	ScanWriter *scanWriter
 }
 
+// Do performs a hook.
 func (hook *Hook) Do(details *commandDetailsT) error {
 	var lerrs []error
 	msgs := FenceMatch(hook.Name, hook.ScanWriter, hook.Fence, details)
@@ -304,9 +308,8 @@ func (c *Controller) cmdDelHook(msg *server.Message) (res string, d commandDetai
 	case server.RESP:
 		if d.updated {
 			return ":1\r\n", d, nil
-		} else {
-			return ":0\r\n", d, nil
 		}
+		return ":0\r\n", d, nil
 	}
 	return
 }

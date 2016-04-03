@@ -15,6 +15,7 @@ import (
 
 var errCorruptedAOF = errors.New("corrupted aof file")
 
+// LegacyAOFReader represents the older AOF file reader.
 type LegacyAOFReader struct {
 	r     io.Reader // reader
 	rerr  error     // read error
@@ -24,6 +25,7 @@ type LegacyAOFReader struct {
 	p     int       // pointer
 }
 
+// ReadCommand reads an old command.
 func (rd *LegacyAOFReader) ReadCommand() ([]byte, error) {
 	if rd.l >= 4 {
 		sz1 := int(binary.LittleEndian.Uint32(rd.buf[rd.p:]))
@@ -75,6 +77,7 @@ func (rd *LegacyAOFReader) ReadCommand() ([]byte, error) {
 	return rd.ReadCommand()
 }
 
+// NewLegacyAOFReader creates a new LegacyAOFReader.
 func NewLegacyAOFReader(r io.Reader) *LegacyAOFReader {
 	rd := &LegacyAOFReader{r: r, chunk: make([]byte, 0xFFFF)}
 	return rd

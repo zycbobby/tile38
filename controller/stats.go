@@ -129,7 +129,7 @@ func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 
 func respValuesSimpleMap(m map[string]interface{}) []resp.Value {
 	var keys []string
-	for key, _ := range m {
+	for key := range m {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)

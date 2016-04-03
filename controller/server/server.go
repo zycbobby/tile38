@@ -39,6 +39,7 @@ NOTE: You only need to do one of the above things in order for the server
 to start accepting connections from the outside.
 `) + "\r\n")
 
+// Conn represents a server connection.
 type Conn struct {
 	net.Conn
 	Authenticated bool
@@ -137,6 +138,7 @@ func handleConn(
 	}
 }
 
+// WriteWebSocketMessage write a websocket message to an io.Writer.
 func WriteWebSocketMessage(w io.Writer, data []byte) error {
 	var msg []byte
 	buf := make([]byte, 10+len(data))
@@ -160,6 +162,7 @@ func WriteWebSocketMessage(w io.Writer, data []byte) error {
 	return err
 }
 
+// OKMessage returns a default OK message in JSON or RESP.
 func OKMessage(msg *Message, start time.Time) string {
 	switch msg.OutputType {
 	case JSON:

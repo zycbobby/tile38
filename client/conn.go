@@ -21,13 +21,14 @@ const LiveJSON = `{"ok":true,"live":true}`
 // MaxMessageSize is maximum accepted message size
 const MaxMessageSize = 0x1FFFFFFF // 536,870,911 bytes
 
+// Proto is the protocol value.
 type Proto int
 
 const (
-	Native    Proto = 0
-	Telnet    Proto = 1
-	HTTP      Proto = 2
-	WebSocket Proto = 3
+	Native    Proto = 0 // native protocol
+	Telnet    Proto = 1 // telnet protocol
+	HTTP      Proto = 2 // http protocol
+	WebSocket Proto = 3 // websocket protocol
 )
 
 // Conn represents a connection to a tile38 server.
@@ -67,12 +68,17 @@ func (conn *Conn) Close() error {
 	return conn.pool.put(conn)
 }
 
+// SetDeadline sets the connection deadline for reads and writes.
 func (conn *Conn) SetDeadline(t time.Time) error {
 	return conn.c.SetDeadline(t)
 }
+
+// SetDeadline sets the connection deadline for reads.
 func (conn *Conn) SetReadDeadline(t time.Time) error {
 	return conn.c.SetReadDeadline(t)
 }
+
+// SetDeadline sets the connection deadline for writes.
 func (conn *Conn) SetWriteDeadline(t time.Time) error {
 	return conn.c.SetWriteDeadline(t)
 }
@@ -123,6 +129,7 @@ func WriteMessage(w io.Writer, message []byte) error {
 	return err
 }
 
+// WriteHTTP writes an http message to the connection and closes the connection.
 func WriteHTTP(conn net.Conn, data []byte) error {
 	var buf bytes.Buffer
 	buf.WriteString("HTTP/1.1 200 OK\r\n")
@@ -136,6 +143,7 @@ func WriteHTTP(conn net.Conn, data []byte) error {
 	return err
 }
 
+// WriteWebSocket writes a websocket message.
 func WriteWebSocket(conn net.Conn, data []byte) error {
 	var msg []byte
 	buf := make([]byte, 10+len(data))
@@ -179,6 +187,8 @@ func readMessage(wr io.Writer, rd *bufio.Reader) (message []byte, proto Proto, a
 	return message, proto, auth, nil
 
 }
+
+// ReadMessage read the next message from a bufio Reader.
 func ReadMessage(rd *bufio.Reader, wr io.Writer) (message []byte, proto Proto, auth string, err error) {
 	return readMessage(wr, rd)
 }

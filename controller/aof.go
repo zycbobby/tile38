@@ -16,6 +16,7 @@ import (
 	"github.com/tidwall/tile38/controller/server"
 )
 
+// AsyncHooks indicates that the hooks should happen in the background.
 const AsyncHooks = true
 
 type errAOFHook struct {

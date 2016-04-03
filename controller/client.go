@@ -7,12 +7,14 @@ import (
 	"github.com/tidwall/resp"
 )
 
+// Conn represents a simple resp connection.
 type Conn struct {
 	conn net.Conn
 	rd   *resp.Reader
 	wr   *resp.Writer
 }
 
+// DialTimeout dials a resp server.
 func DialTimeout(address string, timeout time.Duration) (*Conn, error) {
 	tcpconn, err := net.DialTimeout("tcp", address, timeout)
 	if err != nil {
@@ -26,11 +28,13 @@ func DialTimeout(address string, timeout time.Duration) (*Conn, error) {
 	return conn, nil
 }
 
+// Close closes the connection.
 func (conn *Conn) Close() error {
 	conn.wr.WriteMultiBulk("quit")
 	return conn.conn.Close()
 }
 
+// Do performs a command and returns a resp value.
 func (conn *Conn) Do(commandName string, args ...interface{}) (val resp.Value, err error) {
 	if err := conn.wr.WriteMultiBulk(commandName, args...); err != nil {
 		return val, err

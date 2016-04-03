@@ -358,9 +358,8 @@ func convert2termrespval(v resp.Value, spaces int) string {
 	case resp.BulkString:
 		if v.IsNull() {
 			return "(nil)"
-		} else {
-			return "\"" + v.String() + "\""
 		}
+		return "\"" + v.String() + "\""
 	case resp.Integer:
 		return "(integer) " + v.String()
 	case resp.Error:

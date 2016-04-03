@@ -2,6 +2,7 @@ package bing
 
 import "errors"
 
+// LatLongToQuad iterates through all of the quads parts until levelOfDetail is reached.
 func LatLongToQuad(latitude, longitude float64, levelOfDetail uint64, iterator func(part int) bool) {
 	pixelX, pixelY := LatLongToPixelXY(latitude, longitude, levelOfDetail)
 	tileX, tileY := PixelXYToTileXY(pixelX, pixelY)
@@ -17,16 +18,15 @@ func partForTileXY(tileX, tileY int64, levelOfDetail uint64) int {
 	if (tileX & mask) != 0 {
 		if (tileY & mask) != 0 {
 			return 3
-		} else {
-			return 1
 		}
+		return 1
 	} else if (tileY & mask) != 0 {
 		return 2
-	} else {
-		return 0
 	}
+	return 0
 }
 
+// TileXYToBounds returns the bounds around a tile.
 func TileXYToBounds(tileX, tileY int64, levelOfDetail uint64) (minLat, minLon, maxLat, maxLon float64) {
 	size := int64(1 << levelOfDetail)
 	pixelX, pixelY := TileXYToPixelXY(tileX, tileY)
@@ -48,6 +48,7 @@ func TileXYToBounds(tileX, tileY int64, levelOfDetail uint64) (minLat, minLon, m
 	return
 }
 
+// QuadKeyToBounds convers a quadkey to bounds
 func QuadKeyToBounds(quadkey string) (minLat, minLon, maxLat, maxLon float64, err error) {
 	for i := 0; i < len(quadkey); i++ {
 		switch quadkey[i] {

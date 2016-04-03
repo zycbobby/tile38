@@ -9,6 +9,7 @@ import (
 
 var tmfmt = "2006-01-02T15:04:05.999999999Z07:00"
 
+// FenceMatch executes a fence match returns back json messages for fence detection.
 func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) []string {
 	jshookName := jsonString(hookName)
 	jstime := jsonString(details.timestamp.Format(tmfmt))
@@ -137,21 +138,19 @@ func fenceMatchObject(fence *liveFenceSwitches, obj geojson.Object) bool {
 	} else if fence.cmd == "within" {
 		if fence.o != nil {
 			return obj.Within(fence.o)
-		} else {
-			return obj.WithinBBox(geojson.BBox{
-				Min: geojson.Position{X: fence.minLon, Y: fence.minLat, Z: 0},
-				Max: geojson.Position{X: fence.maxLon, Y: fence.maxLat, Z: 0},
-			})
 		}
+		return obj.WithinBBox(geojson.BBox{
+			Min: geojson.Position{X: fence.minLon, Y: fence.minLat, Z: 0},
+			Max: geojson.Position{X: fence.maxLon, Y: fence.maxLat, Z: 0},
+		})
 	} else if fence.cmd == "intersects" {
 		if fence.o != nil {
 			return obj.Intersects(fence.o)
-		} else {
-			return obj.IntersectsBBox(geojson.BBox{
-				Min: geojson.Position{X: fence.minLon, Y: fence.minLat, Z: 0},
-				Max: geojson.Position{X: fence.maxLon, Y: fence.maxLat, Z: 0},
-			})
 		}
+		return obj.IntersectsBBox(geojson.BBox{
+			Min: geojson.Position{X: fence.minLon, Y: fence.minLat, Z: 0},
+			Max: geojson.Position{X: fence.maxLon, Y: fence.maxLat, Z: 0},
+		})
 	}
 	return false
 }

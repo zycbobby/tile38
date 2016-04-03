@@ -13,8 +13,9 @@ import (
 	"github.com/tidwall/resp"
 )
 
-const TelnetIsJSON = false
+const telnetIsJSON = false
 
+// Type is resp type
 type Type int
 
 const (
@@ -27,6 +28,7 @@ const (
 	JSON
 )
 
+// String return a string for type.
 func (t Type) String() string {
 	switch t {
 	default:
@@ -56,6 +58,7 @@ func (err errRESPProtocolError) Error() string {
 	return "Protocol error: " + err.msg
 }
 
+// Message is a resp message
 type Message struct {
 	Command    string
 	Values     []resp.Value
@@ -64,12 +67,14 @@ type Message struct {
 	Auth       string
 }
 
+// AnyReaderWriter is resp or native reader writer.
 type AnyReaderWriter struct {
 	rd *bufio.Reader
 	wr io.Writer
 	ws bool
 }
 
+// NewAnyReaderWriter returns an AnyReaderWriter object.
 func NewAnyReaderWriter(rd io.Reader) *AnyReaderWriter {
 	ar := &AnyReaderWriter{}
 	if rd2, ok := rd.(*bufio.Reader); ok {
@@ -119,6 +124,7 @@ func (ar *AnyReaderWriter) readcrlfline() (string, error) {
 	}
 }
 
+// ReadMessage reads the next resp message.
 func (ar *AnyReaderWriter) ReadMessage() (*Message, error) {
 	b, err := ar.rd.ReadByte()
 	if err != nil {
@@ -210,7 +216,7 @@ func (ar *AnyReaderWriter) readMultiBulkMessage() (*Message, error) {
 	if len(values) == 0 {
 		return nil, nil
 	}
-	if telnet && TelnetIsJSON {
+	if telnet && telnetIsJSON {
 		return &Message{Command: commandValues(values), Values: values, ConnType: Telnet, OutputType: JSON}, nil
 	}
 	return &Message{Command: commandValues(values), Values: values, ConnType: RESP, OutputType: RESP}, nil

@@ -232,10 +232,9 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		case server.RESP:
 			if err == errInvalidNumberOfArguments {
 				return writeOutput("-ERR wrong number of arguments for '" + msg.Command + "' command\r\n")
-			} else {
-				v, _ := resp.ErrorValue(errors.New("ERR " + err.Error())).MarshalRESP()
-				return writeOutput(string(v))
 			}
+			v, _ := resp.ErrorValue(errors.New("ERR " + err.Error())).MarshalRESP()
+			return writeOutput(string(v))
 		}
 		return nil
 	}

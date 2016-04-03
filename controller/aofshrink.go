@@ -116,7 +116,7 @@ func (c *Controller) aofshrink() {
 		}
 		c.aofsz = int(n)
 		// kill all followers connections
-		for conn, _ := range c.aofconnM {
+		for conn := range c.aofconnM {
 			conn.Close()
 		}
 	}()

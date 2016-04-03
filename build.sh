@@ -72,7 +72,7 @@ OD="$(pwd)"
 
 package(){
 	echo Packaging $1 Binary
-	bdir=tile38-v${VERSION}-$2-$3
+	bdir=tile38-${VERSION}-$2-$3
 	rm -rf packages/$bdir && mkdir -p packages/$bdir
 	GOOS=$2 GOARCH=$3 ./build.sh
 	mv tile38-server packages/$bdir

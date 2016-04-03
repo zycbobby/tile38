@@ -463,12 +463,12 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (d commandDetailsT, fields []
 		}
 		g := geojson.Polygon{
 			Coordinates: [][]geojson.Position{
-				[]geojson.Position{
-					geojson.Position{X: minlon, Y: minlat, Z: 0},
-					geojson.Position{X: minlon, Y: maxlat, Z: 0},
-					geojson.Position{X: maxlon, Y: maxlat, Z: 0},
-					geojson.Position{X: maxlon, Y: minlat, Z: 0},
-					geojson.Position{X: minlon, Y: minlat, Z: 0},
+				{
+					{X: minlon, Y: minlat, Z: 0},
+					{X: minlon, Y: maxlat, Z: 0},
+					{X: maxlon, Y: maxlat, Z: 0},
+					{X: maxlon, Y: minlat, Z: 0},
+					{X: minlon, Y: minlat, Z: 0},
 				},
 			},
 		}

@@ -20,7 +20,6 @@ func (c *Controller) cmdMassInsert(msg *server.Message) (res string, err error) 
 	start := time.Now()
 	vs := msg.Values[1:]
 
-	// massinsert simply forwards a bunch of cmdSets
 	var snumCols, snumPoints string
 	var cols, objs int
 	var ok bool

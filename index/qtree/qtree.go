@@ -24,7 +24,7 @@ type nodeT struct {
 	nodes  [4]*nodeT
 }
 
-// QTree is an implentation of a quad tree
+// QTree is an implementation of a quad tree
 type QTree struct {
 	root       *nodeT
 	minX, minY float64

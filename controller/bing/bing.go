@@ -5,13 +5,20 @@ package bing
 import "math"
 
 const (
-	EarthRadius      = 6378137.0    // The radius of the earth
-	MinLatitude      = -85.05112878 // The min lat
-	MaxLatitude      = 85.05112878  // The max lat
-	MinLongitude     = -180.0       // The min lon
-	MaxLongitude     = 180.0        // The max lon
-	TileSize         = 256          // The size of a tile
-	MaxLevelOfDetail = 38           // The max level of detail
+	// EarthRadius is the radius of the earth
+	EarthRadius = 6378137.0
+	// MinLatitude is the min lat
+	MinLatitude = -85.05112878
+	// MaxLatitude is the max lat
+	MaxLatitude = 85.05112878
+	// MinLongitude is the min lon
+	MinLongitude = -180.0
+	// MaxLongitude is the max lon
+	MaxLongitude = 180.0
+	// TileSize is the size of a tile
+	TileSize = 256
+	// MaxLevelOfDetail is the max level of detail
+	MaxLevelOfDetail = 38
 )
 
 // Clips a number to the specified minimum and maximum values.

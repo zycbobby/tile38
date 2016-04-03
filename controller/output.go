@@ -13,7 +13,7 @@ func (c *Controller) cmdOutput(msg *server.Message) (res string, err error) {
 	var arg string
 	var ok bool
 	if len(vs) != 0 {
-		if vs, arg, ok = tokenval(vs); !ok || arg == "" {
+		if _, arg, ok = tokenval(vs); !ok || arg == "" {
 			return "", errInvalidNumberOfArguments
 		}
 		// Setting the original message output type will be picked up by the

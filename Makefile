@@ -13,3 +13,5 @@ install: all
 uninstall: 
 	rm -f /usr/local/bin/tile38-server
 	rm -f /usr/local/bin/tile38-cli
+package:
+	@./build.sh package

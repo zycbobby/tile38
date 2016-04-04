@@ -16,9 +16,16 @@ import (
 
 const useRandField = true
 
+func randMassInsertPosition(minLat, minLon, maxLat, maxLon float64) (float64, float64) {
+	lat, lon := (rand.Float64()*(maxLat-minLat))+minLat, (rand.Float64()*(maxLon-minLon))+minLon
+	return lat, lon
+}
+
 func (c *Controller) cmdMassInsert(msg *server.Message) (res string, err error) {
 	start := time.Now()
 	vs := msg.Values[1:]
+
+	minLat, minLon, maxLat, maxLon := -90.0, -180.0, 90.0, 180.0 //37.10776, -122.67145, 38.19502, -121.62775
 
 	var snumCols, snumPoints string
 	var cols, objs int
@@ -30,7 +37,35 @@ func (c *Controller) cmdMassInsert(msg *server.Message) (res string, err error) 
 		return "", errInvalidNumberOfArguments
 	}
 	if len(vs) != 0 {
-		return "", errors.New("invalid number of arguments")
+		var sminLat, sminLon, smaxLat, smaxLon string
+		if vs, sminLat, ok = tokenval(vs); !ok || sminLat == "" {
+			return "", errInvalidNumberOfArguments
+		}
+		if vs, sminLon, ok = tokenval(vs); !ok || sminLon == "" {
+			return "", errInvalidNumberOfArguments
+		}
+		if vs, smaxLat, ok = tokenval(vs); !ok || smaxLat == "" {
+			return "", errInvalidNumberOfArguments
+		}
+		if vs, smaxLon, ok = tokenval(vs); !ok || smaxLon == "" {
+			return "", errInvalidNumberOfArguments
+		}
+		var err error
+		if minLat, err = strconv.ParseFloat(sminLat, 64); err != nil {
+			return "", err
+		}
+		if minLon, err = strconv.ParseFloat(sminLon, 64); err != nil {
+			return "", err
+		}
+		if maxLat, err = strconv.ParseFloat(smaxLat, 64); err != nil {
+			return "", err
+		}
+		if maxLon, err = strconv.ParseFloat(smaxLon, 64); err != nil {
+			return "", err
+		}
+		if len(vs) != 0 {
+			return "", errors.New("invalid number of arguments")
+		}
 	}
 	n, err := strconv.ParseUint(snumCols, 10, 64)
 	if err != nil {
@@ -72,7 +107,7 @@ func (c *Controller) cmdMassInsert(msg *server.Message) (res string, err error) 
 
 			for j := 0; j < objs; j++ {
 				id := strconv.FormatInt(int64(j), 10)
-				lat, lon := rand.Float64()*180-90, rand.Float64()*360-180
+				lat, lon := randMassInsertPosition(minLat, minLon, maxLat, maxLon)
 				values := make([]resp.Value, 0, 16)
 				values = append(values, resp.StringValue("set"), resp.StringValue(key), resp.StringValue(id))
 				if useRandField {

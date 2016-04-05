@@ -59,7 +59,7 @@ func writeMessage(conn net.Conn, message []byte, wrapRESP bool, connType server.
 			_, err = conn.Write(message)
 		}
 	case server.Native:
-		_, err = fmt.Fprintf(conn, "$%d\r\n%s\r\n", len(message), string(message))
+		_, err = fmt.Fprintf(conn, "$%d %s\r\n", len(message), string(message))
 	}
 	return err
 }

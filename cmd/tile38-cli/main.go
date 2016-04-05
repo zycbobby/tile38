@@ -46,6 +46,8 @@ var (
 	oneCommand string
 	tokml      bool
 	raw        bool
+	noprompt   bool
+	tty        bool
 )
 
 func showHelp() bool {
@@ -59,6 +61,8 @@ func showHelp() bool {
 	fmt.Fprintf(os.Stdout, "tile38-cli %s%s\n\n", core.Version, gitsha)
 	fmt.Fprintf(os.Stdout, "Usage: tile38-cli [OPTIONS] [cmd [arg [arg ...]]]\n")
 	fmt.Fprintf(os.Stdout, " --raw              Use raw formatting for replies (default when STDOUT is not a tty)\n")
+	fmt.Fprintf(os.Stdout, " --noprompt         Do not display a prompt\n")
+	fmt.Fprintf(os.Stdout, " --tty              Force TTY\n")
 	fmt.Fprintf(os.Stdout, " --resp             Use RESP output formatting (default is JSON output)\n")
 	fmt.Fprintf(os.Stdout, " -h <hostname>      Server hostname (default: %s)\n", hostname)
 	fmt.Fprintf(os.Stdout, " -p <port>          Server port (default: %d)\n", port)
@@ -105,6 +109,10 @@ func parseArgs() bool {
 			tokml = true
 		case "--raw":
 			raw = true
+		case "--tty":
+			tty = true
+		case "--noprompt":
+			noprompt = true
 		case "--resp":
 			output = "resp"
 		case "-h":
@@ -132,7 +140,7 @@ func main() {
 		return
 	}
 
-	if !raw {
+	if !raw && !tty {
 		fi, err := os.Stdout.Stat()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
@@ -199,37 +207,39 @@ func main() {
 
 	line.SetMultiLineMode(false)
 	line.SetCtrlCAborts(true)
-	line.SetCompleter(func(line string) (c []string) {
-		if strings.HasPrefix(strings.ToLower(line), "help ") {
-			var nitems []string
-			nline := strings.TrimSpace(line[5:])
-			if nline == "" || nline[0] == '@' {
-				for _, n := range groups {
-					if strings.HasPrefix(strings.ToLower(n), strings.ToLower(nline)) {
-						nitems = append(nitems, line[:len(line)-len(nline)]+strings.ToLower(n))
+	if !(noprompt && tty) {
+		line.SetCompleter(func(line string) (c []string) {
+			if strings.HasPrefix(strings.ToLower(line), "help ") {
+				var nitems []string
+				nline := strings.TrimSpace(line[5:])
+				if nline == "" || nline[0] == '@' {
+					for _, n := range groups {
+						if strings.HasPrefix(strings.ToLower(n), strings.ToLower(nline)) {
+							nitems = append(nitems, line[:len(line)-len(nline)]+strings.ToLower(n))
+						}
+					}
+				} else {
+					for _, n := range commands {
+						if strings.HasPrefix(strings.ToLower(n), strings.ToLower(nline)) {
+							nitems = append(nitems, line[:len(line)-len(nline)]+strings.ToUpper(n))
+						}
+					}
+				}
+				for _, n := range nitems {
+					if strings.HasPrefix(strings.ToLower(n), strings.ToLower(line)) {
+						c = append(c, n)
 					}
 				}
 			} else {
 				for _, n := range commands {
-					if strings.HasPrefix(strings.ToLower(n), strings.ToLower(nline)) {
-						nitems = append(nitems, line[:len(line)-len(nline)]+strings.ToUpper(n))
+					if strings.HasPrefix(strings.ToLower(n), strings.ToLower(line)) {
+						c = append(c, n)
 					}
 				}
 			}
-			for _, n := range nitems {
-				if strings.HasPrefix(strings.ToLower(n), strings.ToLower(line)) {
-					c = append(c, n)
-				}
-			}
-		} else {
-			for _, n := range commands {
-				if strings.HasPrefix(strings.ToLower(n), strings.ToLower(line)) {
-					c = append(c, n)
-				}
-			}
-		}
-		return
-	})
+			return
+		})
+	}
 	if f, err := os.Open(historyFile); err == nil {
 		line.ReadHistory(f)
 		f.Close()
@@ -253,7 +263,12 @@ func main() {
 		var command string
 		var err error
 		if oneCommand == "" {
-			command, err = line.Prompt(addr + "> ")
+			if raw || noprompt {
+				command, err = line.Prompt("")
+			} else {
+				command, err = line.Prompt(addr + "> ")
+			}
+
 		} else {
 			command = oneCommand
 		}
@@ -297,6 +312,17 @@ func main() {
 					}
 					return
 				}
+				switch strings.ToLower(command) {
+				case "output resp":
+					if string(msg) == "+OK\r\n" {
+						output = "resp"
+					}
+				case "output json":
+					if strings.HasPrefix(string(msg), `{"ok":true`) {
+						output = "json"
+					}
+				}
+
 				mustOutput := true
 				if oneCommand == "" && !strings.HasPrefix(string(msg), `{"ok":true`) {
 					var cerr connError
@@ -428,21 +454,48 @@ func convert2kml(msg []byte) []byte {
 }
 
 func help(arg string) error {
+	var groupsA []string
+	for group := range groupsM {
+		groupsA = append(groupsA, "@"+group)
+	}
+	groups := "Groups: " + strings.Join(groupsA, ", ") + "\n"
+
 	if arg == "" {
 		fmt.Fprintf(os.Stderr, "tile38-cli %s (git:%s)\n", core.Version, core.GitSHA)
-		fmt.Fprintf(os.Stderr, `Type: "help @<group>" to get a list of commands in <group>`+"\n")
-		fmt.Fprintf(os.Stderr, `      "help <command>" for help on <command>`+"\n")
-		fmt.Fprintf(os.Stderr, `      "help <tab>" to get a list of possible help topics`+"\n")
-		fmt.Fprintf(os.Stderr, `      "quit" to exit`+"\n")
+		fmt.Fprintf(os.Stderr, `Type:   "help @<group>" to get a list of commands in <group>`+"\n")
+		fmt.Fprintf(os.Stderr, `        "help <command>" for help on <command>`+"\n")
+		if !(noprompt && tty) {
+			fmt.Fprintf(os.Stderr, `        "help <tab>" to get a list of possible help topics`+"\n")
+		}
+		fmt.Fprintf(os.Stderr, `        "quit" to exit`+"\n")
+		if noprompt && tty {
+			fmt.Fprintf(os.Stderr, groups)
+		}
 		return nil
 	}
+	showGroups := false
+	found := false
 	if strings.HasPrefix(arg, "@") {
 		for _, command := range groupsM[arg[1:]] {
 			fmt.Fprintf(os.Stderr, "%s\n", core.Commands[command].TermOutput("  "))
+			found = true
+		}
+		if !found {
+			showGroups = true
 		}
 	} else {
 		if command, ok := core.Commands[strings.ToUpper(arg)]; ok {
 			fmt.Fprintf(os.Stderr, "%s\n", command.TermOutput("  "))
+			found = true
+		}
+	}
+	if showGroups {
+		if noprompt && tty {
+			fmt.Fprintf(os.Stderr, groups)
+		}
+	} else if !found {
+		if noprompt && tty {
+			help("")
 		}
 	}
 	return nil

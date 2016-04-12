@@ -62,7 +62,7 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 						return sw.writeObject(id, o, fields, false)
 					})
 				} else {
-					s.cursor = sw.col.ScanGreaterOrEqual(sw.glob, s.cursor, func(id string, o geojson.Object, fields []float64) bool {
+					s.cursor = sw.col.ScanGreaterOrEqual(greaterGlob, s.cursor, func(id string, o geojson.Object, fields []float64) bool {
 						return sw.writeObject(id, o, fields, false)
 					})
 				}

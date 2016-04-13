@@ -1015,6 +1015,24 @@ var commandsJSON = `{
     ],
     "group": "connection"
   },
+  "OUTPUT": {
+    "summary": "Gets or sets the output format for the current connection.",
+    "arguments": [
+      {
+        "name": "format",
+        "optional": true,
+        "enumargs": [
+          {
+            "name": "json"
+          },
+          {
+            "name": "resp"
+          }
+        ]
+      }
+    ],
+    "group": "connection"
+  },
   "SETHOOK": {
     "summary": "Creates a webhook which points to geofenced search",
     "arguments": [

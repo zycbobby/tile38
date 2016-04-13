@@ -14,6 +14,7 @@ const (
 	yellow = "\x1b[33m"
 )
 
+// Command represents a Tile38 command.
 type Command struct {
 	Name       string     `json:"-"`
 	Summary    string     `json:"summary"`
@@ -24,6 +25,7 @@ type Command struct {
 	DevOnly    bool       `json:"dev"`
 }
 
+// String returns a string representation of the command.
 func (c Command) String() string {
 	var s = c.Name
 	for _, arg := range c.Arguments {
@@ -32,6 +34,7 @@ func (c Command) String() string {
 	return s
 }
 
+// TermOutput returns a string representation of the command suitable for displaying in a terminal.
 func (c Command) TermOutput(indent string) string {
 	line := c.String()
 	var line1 string
@@ -45,11 +48,13 @@ func (c Command) TermOutput(indent string) string {
 	return indent + line1 + "\n" + indent + line2 + "\n" //+ indent + line3 + "\n"
 }
 
+// EnumArg represents a enum arguments.
 type EnumArg struct {
 	Name      string     `json:"name"`
 	Arguments []Argument `json:"arguments"`
 }
 
+// String returns a string representation of an EnumArg.
 func (a EnumArg) String() string {
 	var s = a.Name
 	for _, arg := range a.Arguments {
@@ -58,6 +63,7 @@ func (a EnumArg) String() string {
 	return s
 }
 
+// Argument represents a command argument.
 type Argument struct {
 	Command  string      `json:"command"`
 	NameAny  interface{} `json:"name"`
@@ -69,6 +75,7 @@ type Argument struct {
 	EnumArgs []EnumArg   `json:"enumargs"`
 }
 
+// String returns a string representation of an Argument.
 func (a Argument) String() string {
 	var s string
 	if a.Command != "" {
@@ -126,6 +133,7 @@ func parseAnyStringArray(any interface{}) []string {
 	return []string{}
 }
 
+// NameTypes returns the types and names of an argument as separate arrays.
 func (a Argument) NameTypes() (names, types []string) {
 	names = parseAnyStringArray(a.NameAny)
 	types = parseAnyStringArray(a.TypeAny)
@@ -139,6 +147,7 @@ func (a Argument) NameTypes() (names, types []string) {
 	return
 }
 
+// Commands is a map of all of the commands.
 var Commands = func() map[string]Command {
 	var commands map[string]Command
 	if err := json.Unmarshal([]byte(commandsJSON), &commands); err != nil {
@@ -162,7 +171,7 @@ var commandsJSON = `{
       },
       {
         "name": "id",
-        "name": "string"
+        "type": "string"
       },
       {
         "command": "FIELD",

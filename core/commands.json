@@ -9,7 +9,7 @@
       },
       {
         "name": "id",
-        "name": "string"
+        "type": "string"
       },
       {
         "command": "FIELD",

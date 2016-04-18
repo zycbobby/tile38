@@ -310,10 +310,6 @@ func (ar *AnyReaderWriter) readHTTPMessage() (*Message, error) {
 	if path == "" {
 		return msg, nil
 	}
-	if !strings.HasSuffix(path, "\r\n") {
-		path += "\r\n"
-	}
-
 	nmsg, err := readNativeMessageLine([]byte(path))
 	if err != nil {
 		return nil, err

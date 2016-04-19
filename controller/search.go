@@ -215,7 +215,7 @@ func (c *Controller) cmdSearchArgs(cmd string, vs []resp.Value, types []string) 
 }
 
 var nearbyTypes = []string{"point"}
-var withinOrIntersectsTypes = []string{"geo", "bounds", "hash", "tile", "quadkey", "get"}
+var withinOrIntersectsTypes = []string{"geo", "bounds", "hash", "tile", "quadkey", "get", "object"}
 
 func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	start := time.Now()
@@ -273,6 +273,9 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
 	if err != nil {
 		return "", err
+	}
+	if sw.col == nil {
+		return "", errKeyNotFound
 	}
 	wr.WriteString(`{"ok":true`)
 	sw.writeHead()

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/tidwall/tile38/controller/server"
@@ -33,46 +34,63 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 		return nil
 	}
 	match = false
+
+	var roamkeys, roamids []string
+	var roammeters []float64
 	detect := "outside"
 	if fence != nil {
-		match1 := fenceMatchObject(fence, details.oldObj)
-		match2 := fenceMatchObject(fence, details.obj)
-		if match1 && match2 {
-			match = true
-			detect = "inside"
-		} else if match1 && !match2 {
-			match = true
-			detect = "exit"
-		} else if !match1 && match2 {
-			match = true
-			detect = "enter"
-			if details.command == "fset" {
-				detect = "inside"
+		if fence.roam.on {
+			if details.command == "set" {
+				// println("roam", fence.roam.key, fence.roam.id, strconv.FormatFloat(fence.roam.meters, 'f', -1, 64))
+				roamkeys, roamids, roammeters = fenceMatchRoam(sw.c, fence, details.key, details.id, details.obj)
 			}
+			if len(roamids) == 0 || len(roamids) != len(roamkeys) {
+				return nil
+			}
+			match = true
+			detect = "roam"
 		} else {
-			if details.command != "fset" {
-				// Maybe the old object and new object create a line that crosses the fence.
-				// Must detect for that possibility.
-				if details.oldObj != nil {
-					ls := geojson.LineString{
-						Coordinates: []geojson.Position{
-							details.oldObj.CalculatedPoint(),
-							details.obj.CalculatedPoint(),
-						},
-					}
-					temp := false
-					if fence.cmd == "within" {
-						// because we are testing if the line croses the area we need to use
-						// "intersects" instead of "within".
-						fence.cmd = "intersects"
-						temp = true
-					}
-					if fenceMatchObject(fence, ls) {
-						//match = true
-						detect = "cross"
-					}
-					if temp {
-						fence.cmd = "within"
+
+			// not using roaming
+			match1 := fenceMatchObject(fence, details.oldObj)
+			match2 := fenceMatchObject(fence, details.obj)
+			if match1 && match2 {
+				match = true
+				detect = "inside"
+			} else if match1 && !match2 {
+				match = true
+				detect = "exit"
+			} else if !match1 && match2 {
+				match = true
+				detect = "enter"
+				if details.command == "fset" {
+					detect = "inside"
+				}
+			} else {
+				if details.command != "fset" {
+					// Maybe the old object and new object create a line that crosses the fence.
+					// Must detect for that possibility.
+					if details.oldObj != nil {
+						ls := geojson.LineString{
+							Coordinates: []geojson.Position{
+								details.oldObj.CalculatedPoint(),
+								details.obj.CalculatedPoint(),
+							},
+						}
+						temp := false
+						if fence.cmd == "within" {
+							// because we are testing if the line croses the area we need to use
+							// "intersects" instead of "within".
+							fence.cmd = "intersects"
+							temp = true
+						}
+						if fenceMatchObject(fence, ls) {
+							//match = true
+							detect = "cross"
+						}
+						if temp {
+							fence.cmd = "within"
+						}
 					}
 				}
 			}
@@ -93,21 +111,22 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 		sw.mu.Unlock()
 		return nil
 	}
+
 	res := sw.wr.String()
 	resb := make([]byte, len(res))
 	copy(resb, res)
-	res = string(resb)
 	sw.wr.Reset()
+	res = string(resb)
 	if sw.output == outputIDs {
 		res = `{"id":` + res + `}`
 	}
 	sw.mu.Unlock()
-
 	if strings.HasPrefix(res, ",") {
 		res = res[1:]
 	}
 
 	jskey := jsonString(details.key)
+
 	ores := res
 	msgs := make([]string, 0, 2)
 	if fence.detect == nil || fence.detect[detect] {
@@ -125,12 +144,25 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 		if fence.detect == nil || fence.detect["outside"] {
 			msgs = append(msgs, `{"command":"`+details.command+`","detect":"outside","hook":`+jshookName+`,"key":`+jskey+`,"time":`+jstime+`,`+ores[1:])
 		}
+	case "roam":
+		if len(msgs) > 0 {
+			var nmsgs []string
+			msg := msgs[0][:len(msgs[0])-1]
+			for i, id := range roamids {
+				nmsgs = append(nmsgs, msg+`,"nearby":{"key":`+jsonString(roamkeys[i])+`,"id":`+jsonString(id)+`,"meters":`+strconv.FormatFloat(roammeters[i], 'f', -1, 64)+`}}`)
+			}
+			msgs = nmsgs
+		}
 	}
 	return msgs
 }
 
 func fenceMatchObject(fence *liveFenceSwitches, obj geojson.Object) bool {
 	if obj == nil {
+		return false
+	}
+	if fence.roam.on {
+		// we need to check this object against
 		return false
 	}
 	if fence.cmd == "nearby" {
@@ -153,4 +185,34 @@ func fenceMatchObject(fence *liveFenceSwitches, obj geojson.Object) bool {
 		})
 	}
 	return false
+}
+
+func fenceMatchRoam(c *Controller, fence *liveFenceSwitches, tkey, tid string, obj geojson.Object) (keys, ids []string, meterss []float64) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	col := c.getCol(fence.roam.key)
+	if col == nil {
+		return
+	}
+	p := obj.CalculatedPoint()
+	col.Nearby(0, 0, p.Y, p.X, fence.roam.meters,
+		func(id string, obj geojson.Object, fields []float64) bool {
+			var match bool
+			if id == tid {
+				return true // skip self
+			}
+			if fence.roam.pattern {
+				match, _ = globMatch(fence.roam.id, id)
+			} else {
+				match = fence.roam.id == id
+			}
+			if match {
+				keys = append(keys, fence.roam.key)
+				ids = append(ids, id)
+				meterss = append(meterss, obj.CalculatedPoint().DistanceTo(p))
+			}
+			return true
+		},
+	)
+	return
 }

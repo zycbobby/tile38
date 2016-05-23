@@ -29,6 +29,7 @@ const (
 
 type scanWriter struct {
 	mu             sync.Mutex
+	c              *Controller
 	wr             *bytes.Buffer
 	msg            *server.Message
 	col            *collection.Collection
@@ -67,6 +68,7 @@ func (c *Controller) newScanWriter(
 	case outputIDs, outputObjects, outputCount, outputBounds, outputPoints, outputHashes:
 	}
 	sw := &scanWriter{
+		c:         c,
 		wr:        wr,
 		msg:       msg,
 		output:    output,

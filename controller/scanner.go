@@ -154,11 +154,17 @@ func (sw *scanWriter) writeFoot(cursor uint64) {
 		sw.wr.WriteString(`,"cursor":` + strconv.FormatUint(cursor, 10))
 	case server.RESP:
 		sw.wr.Reset()
-		values := []resp.Value{
-			resp.IntegerValue(int(cursor)),
-			resp.ArrayValue(sw.values),
+		var data []byte
+		var err error
+		if sw.output == outputCount {
+			data, err = resp.IntegerValue(int(sw.count)).MarshalRESP()
+		} else {
+			values := []resp.Value{
+				resp.IntegerValue(int(cursor)),
+				resp.ArrayValue(sw.values),
+			}
+			data, err = resp.ArrayValue(values).MarshalRESP()
 		}
-		data, err := resp.ArrayValue(values).MarshalRESP()
 		if err != nil {
 			panic("Eek this is bad. Marshal resp should not fail.")
 		}

@@ -14,6 +14,8 @@ import (
 	"github.com/tidwall/tile38/controller/server"
 )
 
+// MASSINSERT num_keys num_points [minx miny maxx maxy]
+
 const useRandField = true
 
 func randMassInsertPosition(minLat, minLon, maxLat, maxLon float64) (float64, float64) {

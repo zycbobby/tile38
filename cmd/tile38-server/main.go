@@ -26,6 +26,13 @@ var (
 	quiet       bool
 )
 
+// Fire up a webhook test server by using the --webhook-consumer-port
+// for example
+//   $ ./tile38-server --webhook-consumer-port 9999
+//
+// The create hooks like such...
+//   SETHOOK myhook http://localhost:9999/myhook NEARBY mykey FENCE POINT 33.5 -115.5 1000
+
 func main() {
 	if len(os.Args) == 3 && os.Args[1] == "--webhook-consumer-port" {
 		log.Default = log.New(os.Stderr, &log.Config{})

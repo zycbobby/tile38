@@ -117,13 +117,13 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 	copy(resb, res)
 	sw.wr.Reset()
 	res = string(resb)
+	if strings.HasPrefix(res, ",") {
+		res = res[1:]
+	}
 	if sw.output == outputIDs {
 		res = `{"id":` + res + `}`
 	}
 	sw.mu.Unlock()
-	if strings.HasPrefix(res, ",") {
-		res = res[1:]
-	}
 
 	jskey := jsonString(details.key)
 

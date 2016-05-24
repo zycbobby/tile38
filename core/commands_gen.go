@@ -531,9 +531,43 @@ var commandsJSON = `{
         ]
       },
       {
-        "command": "POINT",
-        "name": ["lat","lon","meters"],
-        "type": ["double","double","double"]
+        "name": "area",
+        "enumargs": [
+          {
+            "name": "POINT",
+            "arguments": [
+              {
+                "name": "lat",
+                "type": "double"
+              },
+              {
+                "name": "lon",
+                "type": "double"
+              },
+              {
+                "name": "meters",
+                "type": "double"
+              }
+            ]
+          },
+          {
+            "name": "ROAM",
+            "arguments":[
+              {
+                "name": "key",
+                "type": "string"    
+              },
+              {
+                "name": "pattern",
+                "type": "pattern"    
+              },
+              {
+                "name": "meters",
+                "type": "double"    
+              }
+            ]
+          }
+        ]
       }
     ],
     "since": "1.0.0",

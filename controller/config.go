@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/tidwall/tile38/controller/server"
 )
 
-var validProperties = []string{"requirepass", "leaderauth", "protected-mode"}
+var validProperties = []string{"requirepass", "leaderauth", "protected-mode", "maxmemory"}
 
 // Config is a tile38 config
 type Config struct {
@@ -30,6 +31,8 @@ type Config struct {
 	LeaderAuth     string `json:"-"`
 	ProtectedModeP string `json:"protected-mode,omitempty"`
 	ProtectedMode  string `json:"-"`
+	MaxMemoryP     string `json:"maxmemory,omitempty"`
+	MaxMemory      int    `json:"-"`
 }
 
 func (c *Controller) loadConfig() error {
@@ -54,7 +57,56 @@ func (c *Controller) loadConfig() error {
 	if err := c.setConfigProperty("protected-mode", c.config.ProtectedModeP, true); err != nil {
 		return err
 	}
+	if err := c.setConfigProperty("maxmemory", c.config.MaxMemoryP, true); err != nil {
+		return err
+	}
 	return nil
+}
+
+func parseMemSize(s string) (bytes int, ok bool) {
+	if s == "" {
+		return 0, true
+	}
+	s = strings.ToLower(s)
+	var n uint64
+	var sz int
+	var err error
+	if strings.HasSuffix(s, "gb") {
+		n, err = strconv.ParseUint(s[:len(s)-2], 10, 64)
+		sz = int(n * 1024 * 1024 * 1024)
+	} else if strings.HasSuffix(s, "mb") {
+		n, err = strconv.ParseUint(s[:len(s)-2], 10, 64)
+		sz = int(n * 1024 * 1024)
+	} else if strings.HasSuffix(s, "kb") {
+		n, err = strconv.ParseUint(s[:len(s)-2], 10, 64)
+		sz = int(n * 1024)
+	} else {
+		n, err = strconv.ParseUint(s, 10, 64)
+		sz = int(n)
+	}
+	if err != nil {
+		return 0, false
+	}
+	return sz, true
+}
+
+func formatMemSize(sz int) string {
+	if sz <= 0 {
+		return ""
+	}
+	if sz < 1024 {
+		return strconv.FormatInt(int64(sz), 10)
+	}
+	sz /= 1024
+	if sz < 1024 {
+		return strconv.FormatInt(int64(sz), 10) + "kb"
+	}
+	sz /= 1024
+	if sz < 1024 {
+		return strconv.FormatInt(int64(sz), 10) + "mb"
+	}
+	sz /= 1024
+	return strconv.FormatInt(int64(sz), 10) + "gb"
 }
 
 func (c *Controller) setConfigProperty(name, value string, fromLoad bool) error {
@@ -66,6 +118,12 @@ func (c *Controller) setConfigProperty(name, value string, fromLoad bool) error 
 		c.config.RequirePass = value
 	case "leaderauth":
 		c.config.LeaderAuth = value
+	case "maxmemory":
+		sz, ok := parseMemSize(value)
+		if !ok {
+			return fmt.Errorf("Invalid argument '%s' for CONFIG SET '%s'", value, name)
+		}
+		c.config.MaxMemory = sz
 	case "protected-mode":
 		switch strings.ToLower(value) {
 		case "":
@@ -106,6 +164,8 @@ func (c *Controller) getConfigProperty(name string) string {
 		return c.config.LeaderAuth
 	case "protected-mode":
 		return c.config.ProtectedMode
+	case "maxmemory":
+		return formatMemSize(c.config.MaxMemory)
 	}
 }
 
@@ -128,6 +188,7 @@ func (c *Controller) writeConfig(writeProperties bool) error {
 		c.config.RequirePassP = c.config.RequirePass
 		c.config.LeaderAuthP = c.config.LeaderAuth
 		c.config.ProtectedModeP = c.config.ProtectedMode
+		c.config.MaxMemoryP = formatMemSize(c.config.MaxMemory)
 	}
 	var data []byte
 	data, err = json.MarshalIndent(c.config, "", "\t")

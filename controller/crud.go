@@ -506,6 +506,10 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (d commandDetailsT, fields []
 }
 
 func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT, err error) {
+	if c.config.MaxMemory > 0 && c.outOfMemory {
+		err = errOOM
+		return
+	}
 	start := time.Now()
 	vs := msg.Values[1:]
 	var fields []string

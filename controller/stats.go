@@ -104,6 +104,7 @@ func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 		avgsz = int(mem.HeapAlloc) / points
 	}
 	m["heap_size"] = mem.HeapAlloc
+	m["max_heap_size"] = c.config.MaxMemory
 	m["avg_item_size"] = avgsz
 	m["pointer_size"] = (32 << uintptr(uint64(^uintptr(0))>>63)) / 8
 	m["read_only"] = c.config.ReadOnly

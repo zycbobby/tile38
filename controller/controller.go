@@ -23,6 +23,8 @@ import (
 	"github.com/tidwall/tile38/geojson"
 )
 
+var errOOM = errors.New("OOM command not allowed when used memory > 'maxmemory'")
+
 type collectionT struct {
 	Key        string
 	Collection *collection.Collection
@@ -68,6 +70,9 @@ type Controller struct {
 	hooks     map[string]*Hook            // hook name
 	hookcols  map[string]map[string]*Hook // col key
 	aofconnM  map[net.Conn]bool
+
+	stopWatchingMemory bool
+	outOfMemory        bool
 }
 
 // ListenAndServe starts a new tile38 server
@@ -114,6 +119,12 @@ func ListenAndServe(host string, port int, dir string) error {
 		c.mu.Unlock()
 	}()
 	go c.processLives()
+	go c.watchMemory()
+	defer func() {
+		c.mu.Lock()
+		c.stopWatchingMemory = true
+		c.mu.Unlock()
+	}()
 	handler := func(conn *server.Conn, msg *server.Message, rd *server.AnyReaderWriter, w io.Writer, websocket bool) error {
 		err := c.handleInputCommand(conn, msg, w)
 		if err != nil {
@@ -139,6 +150,39 @@ func ListenAndServe(host string, port int, dir string) error {
 		return is
 	}
 	return server.ListenAndServe(host, port, protected, handler)
+}
+
+func (c *Controller) watchMemory() {
+	t := time.NewTicker(time.Second * 2)
+	defer t.Stop()
+	var mem runtime.MemStats
+	for range t.C {
+		func() {
+			c.mu.RLock()
+			if c.stopWatchingMemory {
+				c.mu.RUnlock()
+				return
+			}
+			maxmem := c.config.MaxMemory
+			oom := c.outOfMemory
+			c.mu.RUnlock()
+			if maxmem == 0 {
+				if oom {
+					c.mu.Lock()
+					c.outOfMemory = false
+					c.mu.Unlock()
+				}
+				return
+			}
+			if oom {
+				runtime.GC()
+			}
+			runtime.ReadMemStats(&mem)
+			c.mu.Lock()
+			c.outOfMemory = int(mem.HeapAlloc) > maxmem
+			c.mu.Unlock()
+		}()
+	}
 }
 
 func (c *Controller) setCol(key string, col *collection.Collection) {

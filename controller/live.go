@@ -121,6 +121,9 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *server.AnyReaderWrit
 				}
 				return
 			}
+			if v == nil {
+				continue
+			}
 			switch v.Command {
 			default:
 				log.Error("received a live command that was not QUIT")

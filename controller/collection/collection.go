@@ -7,17 +7,17 @@ import (
 )
 
 type itemT struct {
-	ID     string
-	Object geojson.Object
-	Fields []float64
+	id     string
+	object geojson.Object
+	fields []float64
 }
 
 func (i *itemT) Less(item btree.Item) bool {
-	return i.ID < item.(*itemT).ID
+	return i.id < item.(*itemT).id
 }
 
 func (i *itemT) Rect() (minX, minY, maxX, maxY float64) {
-	bbox := i.Object.CalculatedBBox()
+	bbox := i.object.CalculatedBBox()
 	return bbox.Min.X, bbox.Min.Y, bbox.Max.X, bbox.Max.Y
 }
 
@@ -87,16 +87,16 @@ func (c *Collection) ReplaceOrInsert(id string, obj geojson.Object, fields []str
 	oldItem, ok := c.remove(id)
 	nitem := c.insert(id, obj)
 	if ok {
-		oldObject = oldItem.Object
-		oldFields = oldItem.Fields
-		nitem.Fields = oldFields
-		c.weight += len(nitem.Fields) * 8
+		oldObject = oldItem.object
+		oldFields = oldItem.fields
+		nitem.fields = oldFields
+		c.weight += len(nitem.fields) * 8
 	}
 	if fields == nil && len(values) > 0 {
 		// directly set the field values, update weight
-		c.weight -= len(nitem.Fields) * 8
-		nitem.Fields = values
-		c.weight += len(nitem.Fields) * 8
+		c.weight -= len(nitem.fields) * 8
+		nitem.fields = values
+		c.weight += len(nitem.fields) * 8
 
 	} else {
 		// map field name to value
@@ -104,25 +104,25 @@ func (c *Collection) ReplaceOrInsert(id string, obj geojson.Object, fields []str
 			c.setField(nitem, field, values[i])
 		}
 	}
-	return oldObject, oldFields, nitem.Fields
+	return oldObject, oldFields, nitem.fields
 }
 
 func (c *Collection) remove(id string) (item *itemT, ok bool) {
-	i := c.items.Delete(&itemT{ID: id})
+	i := c.items.Delete(&itemT{id: id})
 	if i == nil {
 		return nil, false
 	}
 	item = i.(*itemT)
 	c.index.Remove(item)
-	c.weight -= len(item.Fields) * 8
-	c.weight -= item.Object.Weight() + len(item.ID)
-	c.points -= item.Object.PositionCount()
+	c.weight -= len(item.fields) * 8
+	c.weight -= item.object.Weight() + len(item.id)
+	c.points -= item.object.PositionCount()
 	c.objects--
 	return item, true
 }
 
 func (c *Collection) insert(id string, obj geojson.Object) (item *itemT) {
-	item = &itemT{ID: id, Object: obj}
+	item = &itemT{id: id, object: obj}
 	c.index.Insert(item)
 	c.items.ReplaceOrInsert(item)
 	c.weight += obj.Weight() + len(id)
@@ -138,16 +138,16 @@ func (c *Collection) Remove(id string) (obj geojson.Object, fields []float64, ok
 	if !ok {
 		return nil, nil, false
 	}
-	return item.Object, item.Fields, true
+	return item.object, item.fields, true
 }
 
 func (c *Collection) get(id string) (obj geojson.Object, fields []float64, ok bool) {
-	i := c.items.Get(&itemT{ID: id})
+	i := c.items.Get(&itemT{id: id})
 	if i == nil {
 		return nil, nil, false
 	}
 	item := i.(*itemT)
-	return item.Object, item.Fields, true
+	return item.object, item.fields, true
 }
 
 // Get returns an object.
@@ -159,14 +159,14 @@ func (c *Collection) Get(id string) (obj geojson.Object, fields []float64, ok bo
 // SetField set a field value for an object and returns that object.
 // If the object does not exist then the 'ok' return value will be false.
 func (c *Collection) SetField(id, field string, value float64) (obj geojson.Object, fields []float64, updated bool, ok bool) {
-	i := c.items.Get(&itemT{ID: id})
+	i := c.items.Get(&itemT{id: id})
 	if i == nil {
 		ok = false
 		return
 	}
 	item := i.(*itemT)
 	updated = c.setField(item, field, value)
-	return item.Object, item.Fields, updated, true
+	return item.object, item.fields, updated, true
 }
 
 func (c *Collection) setField(item *itemT, field string, value float64) (updated bool) {
@@ -175,13 +175,13 @@ func (c *Collection) setField(item *itemT, field string, value float64) (updated
 		idx = len(c.fieldMap)
 		c.fieldMap[field] = idx
 	}
-	c.weight -= len(item.Fields) * 8
-	for idx >= len(item.Fields) {
-		item.Fields = append(item.Fields, 0)
+	c.weight -= len(item.fields) * 8
+	for idx >= len(item.fields) {
+		item.fields = append(item.fields, 0)
 	}
-	c.weight += len(item.Fields) * 8
-	ovalue := item.Fields[idx]
-	item.Fields[idx] = value
+	c.weight += len(item.fields) * 8
+	ovalue := item.fields[idx]
+	item.fields[idx] = value
 	return ovalue != value
 }
 
@@ -206,7 +206,7 @@ func (c *Collection) Scan(cursor uint64, iterator func(id string, obj geojson.Ob
 	c.items.Ascend(func(item btree.Item) bool {
 		if i >= cursor {
 			iitm := item.(*itemT)
-			active = iterator(iitm.ID, iitm.Object, iitm.Fields)
+			active = iterator(iitm.id, iitm.object, iitm.fields)
 		}
 		i++
 		return active
@@ -218,10 +218,10 @@ func (c *Collection) Scan(cursor uint64, iterator func(id string, obj geojson.Ob
 func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
 	var i uint64
 	var active = true
-	c.items.AscendGreaterOrEqual(&itemT{ID: id}, func(item btree.Item) bool {
+	c.items.AscendGreaterOrEqual(&itemT{id: id}, func(item btree.Item) bool {
 		if i >= cursor {
 			iitm := item.(*itemT)
-			active = iterator(iitm.ID, iitm.Object, iitm.Fields)
+			active = iterator(iitm.id, iitm.object, iitm.fields)
 		}
 		i++
 		return active
@@ -236,7 +236,7 @@ func (c *Collection) search(cursor uint64, bbox geojson.BBox, iterator func(id s
 		if !ok {
 			return true // just ignore
 		}
-		if !iterator(iitm.ID, iitm.Object, iitm.Fields) {
+		if !iterator(iitm.id, iitm.object, iitm.fields) {
 			return false
 		}
 		return true

@@ -175,11 +175,13 @@ The server will notify the client if the `command` is `del | set | drop`.
 - `drop` notifies the client that the entire collection is dropped.
 - `set` notifies the client that an object has been added or updated, and when it's position is detected by the fence.
 
-The `detect` may be `enter | exit | cross`.
+The `detect` may be one of the following values.
 
+- `inside` is when an object is inside the specified area.
+- `outside` is when an object is outside the specified area.
 - `enter` is when an object that **was not** previously in the fence has entered the area.
 - `exit` is when an object that **was** previously in the fence has exited the area.
-- `cross` is when an object that **was not** previously in the fence has entered and exited the area.
+- `cross` is when an object that **was not** previously in the fence has entered **and** exited the area.
 
 ## Object types
 

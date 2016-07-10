@@ -6,9 +6,21 @@ import (
 	"github.com/tidwall/tile38/index"
 )
 
+// ScanType is the classification of objects that are returned from Scan()
+type ScanType int
+
+const (
+	// TypeAll means to return all type during a Scan()
+	TypeAll = ScanType(0)
+	// TypeGeometry means to return only geometries
+	TypeGeometry = ScanType(1)
+	// TypeNonGeometry means to return non-geometries
+	TypeNonGeometry = ScanType(2)
+)
+
 const (
 	idOrdered    = 0
-	valueOrdered = 2
+	valueOrdered = 1
 )
 
 type itemT struct {
@@ -24,12 +36,14 @@ func (i *itemT) Less(item btree.Item, ctx int) bool {
 	case idOrdered:
 		return i.id < item.(*itemT).id
 	case valueOrdered:
-		if i.object.String() < item.(*itemT).object.String() {
+		i1, i2 := i.object.String(), item.(*itemT).object.String()
+		if i1 < i2 {
 			return true
 		}
-		if i.object.String() > item.(*itemT).object.String() {
+		if i1 > i2 {
 			return false
 		}
+		// the values match so we will compare the ids, which are always unique.
 		return i.id < item.(*itemT).id
 	}
 
@@ -53,7 +67,8 @@ type Collection struct {
 	fieldMap map[string]int
 	weight   int
 	points   int
-	objects  int
+	objects  int // geometry count
+	nobjects int // non-geometry count
 }
 
 var counter uint64
@@ -70,8 +85,15 @@ func New() *Collection {
 }
 
 // Count returns the number of objects in collection.
-func (c *Collection) Count() int {
-	return c.objects
+func (c *Collection) Count(stype ScanType) int {
+	switch stype {
+	default:
+		return c.objects + c.nobjects
+	case TypeGeometry:
+		return c.objects
+	case TypeNonGeometry:
+		return c.nobjects
+	}
 }
 
 // PointCount returns the number of points (lat/lon coordinates) in collection.
@@ -120,13 +142,14 @@ func (c *Collection) remove(id string) (item *itemT, ok bool) {
 	item = i.(*itemT)
 	if item.object.IsGeometry() {
 		c.index.Remove(item)
+		c.objects--
 	} else {
 		c.values.Delete(item)
+		c.nobjects--
 	}
 	c.weight -= len(item.fields) * 8
 	c.weight -= item.object.Weight() + len(item.id)
 	c.points -= item.object.PositionCount()
-	c.objects--
 	return item, true
 }
 
@@ -134,13 +157,14 @@ func (c *Collection) insert(id string, obj geojson.Object) (item *itemT) {
 	item = &itemT{id: id, object: obj}
 	if obj.IsGeometry() {
 		c.index.Insert(item)
+		c.objects++
 	} else {
 		c.values.ReplaceOrInsert(item)
+		c.nobjects++
 	}
 	c.items.ReplaceOrInsert(item)
 	c.weight += obj.Weight() + len(id)
 	c.points += obj.PositionCount()
-	c.objects++
 	return item
 }
 
@@ -213,7 +237,7 @@ func (c *Collection) FieldArr() []string {
 }
 
 // Scan iterates though the collection. A cursor can be used for paging.
-func (c *Collection) Scan(cursor uint64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) Scan(cursor uint64, stype ScanType, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
 	var i uint64
 	var active = true
 	c.items.Ascend(func(item btree.Item) bool {
@@ -228,7 +252,7 @@ func (c *Collection) Scan(cursor uint64, iterator func(id string, obj geojson.Ob
 }
 
 // ScanGreaterOrEqual iterates though the collection starting with specified id. A cursor can be used for paging.
-func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, stype ScanType, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
 	var i uint64
 	var active = true
 	c.items.AscendGreaterOrEqual(&itemT{id: id}, func(item btree.Item) bool {
@@ -242,7 +266,7 @@ func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, iterator func(
 	return i
 }
 
-func (c *Collection) search(cursor uint64, bbox geojson.BBox, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) geoSearch(cursor uint64, bbox geojson.BBox, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
 	return c.index.Search(cursor, bbox.Min.Y, bbox.Min.X, bbox.Max.Y, bbox.Max.X, func(item index.Item) bool {
 		var iitm *itemT
 		iitm, ok := item.(*itemT)
@@ -263,7 +287,7 @@ func (c *Collection) Nearby(cursor uint64, sparse uint8, lat, lon, meters float6
 	bboxes := bbox.Sparse(sparse)
 	if sparse > 0 {
 		for _, bbox := range bboxes {
-			c.search(cursor, bbox, func(id string, obj geojson.Object, fields []float64) bool {
+			c.geoSearch(cursor, bbox, func(id string, obj geojson.Object, fields []float64) bool {
 				if obj.Nearby(center, meters) {
 					if iterator(id, obj, fields) {
 						return false
@@ -274,7 +298,7 @@ func (c *Collection) Nearby(cursor uint64, sparse uint8, lat, lon, meters float6
 		}
 		return 0
 	}
-	return c.search(cursor, bbox, func(id string, obj geojson.Object, fields []float64) bool {
+	return c.geoSearch(cursor, bbox, func(id string, obj geojson.Object, fields []float64) bool {
 		if obj.Nearby(center, meters) {
 			return iterator(id, obj, fields)
 		}
@@ -294,7 +318,7 @@ func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, min
 	if sparse > 0 {
 		for _, bbox := range bboxes {
 			if obj != nil {
-				c.search(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+				c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
 					if o.Within(obj) {
 						if iterator(id, o, fields) {
 							return false
@@ -303,7 +327,7 @@ func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, min
 					return true
 				})
 			}
-			c.search(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+			c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
 				if o.WithinBBox(bbox) {
 					if iterator(id, o, fields) {
 						return false
@@ -315,14 +339,14 @@ func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, min
 		return 0
 	}
 	if obj != nil {
-		return c.search(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+		return c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
 			if o.Within(obj) {
 				return iterator(id, o, fields)
 			}
 			return true
 		})
 	}
-	return c.search(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+	return c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
 		if o.WithinBBox(bbox) {
 			return iterator(id, o, fields)
 		}
@@ -353,7 +377,7 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 		}
 		for _, bbox := range bboxes {
 			if obj != nil {
-				c.search(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+				c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
 					if o.Intersects(obj) {
 						if iterator(id, o, fields) {
 							return false
@@ -362,7 +386,7 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 					return true
 				})
 			}
-			c.search(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+			c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
 				if o.IntersectsBBox(bbox) {
 					if iterator(id, o, fields) {
 						return false
@@ -374,14 +398,14 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 		return 0
 	}
 	if obj != nil {
-		return c.search(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+		return c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
 			if o.Intersects(obj) {
 				return iterator(id, o, fields)
 			}
 			return true
 		})
 	}
-	return c.search(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+	return c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
 		if o.IntersectsBBox(bbox) {
 			return iterator(id, o, fields)
 		}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/tidwall/resp"
+	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 )
@@ -34,22 +35,14 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 	if err != nil {
 		return "", err
 	}
-	if s.sparse > 0 && sw.col != nil {
-		msg.Values = append(msg.Values,
-			resp.StringValue("BOUNDS"),
-			resp.StringValue("-90"),
-			resp.StringValue("-180"),
-			resp.StringValue("180"),
-		)
-		return c.cmdWithinOrIntersects("within", msg)
-	}
 	if msg.OutputType == server.JSON {
 		wr.WriteString(`{"ok":true`)
 	}
 	sw.writeHead()
 	if sw.col != nil {
+		stype := collection.TypeAll
 		if sw.output == outputCount && len(sw.wheres) == 0 && sw.globEverything == true {
-			count := sw.col.Count() - int(s.cursor)
+			count := sw.col.Count(stype) - int(s.cursor)
 			if count < 0 {
 				count = 0
 			}
@@ -58,18 +51,24 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 			if strings.HasSuffix(sw.glob, "*") {
 				greaterGlob := sw.glob[:len(sw.glob)-1]
 				if globIsGlob(greaterGlob) {
-					s.cursor = sw.col.Scan(s.cursor, func(id string, o geojson.Object, fields []float64) bool {
-						return sw.writeObject(id, o, fields, false)
-					})
+					s.cursor = sw.col.Scan(s.cursor, stype,
+						func(id string, o geojson.Object, fields []float64) bool {
+							return sw.writeObject(id, o, fields, false)
+						},
+					)
 				} else {
-					s.cursor = sw.col.ScanGreaterOrEqual(greaterGlob, s.cursor, func(id string, o geojson.Object, fields []float64) bool {
-						return sw.writeObject(id, o, fields, false)
-					})
+					s.cursor = sw.col.ScanGreaterOrEqual(greaterGlob, s.cursor, stype,
+						func(id string, o geojson.Object, fields []float64) bool {
+							return sw.writeObject(id, o, fields, false)
+						},
+					)
 				}
 			} else {
-				s.cursor = sw.col.Scan(s.cursor, func(id string, o geojson.Object, fields []float64) bool {
-					return sw.writeObject(id, o, fields, false)
-				})
+				s.cursor = sw.col.Scan(s.cursor, stype,
+					func(id string, o geojson.Object, fields []float64) bool {
+						return sw.writeObject(id, o, fields, false)
+					},
+				)
 			}
 		}
 	}

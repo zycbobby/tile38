@@ -87,75 +87,79 @@ func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 	if msg.OutputType == server.JSON {
 		buf.WriteString(`{"ok":true`)
 	}
-	if vs, typ, ok = tokenval(vs); !ok || strings.ToLower(typ) == "object" {
+	vs, typ, ok = tokenval(vs)
+	typ = strings.ToLower(typ)
+	if !ok {
+		typ = "object"
+	}
+	switch typ {
+	default:
+		return "", errInvalidArgument(typ)
+	case "object":
 		if msg.OutputType == server.JSON {
 			buf.WriteString(`,"object":`)
 			buf.WriteString(o.JSON())
 		} else {
 			vals = append(vals, resp.StringValue(o.String()))
 		}
-	} else {
-		switch strings.ToLower(typ) {
-		default:
-			return "", errInvalidArgument(typ)
-		case "point":
-			point := o.CalculatedPoint()
-			if msg.OutputType == server.JSON {
-				buf.WriteString(`,"point":`)
-				buf.WriteString(point.ExternalJSON())
-			} else {
-				if point.Z != 0 {
-					vals = append(vals, resp.ArrayValue([]resp.Value{
-						resp.StringValue(strconv.FormatFloat(point.Y, 'f', -1, 64)),
-						resp.StringValue(strconv.FormatFloat(point.X, 'f', -1, 64)),
-						resp.StringValue(strconv.FormatFloat(point.Z, 'f', -1, 64)),
-					}))
-				} else {
-					vals = append(vals, resp.ArrayValue([]resp.Value{
-						resp.StringValue(strconv.FormatFloat(point.Y, 'f', -1, 64)),
-						resp.StringValue(strconv.FormatFloat(point.X, 'f', -1, 64)),
-					}))
-				}
-			}
-		case "hash":
-			if vs, sprecision, ok = tokenval(vs); !ok || sprecision == "" {
-				return "", errInvalidNumberOfArguments
-			}
-			if msg.OutputType == server.JSON {
-				buf.WriteString(`,"hash":`)
-			}
-			precision, err := strconv.ParseInt(sprecision, 10, 64)
-			if err != nil || precision < 1 || precision > 64 {
-				return "", errInvalidArgument(sprecision)
-			}
-			p, err := o.Geohash(int(precision))
-			if err != nil {
-				return "", err
-			}
-			if msg.OutputType == server.JSON {
-				buf.WriteString(`"` + p + `"`)
-			} else {
-				vals = append(vals, resp.StringValue(p))
-			}
-		case "bounds":
-			bbox := o.CalculatedBBox()
-			if msg.OutputType == server.JSON {
-				buf.WriteString(`,"bounds":`)
-				buf.WriteString(bbox.ExternalJSON())
+	case "point":
+		point := o.CalculatedPoint()
+		if msg.OutputType == server.JSON {
+			buf.WriteString(`,"point":`)
+			buf.WriteString(point.ExternalJSON())
+		} else {
+			if point.Z != 0 {
+				vals = append(vals, resp.ArrayValue([]resp.Value{
+					resp.StringValue(strconv.FormatFloat(point.Y, 'f', -1, 64)),
+					resp.StringValue(strconv.FormatFloat(point.X, 'f', -1, 64)),
+					resp.StringValue(strconv.FormatFloat(point.Z, 'f', -1, 64)),
+				}))
 			} else {
 				vals = append(vals, resp.ArrayValue([]resp.Value{
-					resp.ArrayValue([]resp.Value{
-						resp.FloatValue(bbox.Min.Y),
-						resp.FloatValue(bbox.Min.X),
-					}),
-					resp.ArrayValue([]resp.Value{
-						resp.FloatValue(bbox.Max.Y),
-						resp.FloatValue(bbox.Max.X),
-					}),
+					resp.StringValue(strconv.FormatFloat(point.Y, 'f', -1, 64)),
+					resp.StringValue(strconv.FormatFloat(point.X, 'f', -1, 64)),
 				}))
 			}
 		}
+	case "hash":
+		if vs, sprecision, ok = tokenval(vs); !ok || sprecision == "" {
+			return "", errInvalidNumberOfArguments
+		}
+		if msg.OutputType == server.JSON {
+			buf.WriteString(`,"hash":`)
+		}
+		precision, err := strconv.ParseInt(sprecision, 10, 64)
+		if err != nil || precision < 1 || precision > 64 {
+			return "", errInvalidArgument(sprecision)
+		}
+		p, err := o.Geohash(int(precision))
+		if err != nil {
+			return "", err
+		}
+		if msg.OutputType == server.JSON {
+			buf.WriteString(`"` + p + `"`)
+		} else {
+			vals = append(vals, resp.StringValue(p))
+		}
+	case "bounds":
+		bbox := o.CalculatedBBox()
+		if msg.OutputType == server.JSON {
+			buf.WriteString(`,"bounds":`)
+			buf.WriteString(bbox.ExternalJSON())
+		} else {
+			vals = append(vals, resp.ArrayValue([]resp.Value{
+				resp.ArrayValue([]resp.Value{
+					resp.FloatValue(bbox.Min.Y),
+					resp.FloatValue(bbox.Min.X),
+				}),
+				resp.ArrayValue([]resp.Value{
+					resp.FloatValue(bbox.Max.Y),
+					resp.FloatValue(bbox.Max.X),
+				}),
+			}))
+		}
 	}
+
 	if len(vs) != 0 {
 		return "", errInvalidNumberOfArguments
 	}
@@ -225,7 +229,7 @@ func (c *Controller) cmdDel(msg *server.Message) (res string, d commandDetailsT,
 	if col != nil {
 		d.obj, d.fields, ok = col.Remove(d.id)
 		if ok {
-			if col.Count() == 0 {
+			if col.Count(collection.TypeAll) == 0 {
 				c.deleteCol(d.key)
 				d.revert = func() {
 					c.setCol(d.key, col)

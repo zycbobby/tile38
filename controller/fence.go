@@ -30,7 +30,7 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 	nofields := sw.nofields
 	sw.mu.Unlock()
 
-	if details.obj == nil || (details.command == "fset" && nofields) {
+	if details.obj == nil || !details.obj.IsGeometry() || (details.command == "fset" && nofields) {
 		return nil
 	}
 	match = false

@@ -150,13 +150,15 @@ func (c *Controller) aofshrink() {
 				objs := make(map[string]objFields)
 				c.mu.Lock()
 				fnames := col.FieldArr() // reload an array of field names to match each object
-				col.ScanGreaterOrEqual(nextID, 0, func(id string, obj geojson.Object, fields []float64) bool {
-					if id != nextID {
-						objs[id] = objFields{obj, fields}
-						nextID = id
-					}
-					return len(objs) < maxIDGroup
-				})
+				col.ScanGreaterOrEqual(nextID, 0, collection.TypeAll,
+					func(id string, obj geojson.Object, fields []float64) bool {
+						if id != nextID {
+							objs[id] = objFields{obj, fields}
+							nextID = id
+						}
+						return len(objs) < maxIDGroup
+					},
+				)
 				c.mu.Unlock()
 
 				ids := make([]string, 0, maxIDGroup)
@@ -177,7 +179,11 @@ func (c *Controller) aofshrink() {
 					}
 					switch obj := obj.obj.(type) {
 					default:
-						values = append(values, resp.StringValue("object"), resp.StringValue(obj.JSON()))
+						if obj.IsGeometry() {
+							values = append(values, resp.StringValue("object"), resp.StringValue(obj.JSON()))
+						} else {
+							values = append(values, resp.StringValue("string"), resp.StringValue(obj.String()))
+						}
 					case geojson.SimplePoint:
 						values = append(values, resp.StringValue("point"), resp.FloatValue(obj.Y), resp.FloatValue(obj.X))
 					case geojson.Point:

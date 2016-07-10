@@ -239,6 +239,15 @@ var commandsJSON = `{
                 "type": "geohash"    
               }
             ]
+          },
+          {
+            "name": "STRING",
+            "arguments":[
+              {
+                "name": "value",
+                "type": "string"    
+              }
+            ]
           }
         ]
       }

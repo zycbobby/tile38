@@ -44,7 +44,7 @@
 // widely used ordered tree implementation in the Go ecosystem currently.
 // Its functions, therefore, exactly mirror those of
 // llrb.LLRB where possible.  Unlike gollrb, though, we currently don't
-// support storing multiple equivalent values or backwards iteration.
+// support storing multiple equivalent values.
 package btree
 
 import (
@@ -61,7 +61,10 @@ type Item interface {
 	// This must provide a strict weak ordering.
 	// If !a.Less(b) && !b.Less(a), we treat this to mean a == b (i.e. we can only
 	// hold one of either a or b in the tree).
-	Less(than Item) bool
+	//
+	// There is a user-defined ctx argument that is equal to the ctx value which
+	// is set at time of the btree contruction.
+	Less(than Item, ctx int) bool
 }
 
 const (
@@ -106,18 +109,20 @@ type ItemIterator func(i Item) bool
 //
 // New(2), for example, will create a 2-3-4 tree (each node contains 1-3 items
 // and 2-4 children).
-func New(degree int) *BTree {
-	return NewWithFreeList(degree, NewFreeList(DefaultFreeListSize))
+// The ctx param is user-defined.
+func New(degree, ctx int) *BTree {
+	return NewWithFreeList(degree, NewFreeList(DefaultFreeListSize), ctx)
 }
 
 // NewWithFreeList creates a new B-Tree that uses the given node free list.
-func NewWithFreeList(degree int, f *FreeList) *BTree {
+func NewWithFreeList(degree int, f *FreeList, ctx int) *BTree {
 	if degree <= 1 {
 		panic("bad degree")
 	}
 	return &BTree{
 		degree:   degree,
 		freelist: f,
+		ctx:      ctx,
 	}
 }
 
@@ -156,11 +161,11 @@ func (s *items) pop() (out Item) {
 // find returns the index where the given item should be inserted into this
 // list.  'found' is true if the item already exists in the list at the given
 // index.
-func (s items) find(item Item) (index int, found bool) {
+func (s items) find(item Item, ctx int) (index int, found bool) {
 	i := sort.Search(len(s), func(i int) bool {
-		return item.Less(s[i])
+		return item.Less(s[i], ctx)
 	})
-	if i > 0 && !s[i-1].Less(item) {
+	if i > 0 && !s[i-1].Less(item, ctx) {
 		return i - 1, true
 	}
 	return i, false
@@ -240,8 +245,8 @@ func (n *node) maybeSplitChild(i, maxItems int) bool {
 // insert inserts an item into the subtree rooted at this node, making sure
 // no nodes in the subtree exceed maxItems items.  Should an equivalent item be
 // be found/replaced by insert, it will be returned.
-func (n *node) insert(item Item, maxItems int) Item {
-	i, found := n.items.find(item)
+func (n *node) insert(item Item, maxItems int, ctx int) Item {
+	i, found := n.items.find(item, ctx)
 	if found {
 		out := n.items[i]
 		n.items[i] = item
@@ -254,9 +259,9 @@ func (n *node) insert(item Item, maxItems int) Item {
 	if n.maybeSplitChild(i, maxItems) {
 		inTree := n.items[i]
 		switch {
-		case item.Less(inTree):
+		case item.Less(inTree, ctx):
 			// no change, we want first split node
-		case inTree.Less(item):
+		case inTree.Less(item, ctx):
 			i++ // we want second split node
 		default:
 			out := n.items[i]
@@ -264,16 +269,16 @@ func (n *node) insert(item Item, maxItems int) Item {
 			return out
 		}
 	}
-	return n.children[i].insert(item, maxItems)
+	return n.children[i].insert(item, maxItems, ctx)
 }
 
 // get finds the given key in the subtree and returns it.
-func (n *node) get(key Item) Item {
-	i, found := n.items.find(key)
+func (n *node) get(key Item, ctx int) Item {
+	i, found := n.items.find(key, ctx)
 	if found {
 		return n.items[i]
 	} else if len(n.children) > 0 {
-		return n.children[i].get(key)
+		return n.children[i].get(key, ctx)
 	}
 	return nil
 }
@@ -316,7 +321,7 @@ const (
 )
 
 // remove removes an item from the subtree rooted at this node.
-func (n *node) remove(item Item, minItems int, typ toRemove) Item {
+func (n *node) remove(item Item, minItems int, typ toRemove, ctx int) Item {
 	var i int
 	var found bool
 	switch typ {
@@ -331,7 +336,7 @@ func (n *node) remove(item Item, minItems int, typ toRemove) Item {
 		}
 		i = 0
 	case removeItem:
-		i, found = n.items.find(item)
+		i, found = n.items.find(item, ctx)
 		if len(n.children) == 0 {
 			if found {
 				return n.items.removeAt(i)
@@ -344,7 +349,7 @@ func (n *node) remove(item Item, minItems int, typ toRemove) Item {
 	// If we get to here, we have children.
 	child := n.children[i]
 	if len(child.items) <= minItems {
-		return n.growChildAndRemove(i, item, minItems, typ)
+		return n.growChildAndRemove(i, item, minItems, typ, ctx)
 	}
 	// Either we had enough items to begin with, or we've done some
 	// merging/stealing, because we've got enough now and we're ready to return
@@ -356,12 +361,12 @@ func (n *node) remove(item Item, minItems int, typ toRemove) Item {
 		// We use our special-case 'remove' call with typ=maxItem to pull the
 		// predecessor of item i (the rightmost leaf of our immediate left child)
 		// and set it into where we pulled the item from.
-		n.items[i] = child.remove(nil, minItems, removeMax)
+		n.items[i] = child.remove(nil, minItems, removeMax, ctx)
 		return out
 	}
 	// Final recursive call.  Once we're here, we know that the item isn't in this
 	// node and that the child is big enough to remove from.
-	return child.remove(item, minItems, typ)
+	return child.remove(item, minItems, typ, ctx)
 }
 
 // growChildAndRemove grows child 'i' to make sure it's possible to remove an
@@ -383,7 +388,7 @@ func (n *node) remove(item Item, minItems int, typ toRemove) Item {
 // We then simply redo our remove call, and the second time (regardless of
 // whether we're in case 1 or 2), we'll have enough items and can guarantee
 // that we hit case A.
-func (n *node) growChildAndRemove(i int, item Item, minItems int, typ toRemove) Item {
+func (n *node) growChildAndRemove(i int, item Item, minItems int, typ toRemove, ctx int) Item {
 	child := n.children[i]
 	if i > 0 && len(n.children[i-1].items) > minItems {
 		// Steal from left child
@@ -416,37 +421,80 @@ func (n *node) growChildAndRemove(i int, item Item, minItems int, typ toRemove) 
 		child.children = append(child.children, mergeChild.children...)
 		n.t.freeNode(mergeChild)
 	}
-	return n.remove(item, minItems, typ)
+	return n.remove(item, minItems, typ, ctx)
 }
 
+type direction int
+
+const (
+	descend = direction(-1)
+	ascend  = direction(+1)
+)
+
 // iterate provides a simple method for iterating over elements in the tree.
-// It could probably use some work to be extra-efficient (it calls from() a
-// little more than it should), but it works pretty well for now.
 //
-// It requires that 'from' and 'to' both return true for values we should hit
-// with the iterator.  It should also be the case that 'from' returns true for
-// values less than or equal to values 'to' returns true for, and 'to'
-// returns true for values greater than or equal to those that 'from'
-// does.
-func (n *node) iterate(from, to func(Item) bool, iter ItemIterator) bool {
-	for i, item := range n.items {
-		if !from(item) {
-			continue
+// When ascending, the 'start' should be less than 'stop' and when descending,
+// the 'start' should be greater than 'stop'. Setting 'includeStart' to true
+// will force the iterator to include the first item when it equals 'start',
+// thus creating a "greaterOrEqual" or "lessThanEqual" rather than just a
+// "greaterThan" or "lessThan" queries.
+func (n *node) iterate(dir direction, start, stop Item, includeStart bool, hit bool, iter ItemIterator, ctx int) (bool, bool) {
+	var ok bool
+	switch dir {
+	case ascend:
+		for i := 0; i < len(n.items); i++ {
+			if start != nil && n.items[i].Less(start, ctx) {
+				continue
+			}
+			if len(n.children) > 0 {
+				if hit, ok = n.children[i].iterate(dir, start, stop, includeStart, hit, iter, ctx); !ok {
+					return hit, false
+				}
+			}
+			if !includeStart && !hit && start != nil && !start.Less(n.items[i], ctx) {
+				hit = true
+				continue
+			}
+			hit = true
+			if stop != nil && !n.items[i].Less(stop, ctx) {
+				return hit, false
+			}
+			if !iter(n.items[i]) {
+				return hit, false
+			}
 		}
-		if len(n.children) > 0 && !n.children[i].iterate(from, to, iter) {
-			return false
+		if len(n.children) > 0 {
+			if hit, ok = n.children[len(n.children)-1].iterate(dir, start, stop, includeStart, hit, iter, ctx); !ok {
+				return hit, false
+			}
 		}
-		if !to(item) {
-			return false
+	case descend:
+		for i := len(n.items) - 1; i >= 0; i-- {
+			if start != nil && !n.items[i].Less(start, ctx) {
+				if !includeStart || hit || start.Less(n.items[i], ctx) {
+					continue
+				}
+			}
+			if len(n.children) > 0 {
+				if hit, ok = n.children[i+1].iterate(dir, start, stop, includeStart, hit, iter, ctx); !ok {
+					return hit, false
+				}
+			}
+			if stop != nil && !stop.Less(n.items[i], ctx) {
+				return hit, false //	continue
+			}
+			hit = true
+			if !iter(n.items[i]) {
+				return hit, false
+			}
 		}
-		if !iter(item) {
-			return false
+		if len(n.children) > 0 {
+			if hit, ok = n.children[0].iterate(dir, start, stop, includeStart, hit, iter, ctx); !ok {
+				return hit, false
+			}
 		}
 	}
-	if len(n.children) > 0 {
-		return n.children[len(n.children)-1].iterate(from, to, iter)
-	}
-	return true
+	return hit, true
 }
 
 // Used for testing/debugging purposes.
@@ -469,6 +517,7 @@ type BTree struct {
 	length   int
 	root     *node
 	freelist *FreeList
+	ctx      int
 }
 
 // maxItems returns the max number of items to allow per node.
@@ -522,7 +571,7 @@ func (t *BTree) ReplaceOrInsert(item Item) Item {
 		t.root.items = append(t.root.items, item2)
 		t.root.children = append(t.root.children, oldroot, second)
 	}
-	out := t.root.insert(item, t.maxItems())
+	out := t.root.insert(item, t.maxItems(), t.ctx)
 	if out == nil {
 		t.length++
 	}
@@ -532,26 +581,26 @@ func (t *BTree) ReplaceOrInsert(item Item) Item {
 // Delete removes an item equal to the passed in item from the tree, returning
 // it.  If no such item exists, returns nil.
 func (t *BTree) Delete(item Item) Item {
-	return t.deleteItem(item, removeItem)
+	return t.deleteItem(item, removeItem, t.ctx)
 }
 
 // DeleteMin removes the smallest item in the tree and returns it.
 // If no such item exists, returns nil.
 func (t *BTree) DeleteMin() Item {
-	return t.deleteItem(nil, removeMin)
+	return t.deleteItem(nil, removeMin, t.ctx)
 }
 
 // DeleteMax removes the largest item in the tree and returns it.
 // If no such item exists, returns nil.
 func (t *BTree) DeleteMax() Item {
-	return t.deleteItem(nil, removeMax)
+	return t.deleteItem(nil, removeMax, t.ctx)
 }
 
-func (t *BTree) deleteItem(item Item, typ toRemove) Item {
+func (t *BTree) deleteItem(item Item, typ toRemove, ctx int) Item {
 	if t.root == nil || len(t.root.items) == 0 {
 		return nil
 	}
-	out := t.root.remove(item, t.minItems(), typ)
+	out := t.root.remove(item, t.minItems(), typ, ctx)
 	if len(t.root.items) == 0 && len(t.root.children) > 0 {
 		oldroot := t.root
 		t.root = t.root.children[0]
@@ -569,10 +618,7 @@ func (t *BTree) AscendRange(greaterOrEqual, lessThan Item, iterator ItemIterator
 	if t.root == nil {
 		return
 	}
-	t.root.iterate(
-		func(a Item) bool { return !a.Less(greaterOrEqual) },
-		func(a Item) bool { return a.Less(lessThan) },
-		iterator)
+	t.root.iterate(ascend, greaterOrEqual, lessThan, true, false, iterator, t.ctx)
 }
 
 // AscendLessThan calls the iterator for every value in the tree within the range
@@ -581,10 +627,7 @@ func (t *BTree) AscendLessThan(pivot Item, iterator ItemIterator) {
 	if t.root == nil {
 		return
 	}
-	t.root.iterate(
-		func(a Item) bool { return true },
-		func(a Item) bool { return a.Less(pivot) },
-		iterator)
+	t.root.iterate(ascend, nil, pivot, false, false, iterator, t.ctx)
 }
 
 // AscendGreaterOrEqual calls the iterator for every value in the tree within
@@ -593,10 +636,7 @@ func (t *BTree) AscendGreaterOrEqual(pivot Item, iterator ItemIterator) {
 	if t.root == nil {
 		return
 	}
-	t.root.iterate(
-		func(a Item) bool { return !a.Less(pivot) },
-		func(a Item) bool { return true },
-		iterator)
+	t.root.iterate(ascend, pivot, nil, true, false, iterator, t.ctx)
 }
 
 // Ascend calls the iterator for every value in the tree within the range
@@ -605,10 +645,43 @@ func (t *BTree) Ascend(iterator ItemIterator) {
 	if t.root == nil {
 		return
 	}
-	t.root.iterate(
-		func(a Item) bool { return true },
-		func(a Item) bool { return true },
-		iterator)
+	t.root.iterate(ascend, nil, nil, false, false, iterator, t.ctx)
+}
+
+// DescendRange calls the iterator for every value in the tree within the range
+// [lessOrEqual, greaterThan), until iterator returns false.
+func (t *BTree) DescendRange(lessOrEqual, greaterThan Item, iterator ItemIterator) {
+	if t.root == nil {
+		return
+	}
+	t.root.iterate(descend, lessOrEqual, greaterThan, true, false, iterator, t.ctx)
+}
+
+// DescendLessOrEqual calls the iterator for every value in the tree within the range
+// [pivot, first], until iterator returns false.
+func (t *BTree) DescendLessOrEqual(pivot Item, iterator ItemIterator) {
+	if t.root == nil {
+		return
+	}
+	t.root.iterate(descend, pivot, nil, true, false, iterator, t.ctx)
+}
+
+// DescendGreaterThan calls the iterator for every value in the tree within
+// the range [last, pivot), until iterator returns false.
+func (t *BTree) DescendGreaterThan(pivot Item, iterator ItemIterator) {
+	if t.root == nil {
+		return
+	}
+	t.root.iterate(descend, nil, pivot, false, false, iterator, t.ctx)
+}
+
+// Descend calls the iterator for every value in the tree within the range
+// [last, first], until iterator returns false.
+func (t *BTree) Descend(iterator ItemIterator) {
+	if t.root == nil {
+		return
+	}
+	t.root.iterate(descend, nil, nil, false, false, iterator, t.ctx)
 }
 
 // Get looks for the key item in the tree, returning it.  It returns nil if
@@ -617,7 +690,7 @@ func (t *BTree) Get(key Item) Item {
 	if t.root == nil {
 		return nil
 	}
-	return t.root.get(key)
+	return t.root.get(key, t.ctx)
 }
 
 // Min returns the smallest item in the tree, or nil if the tree is empty.
@@ -644,6 +717,6 @@ func (t *BTree) Len() int {
 type Int int
 
 // Less returns true if int(a) < int(b).
-func (a Int) Less(b Item) bool {
+func (a Int) Less(b Item, ctx int) bool {
 	return a < b.(Int)
 }

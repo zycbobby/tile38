@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/google/btree"
+	"github.com/tidwall/btree"
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/server"
 )

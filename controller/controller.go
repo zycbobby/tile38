@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/btree"
+	"github.com/tidwall/btree"
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/controller/log"
@@ -45,7 +45,7 @@ type commandDetailsT struct {
 	timestamp time.Time
 }
 
-func (col *collectionT) Less(item btree.Item) bool {
+func (col *collectionT) Less(item btree.Item, ctx int) bool {
 	return col.Key < item.(*collectionT).Key
 }
 
@@ -82,7 +82,7 @@ func ListenAndServe(host string, port int, dir string) error {
 		host:     host,
 		port:     port,
 		dir:      dir,
-		cols:     btree.New(16),
+		cols:     btree.New(16, 0),
 		follows:  make(map[*bytes.Buffer]bool),
 		fcond:    sync.NewCond(&sync.Mutex{}),
 		lives:    make(map[*liveBuffer]bool),
@@ -387,7 +387,7 @@ func randomKey(n int) string {
 
 func (c *Controller) reset() {
 	c.aofsz = 0
-	c.cols = btree.New(16)
+	c.cols = btree.New(16, 0)
 }
 
 func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d commandDetailsT, err error) {

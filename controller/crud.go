@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/btree"
+	"github.com/tidwall/btree"
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/controller/server"
@@ -92,7 +92,7 @@ func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 			buf.WriteString(`,"object":`)
 			buf.WriteString(o.JSON())
 		} else {
-			vals = append(vals, resp.StringValue(o.JSON()))
+			vals = append(vals, resp.StringValue(o.String()))
 		}
 	} else {
 		switch strings.ToLower(typ) {
@@ -300,7 +300,7 @@ func (c *Controller) cmdFlushDB(msg *server.Message) (res string, d commandDetai
 		err = errInvalidNumberOfArguments
 		return
 	}
-	c.cols = btree.New(16)
+	c.cols = btree.New(16, 0)
 	c.hooks = make(map[string]*Hook)
 	c.hookcols = make(map[string]map[string]*Hook)
 	d.command = "flushdb"
@@ -379,6 +379,13 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (d commandDetailsT, fields []
 	default:
 		err = errInvalidArgument(typ)
 		return
+	case lc(typ, "string"):
+		var str string
+		if vs, str, ok = tokenval(vs); !ok {
+			err = errInvalidNumberOfArguments
+			return
+		}
+		d.obj = geojson.String(str)
 	case lc(typ, "point"):
 		var slat, slon, sz string
 		if vs, slat, ok = tokenval(vs); !ok || slat == "" {

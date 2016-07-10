@@ -325,7 +325,7 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 		} else {
 			switch sw.output {
 			case outputObjects:
-				vals = append(vals, resp.StringValue(o.JSON()))
+				vals = append(vals, resp.StringValue(o.String()))
 			case outputPoints:
 				point := o.CalculatedPoint()
 				if point.Z != 0 {

@@ -1,9 +1,14 @@
 package collection
 
 import (
-	"github.com/google/btree"
+	"github.com/tidwall/btree"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/index"
+)
+
+const (
+	idOrdered    = 0
+	valueOrdered = 2
 )
 
 type itemT struct {
@@ -12,8 +17,22 @@ type itemT struct {
 	fields []float64
 }
 
-func (i *itemT) Less(item btree.Item) bool {
-	return i.id < item.(*itemT).id
+func (i *itemT) Less(item btree.Item, ctx int) bool {
+	switch ctx {
+	default:
+		return false
+	case idOrdered:
+		return i.id < item.(*itemT).id
+	case valueOrdered:
+		if i.object.String() < item.(*itemT).object.String() {
+			return true
+		}
+		if i.object.String() > item.(*itemT).object.String() {
+			return false
+		}
+		return i.id < item.(*itemT).id
+	}
+
 }
 
 func (i *itemT) Rect() (minX, minY, maxX, maxY float64) {
@@ -28,8 +47,9 @@ func (i *itemT) Point() (x, y float64) {
 
 // Collection represents a collection of geojson objects.
 type Collection struct {
-	items    *btree.BTree
-	index    *index.Index
+	items    *btree.BTree // items sorted by keys
+	values   *btree.BTree // items sorted by value+key
+	index    *index.Index // items geospatially indexed
 	fieldMap map[string]int
 	weight   int
 	points   int
@@ -42,7 +62,8 @@ var counter uint64
 func New() *Collection {
 	col := &Collection{
 		index:    index.New(),
-		items:    btree.New(16),
+		items:    btree.New(16, idOrdered),
+		values:   btree.New(16, valueOrdered),
 		fieldMap: make(map[string]int),
 	}
 	return col
@@ -60,23 +81,7 @@ func (c *Collection) PointCount() int {
 
 // TotalWeight calculates the in-memory cost of the collection in bytes.
 func (c *Collection) TotalWeight() int {
-	return c.weight + c.overheadWeight()
-}
-
-func (c *Collection) overheadWeight() int {
-	// the field map.
-	mapweight := 0
-	for field := range c.fieldMap {
-		mapweight += len(field) + 8 // key + value
-	}
-	mapweight = int((float64(mapweight) * 1.05) + 28.0) // about an 8% pad plus golang 28 byte map overhead.
-	// the btree. each object takes up 64bits for the interface head for each item.
-	btreeweight := (c.objects * 8)
-	// plus roughly one pointer for every item
-	btreeweight += (c.objects * 8)
-	// also the btree header weight
-	btreeweight += 24
-	return mapweight + btreeweight
+	return c.weight
 }
 
 // ReplaceOrInsert adds or replaces an object in the collection and returns the fields array.
@@ -113,7 +118,11 @@ func (c *Collection) remove(id string) (item *itemT, ok bool) {
 		return nil, false
 	}
 	item = i.(*itemT)
-	c.index.Remove(item)
+	if item.object.IsGeometry() {
+		c.index.Remove(item)
+	} else {
+		c.values.Delete(item)
+	}
 	c.weight -= len(item.fields) * 8
 	c.weight -= item.object.Weight() + len(item.id)
 	c.points -= item.object.PositionCount()
@@ -123,7 +132,11 @@ func (c *Collection) remove(id string) (item *itemT, ok bool) {
 
 func (c *Collection) insert(id string, obj geojson.Object) (item *itemT) {
 	item = &itemT{id: id, object: obj}
-	c.index.Insert(item)
+	if obj.IsGeometry() {
+		c.index.Insert(item)
+	} else {
+		c.values.ReplaceOrInsert(item)
+	}
 	c.items.ReplaceOrInsert(item)
 	c.weight += obj.Weight() + len(id)
 	c.points += obj.PositionCount()

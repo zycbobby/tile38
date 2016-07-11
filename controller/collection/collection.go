@@ -46,7 +46,6 @@ func (i *itemT) Less(item btree.Item, ctx int) bool {
 		// the values match so we will compare the ids, which are always unique.
 		return i.id < item.(*itemT).id
 	}
-
 }
 
 func (i *itemT) Rect() (minX, minY, maxX, maxY float64) {
@@ -411,4 +410,6 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 		}
 		return true
 	})
+}
+func (c *Collection) SearchValues(pivot string, desc bool, iterator func(id string, obj geojson.Object, fields []float64) bool) {
 }

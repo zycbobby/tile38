@@ -159,6 +159,16 @@ reading:
 			values = append(values, resp.StringValue(string(line)))
 			break
 		}
+		if line[0] == '"' && line[len(line)-1] == '"' {
+			if len(values) > 0 &&
+				strings.ToLower(values[0].String()) == "set" &&
+				strings.ToLower(values[len(values)-1].String()) == "string" {
+				// Setting a string value that is contained inside double quotes.
+				// This is only because of the boundary issues of the native protocol.
+				values = append(values, resp.StringValue(string(line[1:len(line)-1])))
+				break
+			}
+		}
 		i := 0
 		for ; i < len(line); i++ {
 			if line[i] == ' ' {

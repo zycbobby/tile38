@@ -8,6 +8,14 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 
 *This README is quick start document. You can find detailed documentation at [http://tile38.com](http://tile38.com).*
 
+<p align="center">
+<a href="http://tile38.com/commands/nearby"><img src="/doc/search-nearby.png" alt="Nearby" border="0" width="120" height="120"></a>
+<a href="http://tile38.com/commands/within"><img src="/doc/search-within.png" alt="Within" border="0" width="120" height="120"></a>
+<a href="http://tile38.com/commands/intersects"><img src="/doc/search-intersects.png" alt="Intersects" border="0" width="120" height="120"></a>
+<a href="http://tile38.com/commands/geofencing"><img src="/doc/geofence.gif" alt="Geofencing" border="0" width="120" height="120"></a>
+<a href="http://tile38.com/topics/roaming-geofences"><img src="/doc/roaming.gif" alt="Roaming Geofences" border="0" width="120" height="120"></a>
+</p>
+
 ## Features
 
 - Spatial index with [search](#searching) methods such as Nearby, Within, and Intersects.
@@ -19,15 +27,6 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 - Full [command line interface](#cli).
 - Leader / follower [replication](#replication).
 - In-memory database that persists on disk.
-
-<br>
-<p align="center">
-<a href="#nearby"><img src="/doc/search-nearby.png" alt="Nearby" border="0" width="120" height="120"></a>
-<a href="#within"><img src="/doc/search-within.png" alt="Within" border="0" width="120" height="120"></a>
-<a href="#intersects"><img src="/doc/search-intersects.png" alt="Intersects" border="0" width="120" height="120"></a>
-<a href="#geofencing"><img src="/doc/geofence.gif" alt="Geofencing" border="0" width="120" height="120"></a>
-<a href="http://tile38.com/topics/roaming-geofences"><img src="/doc/roaming.gif" alt="Roaming Geofences" border="0" width="120" height="120"></a>
-</p>
 
 ## Components
 - `tile38-server ` - The server

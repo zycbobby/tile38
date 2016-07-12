@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 )
@@ -14,13 +15,13 @@ var tmfmt = "2006-01-02T15:04:05.999999999Z07:00"
 func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) []string {
 	jshookName := jsonString(hookName)
 	jstime := jsonString(details.timestamp.Format(tmfmt))
-	glob := fence.glob
+	pattern := fence.glob
 	if details.command == "drop" {
 		return []string{`{"cmd":"drop","hook":` + jshookName + `,"time":` + jstime + `}`}
 	}
 	match := true
-	if glob != "" && glob != "*" {
-		match, _ = globMatch(glob, details.id)
+	if pattern != "" && pattern != "*" {
+		match, _ = glob.Match(pattern, details.id)
 	}
 	if !match {
 		return nil
@@ -202,7 +203,7 @@ func fenceMatchRoam(c *Controller, fence *liveFenceSwitches, tkey, tid string, o
 				return true // skip self
 			}
 			if fence.roam.pattern {
-				match, _ = globMatch(fence.roam.id, id)
+				match, _ = glob.Match(fence.roam.id, id)
 			} else {
 				match = fence.roam.id == id
 			}

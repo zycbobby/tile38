@@ -150,7 +150,7 @@ func (c *Controller) aofshrink() {
 				objs := make(map[string]objFields)
 				c.mu.Lock()
 				fnames := col.FieldArr() // reload an array of field names to match each object
-				col.ScanGreaterOrEqual(nextID, 0, collection.TypeAll,
+				col.ScanGreaterOrEqual(nextID, 1, collection.TypeAll, false,
 					func(id string, obj geojson.Object, fields []float64) bool {
 						if id != nextID {
 							objs[id] = objFields{obj, fields}

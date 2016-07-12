@@ -378,7 +378,6 @@ var commandsJSON = `{
     "since": "1.0.0",
     "group": "keys"
   },
-
   "SCAN": {
     "summary": "Incrementally iterate though a key",
     "complexity": "O(N) where N is the number of ids in the key",
@@ -405,6 +404,18 @@ var commandsJSON = `{
         "type": "pattern",
         "optional": true
       },
+      {
+        "name": "order",
+        "optional": true,
+        "enumargs": [
+          {
+            "name": "ASC"
+          },
+          {
+            "name": "DESC"
+          }
+		]
+	  },
       {
         "command": "WHERE",
         "name": ["field","min","max"],

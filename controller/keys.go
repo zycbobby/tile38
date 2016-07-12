@@ -7,6 +7,7 @@ import (
 
 	"github.com/tidwall/btree"
 	"github.com/tidwall/resp"
+	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 )
 
@@ -44,7 +45,7 @@ func (c *Controller) cmdKeys(msg *server.Message) (res string, err error) {
 			}
 			match = true
 		} else {
-			match, _ = globMatch(pattern, key)
+			match, _ = glob.Match(pattern, key)
 		}
 		if match {
 			if once {
@@ -69,14 +70,14 @@ func (c *Controller) cmdKeys(msg *server.Message) (res string, err error) {
 	} else {
 		if strings.HasSuffix(pattern, "*") {
 			greaterPivot = pattern[:len(pattern)-1]
-			if globIsGlob(greaterPivot) {
+			if glob.IsGlob(greaterPivot) {
 				greater = false
 				c.cols.Ascend(iterator)
 			} else {
 				greater = true
 				c.cols.AscendGreaterOrEqual(&collectionT{Key: greaterPivot}, iterator)
 			}
-		} else if globIsGlob(pattern) {
+		} else if glob.IsGlob(pattern) {
 			greater = false
 			c.cols.Ascend(iterator)
 		} else {

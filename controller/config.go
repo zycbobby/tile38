@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tidwall/resp"
+	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 )
 
@@ -147,7 +148,7 @@ func (c *Controller) setConfigProperty(name, value string, fromLoad bool) error 
 func (c *Controller) getConfigProperties(pattern string) map[string]interface{} {
 	m := make(map[string]interface{})
 	for _, name := range validProperties {
-		matched, _ := globMatch(pattern, name)
+		matched, _ := glob.Match(pattern, name)
 		if matched {
 			m[name] = c.getConfigProperty(name)
 		}

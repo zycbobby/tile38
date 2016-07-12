@@ -130,6 +130,7 @@ type searchScanBaseTokens struct {
 	nofields  bool
 	limit     uint64
 	sparse    uint8
+	desc      bool
 }
 
 func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value, t searchScanBaseTokens, err error) {
@@ -141,6 +142,7 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 	var slimit string
 	var ssparse string
 	var scursor string
+	var asc bool
 	for {
 		nvs, wtok, ok := tokenval(vs)
 		if ok && len(wtok) > 0 {
@@ -273,7 +275,22 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 						"cross":   true,
 					}
 				}
-
+				continue
+			} else if (wtok[0] == 'D' || wtok[0] == 'd') && strings.ToLower(wtok) == "desc" {
+				vs = nvs
+				if t.desc || asc {
+					err = errDuplicateArgument(strings.ToUpper(wtok))
+					return
+				}
+				t.desc = true
+				continue
+			} else if (wtok[0] == 'A' || wtok[0] == 'a') && strings.ToLower(wtok) == "asc" {
+				vs = nvs
+				if t.desc || asc {
+					err = errDuplicateArgument(strings.ToUpper(wtok))
+					return
+				}
+				asc = true
 				continue
 			} else if (wtok[0] == 'M' || wtok[0] == 'm') && strings.ToLower(wtok) == "match" {
 				vs = nvs
@@ -299,6 +316,15 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 		}
 		if t.fence {
 			err = errors.New("FENCE is not allowed for SCAN")
+			return
+		}
+	} else {
+		if t.desc {
+			err = errors.New("DESC is not allowed for " + strings.ToUpper(cmd))
+			return
+		}
+		if asc {
+			err = errors.New("ASC is not allowed for " + strings.ToUpper(cmd))
 			return
 		}
 	}
@@ -353,7 +379,6 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 			vs = nvs
 		}
 	}
-
 	if scursor != "" {
 		if t.cursor, err = strconv.ParseUint(scursor, 10, 64); err != nil {
 			err = errInvalidArgument(scursor)

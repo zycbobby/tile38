@@ -236,32 +236,69 @@ func (c *Collection) FieldArr() []string {
 }
 
 // Scan iterates though the collection. A cursor can be used for paging.
-func (c *Collection) Scan(cursor uint64, stype ScanType, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) Scan(cursor uint64, stype ScanType, desc bool,
+	iterator func(id string, obj geojson.Object, fields []float64) bool,
+) (ncursor uint64) {
 	var i uint64
 	var active = true
-	c.items.Ascend(func(item btree.Item) bool {
+	iter := func(item btree.Item) bool {
 		if i >= cursor {
 			iitm := item.(*itemT)
 			active = iterator(iitm.id, iitm.object, iitm.fields)
 		}
 		i++
 		return active
-	})
+	}
+	if desc {
+		c.items.Descend(iter)
+	} else {
+		c.items.Ascend(iter)
+	}
 	return i
 }
 
 // ScanGreaterOrEqual iterates though the collection starting with specified id. A cursor can be used for paging.
-func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, stype ScanType, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) ScanRange(cursor uint64, stype ScanType, start, end string, desc bool,
+	iterator func(id string, obj geojson.Object, fields []float64) bool,
+) (ncursor uint64) {
 	var i uint64
 	var active = true
-	c.items.AscendGreaterOrEqual(&itemT{id: id}, func(item btree.Item) bool {
+	iter := func(item btree.Item) bool {
 		if i >= cursor {
 			iitm := item.(*itemT)
 			active = iterator(iitm.id, iitm.object, iitm.fields)
 		}
 		i++
 		return active
-	})
+	}
+
+	if desc {
+		c.items.DescendRange(&itemT{id: start}, &itemT{id: end}, iter)
+	} else {
+		c.items.AscendRange(&itemT{id: start}, &itemT{id: end}, iter)
+	}
+	return i
+}
+
+// ScanGreaterOrEqual iterates though the collection starting with specified id. A cursor can be used for paging.
+func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, stype ScanType, desc bool,
+	iterator func(id string, obj geojson.Object, fields []float64) bool,
+) (ncursor uint64) {
+	var i uint64
+	var active = true
+	iter := func(item btree.Item) bool {
+		if i >= cursor {
+			iitm := item.(*itemT)
+			active = iterator(iitm.id, iitm.object, iitm.fields)
+		}
+		i++
+		return active
+	}
+	if desc {
+		c.items.DescendLessOrEqual(&itemT{id: id}, iter)
+	} else {
+		c.items.AscendGreaterOrEqual(&itemT{id: id}, iter)
+	}
 	return i
 }
 

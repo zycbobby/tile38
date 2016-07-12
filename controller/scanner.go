@@ -8,6 +8,7 @@ import (
 
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
+	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 )
@@ -53,7 +54,7 @@ type scanWriter struct {
 }
 
 func (c *Controller) newScanWriter(
-	wr *bytes.Buffer, msg *server.Message, key string, output outputT, precision uint64, glob string, limit uint64, wheres []whereT, nofields bool,
+	wr *bytes.Buffer, msg *server.Message, key string, output outputT, precision uint64, globPattern string, limit uint64, wheres []whereT, nofields bool,
 ) (
 	*scanWriter, error,
 ) {
@@ -75,13 +76,13 @@ func (c *Controller) newScanWriter(
 		wheres:    wheres,
 		precision: precision,
 		nofields:  nofields,
-		glob:      glob,
+		glob:      globPattern,
 		limit:     limit,
 	}
-	if glob == "*" || glob == "" {
+	if globPattern == "*" || globPattern == "" {
 		sw.globEverything = true
 	} else {
-		if !globIsGlob(glob) {
+		if !glob.IsGlob(globPattern) {
 			sw.globSingle = true
 		}
 	}
@@ -241,7 +242,7 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 			}
 			keepGoing = false // return current object and stop iterating
 		} else {
-			ok, _ := globMatch(sw.glob, id)
+			ok, _ := glob.Match(sw.glob, id)
 			if !ok {
 				return true
 			}

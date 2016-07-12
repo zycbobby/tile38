@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tidwall/resp"
+	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/controller/server"
 )
@@ -329,7 +330,7 @@ func (c *Controller) cmdHooks(msg *server.Message) (res string, err error) {
 
 	var hooks []*Hook
 	for name, hook := range c.hooks {
-		match, _ := globMatch(pattern, name)
+		match, _ := glob.Match(pattern, name)
 		if match {
 			hooks = append(hooks, hook)
 		}

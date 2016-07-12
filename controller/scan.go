@@ -2,11 +2,11 @@ package controller
 
 import (
 	"bytes"
-	"strings"
 	"time"
 
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
+	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 )
@@ -48,23 +48,16 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 			}
 			sw.count = uint64(count)
 		} else {
-			if strings.HasSuffix(sw.glob, "*") {
-				greaterGlob := sw.glob[:len(sw.glob)-1]
-				if globIsGlob(greaterGlob) {
-					s.cursor = sw.col.Scan(s.cursor, stype,
-						func(id string, o geojson.Object, fields []float64) bool {
-							return sw.writeObject(id, o, fields, false)
-						},
-					)
-				} else {
-					s.cursor = sw.col.ScanGreaterOrEqual(greaterGlob, s.cursor, stype,
-						func(id string, o geojson.Object, fields []float64) bool {
-							return sw.writeObject(id, o, fields, false)
-						},
-					)
-				}
+			g := glob.Parse(sw.glob, s.desc)
+			if g.Limits[0] == "" && g.Limits[1] == "" {
+				s.cursor = sw.col.Scan(s.cursor, stype, s.desc,
+					func(id string, o geojson.Object, fields []float64) bool {
+						return sw.writeObject(id, o, fields, false)
+					},
+				)
 			} else {
-				s.cursor = sw.col.Scan(s.cursor, stype,
+				s.cursor = sw.col.ScanRange(
+					s.cursor, stype, g.Limits[0], g.Limits[1], s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
 						return sw.writeObject(id, o, fields, false)
 					},

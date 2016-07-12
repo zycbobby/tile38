@@ -8,6 +8,7 @@ import (
 
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/bing"
+	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/geojson/geohash"
@@ -230,7 +231,7 @@ func (c *Controller) cmdSearchArgs(cmd string, vs []resp.Value, types []string) 
 			err = errInvalidNumberOfArguments
 			return
 		}
-		s.roam.pattern = globIsGlob(s.roam.id)
+		s.roam.pattern = glob.IsGlob(s.roam.id)
 		var smeters string
 		if vs, smeters, ok = tokenval(vs); !ok || smeters == "" {
 			err = errInvalidNumberOfArguments

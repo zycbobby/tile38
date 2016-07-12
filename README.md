@@ -10,9 +10,9 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 
 <p align="center">
 <i>This README is quick start document. You can find detailed documentation at <a href="http://tile38.com">http://tile38.com</a>.</i><br><br>
-<a href="http://tile38.com/commands/nearby"><img src="/doc/search-nearby.png" alt="Nearby" border="0" width="120" height="120"></a>
-<a href="http://tile38.com/commands/within"><img src="/doc/search-within.png" alt="Within" border="0" width="120" height="120"></a>
-<a href="http://tile38.com/commands/intersects"><img src="/doc/search-intersects.png" alt="Intersects" border="0" width="120" height="120"></a>
+<a href="#searching"><img src="/doc/search-nearby.png" alt="Nearby" border="0" width="120" height="120"></a>
+<a href="#searching"><img src="/doc/search-within.png" alt="Within" border="0" width="120" height="120"></a>
+<a href="#searching"><img src="/doc/search-intersects.png" alt="Intersects" border="0" width="120" height="120"></a>
 <a href="http://tile38.com/commands/geofencing"><img src="/doc/geofence.gif" alt="Geofencing" border="0" width="120" height="120"></a>
 <a href="http://tile38.com/topics/roaming-geofences"><img src="/doc/roaming.gif" alt="Roaming Geofences" border="0" width="120" height="120"></a>
 </p>

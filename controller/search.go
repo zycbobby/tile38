@@ -374,7 +374,7 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 			}
 			sw.count = uint64(count)
 		} else {
-			g := glob.Parse(sw.glob, s.desc)
+			g := glob.Parse(sw.globPattern, s.desc)
 			if g.Limits[0] == "" && g.Limits[1] == "" {
 				s.cursor = sw.col.SearchValues(s.cursor, stype, s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {

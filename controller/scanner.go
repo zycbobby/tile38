@@ -46,7 +46,7 @@ type scanWriter struct {
 	once           bool
 	count          uint64
 	precision      uint64
-	glob           string
+	globPattern    string
 	globEverything bool
 	globSingle     bool
 	fullFields     bool
@@ -75,12 +75,12 @@ func (c *Controller) newScanWriter(
 		c:           c,
 		wr:          wr,
 		msg:         msg,
-		output:      output,
-		wheres:      wheres,
-		precision:   precision,
-		nofields:    nofields,
-		glob:        globPattern,
 		limit:       limit,
+		wheres:      wheres,
+		output:      output,
+		nofields:    nofields,
+		precision:   precision,
+		globPattern: globPattern,
 		matchValues: matchValues,
 	}
 	if globPattern == "*" || globPattern == "" {
@@ -241,7 +241,7 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 	keepGoing := true
 	if !sw.globEverything {
 		if sw.globSingle {
-			if sw.glob != id {
+			if sw.globPattern != id {
 				return true
 			}
 			keepGoing = false // return current object and stop iterating
@@ -252,7 +252,7 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 			} else {
 				val = id
 			}
-			ok, _ := glob.Match(sw.glob, val)
+			ok, _ := glob.Match(sw.globPattern, val)
 			if !ok {
 				return true
 			}

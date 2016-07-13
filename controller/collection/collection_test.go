@@ -38,7 +38,7 @@ func TestCollection(t *testing.T) {
 	if count != len(objs) {
 		t.Fatalf("count = %d, expect %d", count, len(objs))
 	}
-	count = c.Count(TypeAll)
+	count = c.Count()
 	if count != len(objs) {
 		t.Fatalf("c.Count() = %d, expect %d", count, len(objs))
 	}

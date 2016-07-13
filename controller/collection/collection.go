@@ -235,7 +235,7 @@ func (c *Collection) FieldArr() []string {
 	return arr
 }
 
-// Scan iterates though the collection. A cursor can be used for paging.
+// Scan iterates though the collection ids. A cursor can be used for paging.
 func (c *Collection) Scan(cursor uint64, stype ScanType, desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
 ) (ncursor uint64) {
@@ -276,6 +276,50 @@ func (c *Collection) ScanRange(cursor uint64, stype ScanType, start, end string,
 		c.items.DescendRange(&itemT{id: start}, &itemT{id: end}, iter)
 	} else {
 		c.items.AscendRange(&itemT{id: start}, &itemT{id: end}, iter)
+	}
+	return i
+}
+
+// SearchValues iterates though the collection values. A cursor can be used for paging.
+func (c *Collection) SearchValues(cursor uint64, stype ScanType, desc bool,
+	iterator func(id string, obj geojson.Object, fields []float64) bool,
+) (ncursor uint64) {
+	var i uint64
+	var active = true
+	iter := func(item btree.Item) bool {
+		if i >= cursor {
+			iitm := item.(*itemT)
+			active = iterator(iitm.id, iitm.object, iitm.fields)
+		}
+		i++
+		return active
+	}
+	if desc {
+		c.values.Descend(iter)
+	} else {
+		c.values.Ascend(iter)
+	}
+	return i
+}
+
+// SearchValuesRange iterates though the collection values. A cursor can be used for paging.
+func (c *Collection) SearchValuesRange(cursor uint64, stype ScanType, start, end string, desc bool,
+	iterator func(id string, obj geojson.Object, fields []float64) bool,
+) (ncursor uint64) {
+	var i uint64
+	var active = true
+	iter := func(item btree.Item) bool {
+		if i >= cursor {
+			iitm := item.(*itemT)
+			active = iterator(iitm.id, iitm.object, iitm.fields)
+		}
+		i++
+		return active
+	}
+	if desc {
+		c.values.DescendRange(&itemT{object: geojson.String(start)}, &itemT{object: geojson.String(end)}, iter)
+	} else {
+		c.values.AscendRange(&itemT{object: geojson.String(start)}, &itemT{object: geojson.String(end)}, iter)
 	}
 	return i
 }
@@ -447,6 +491,4 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 		}
 		return true
 	})
-}
-func (c *Collection) SearchValues(pivot string, desc bool, iterator func(id string, obj geojson.Object, fields []float64) bool) {
 }

@@ -51,10 +51,13 @@ type scanWriter struct {
 	globSingle     bool
 	fullFields     bool
 	values         []resp.Value
+	matchValues    bool
 }
 
 func (c *Controller) newScanWriter(
-	wr *bytes.Buffer, msg *server.Message, key string, output outputT, precision uint64, globPattern string, limit uint64, wheres []whereT, nofields bool,
+	wr *bytes.Buffer, msg *server.Message, key string, output outputT,
+	precision uint64, globPattern string, matchValues bool,
+	limit uint64, wheres []whereT, nofields bool,
 ) (
 	*scanWriter, error,
 ) {
@@ -69,15 +72,16 @@ func (c *Controller) newScanWriter(
 	case outputIDs, outputObjects, outputCount, outputBounds, outputPoints, outputHashes:
 	}
 	sw := &scanWriter{
-		c:         c,
-		wr:        wr,
-		msg:       msg,
-		output:    output,
-		wheres:    wheres,
-		precision: precision,
-		nofields:  nofields,
-		glob:      globPattern,
-		limit:     limit,
+		c:           c,
+		wr:          wr,
+		msg:         msg,
+		output:      output,
+		wheres:      wheres,
+		precision:   precision,
+		nofields:    nofields,
+		glob:        globPattern,
+		limit:       limit,
+		matchValues: matchValues,
 	}
 	if globPattern == "*" || globPattern == "" {
 		sw.globEverything = true
@@ -242,7 +246,13 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 			}
 			keepGoing = false // return current object and stop iterating
 		} else {
-			ok, _ := glob.Match(sw.glob, id)
+			var val string
+			if sw.matchValues {
+				val = o.String()
+			} else {
+				val = id
+			}
+			ok, _ := glob.Match(sw.glob, val)
 			if !ok {
 				return true
 			}

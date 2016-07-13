@@ -216,6 +216,91 @@
     "since": "1.0.0",
     "group": "keys"
   },
+  "SEARCH": {
+    "summary": "Search for string values in a key",
+    "complexity": "O(N) where N is the number of values in the key",
+    "arguments":[
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "command": "CURSOR",
+        "name": "start",
+        "type": "integer",
+        "optional": true
+      },
+      {
+        "command": "LIMIT",
+        "name": "count",
+        "type": "integer",
+        "optional": true
+      },
+      {
+        "command": "MATCH",
+        "name": "pattern",
+        "type": "pattern",
+        "optional": true
+      },
+      {
+        "name": "order",
+        "optional": true,
+        "enumargs": [
+          {
+            "name": "ASC"
+          },
+          {
+            "name": "DESC"
+          }
+		]
+	  },
+      {
+        "command": "WHERE",
+        "name": ["field","min","max"],
+        "type": ["string","double","double"],
+        "optional": true,
+        "multiple": true
+      },
+      {
+        "command": "NOFIELDS",
+        "name": [],
+        "type": [],
+        "optional": true
+      },
+      {
+        "name": "type",
+        "optional": true,
+        "enumargs": [
+          {
+            "name": "COUNT"
+          },
+          {
+            "name": "IDS"
+          },
+          {
+            "name": "OBJECTS"
+          },
+          {
+            "name": "POINTS"
+          },
+          {
+            "name": "BOUNDS"
+          },
+          {
+            "name": "HASHES",
+            "arguments": [
+              {
+                "name": "precision",
+                "type": "integer"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "since": "1.0.0",
+    "group": "search"
+  },
   "SCAN": {
     "summary": "Incrementally iterate though a key",
     "complexity": "O(N) where N is the number of ids in the key",

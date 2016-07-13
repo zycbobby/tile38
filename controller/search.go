@@ -8,6 +8,7 @@ import (
 
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/bing"
+	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
@@ -264,7 +265,7 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	if s.fence {
 		return "", s
 	}
-	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.limit, s.wheres, s.nofields)
 	if err != nil {
 		return "", err
 	}
@@ -305,7 +306,7 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 	if s.fence {
 		return "", s
 	}
-	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, s.limit, s.wheres, s.nofields)
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.limit, s.wheres, s.nofields)
 	if err != nil {
 		return "", err
 	}
@@ -336,95 +337,63 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 	return string(wr.Bytes()), nil
 }
 
-func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
-	start := time.Now()
-	vs := msg.Values[1:]
-	var ok bool
-	var key string
-	if vs, key, ok = tokenval(vs); !ok || key == "" {
+func cmdSeachValuesArgs(vs []resp.Value) (s liveFenceSwitches, err error) {
+	if vs, s.searchScanBaseTokens, err = parseSearchScanBaseTokens("search", vs); err != nil {
+		return
+	}
+	if len(vs) != 0 {
 		err = errInvalidNumberOfArguments
 		return
 	}
-	col := c.getCol(key)
-	if col == nil {
-		err = errKeyNotFound
-		return
-	}
-	var tok string
-	var pivot string
-	var pivoton bool
-	var limiton bool
-	var limit int
-	var descon bool
-	var desc bool
-	for {
-		if vs, tok, ok = tokenval(vs); !ok || tok == "" {
-			break
-		}
-		switch strings.ToLower(tok) {
-		default:
-			err = errInvalidArgument(tok)
-			return
-		case "pivot":
-			if pivoton {
-				err = errInvalidArgument(tok)
-				return
-			}
-			pivoton = true
-			if vs, pivot, ok = tokenval(vs); !ok || pivot == "" {
-				err = errInvalidNumberOfArguments
-				return
-			}
-		case "limit":
-			if limiton {
-				err = errInvalidArgument(tok)
-				return
-			}
-			limiton = true
-			if vs, tok, ok = tokenval(vs); !ok || tok == "" {
-				err = errInvalidNumberOfArguments
-				return
-			}
-			n, err2 := strconv.ParseUint(tok, 10, 64)
-			if err2 != nil {
-				err = errInvalidArgument(tok)
-				return
-			}
-			limit = int(n)
-		case "asc", "desc":
-			if descon {
-				err = errInvalidArgument(tok)
-				return
-			}
-			descon = true
-			switch strings.ToLower(tok) {
-			case "asc":
-				desc = false
-			case "desc":
-				desc = true
-			}
-		}
-	}
-	println(pivoton, pivot)
-	println(limiton, limit)
-	println(descon, desc)
+	return
+}
+
+func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+
 	wr := &bytes.Buffer{}
-	if msg.OutputType == server.JSON {
-		wr.WriteString(`{"ok":true,"objects":[`)
+	s, err := cmdSeachValuesArgs(vs)
+	if err != nil {
+		return "", err
 	}
-	n := 0
-	col.SearchValues(pivot, desc, func(id string, obj geojson.Object, fields []float64) bool {
-		if msg.OutputType == server.JSON {
-			if n > 0 {
-				wr.WriteString(`,`)
-			}
-			wr.WriteString(`{"id":` + jsonString(id) + `,"object":` + obj.JSON() + `}`)
-			n++
-		}
-		return true
-	})
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, true, s.limit, s.wheres, s.nofields)
+	if err != nil {
+		return "", err
+	}
 	if msg.OutputType == server.JSON {
-		wr.WriteString(`],"elapsed":"` + time.Now().Sub(start).String() + "\"}")
+		wr.WriteString(`{"ok":true`)
+	}
+	sw.writeHead()
+	if sw.col != nil {
+		stype := collection.TypeAll
+		if sw.output == outputCount && len(sw.wheres) == 0 && sw.globEverything == true {
+			count := sw.col.Count(stype) - int(s.cursor)
+			if count < 0 {
+				count = 0
+			}
+			sw.count = uint64(count)
+		} else {
+			g := glob.Parse(sw.glob, s.desc)
+			if g.Limits[0] == "" && g.Limits[1] == "" {
+				s.cursor = sw.col.SearchValues(s.cursor, stype, s.desc,
+					func(id string, o geojson.Object, fields []float64) bool {
+						return sw.writeObject(id, o, fields, false)
+					},
+				)
+			} else {
+				s.cursor = sw.col.SearchValuesRange(
+					s.cursor, stype, g.Limits[0], g.Limits[1], s.desc,
+					func(id string, o geojson.Object, fields []float64) bool {
+						return sw.writeObject(id, o, fields, false)
+					},
+				)
+			}
+		}
+	}
+	sw.writeFoot(s.cursor)
+	if msg.OutputType == server.JSON {
+		wr.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
 	}
 	return string(wr.Bytes()), nil
 }

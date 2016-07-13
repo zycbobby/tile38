@@ -309,13 +309,13 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 	}
 
 	// check to make sure that there aren't any conflicts
-	if cmd == "scan" {
+	if cmd == "scan" || cmd == "search" {
 		if ssparse != "" {
-			err = errors.New("SPARSE is not allowed for SCAN")
+			err = errors.New("SPARSE is not allowed for " + strings.ToUpper(cmd))
 			return
 		}
 		if t.fence {
-			err = errors.New("FENCE is not allowed for SCAN")
+			err = errors.New("FENCE is not allowed for " + strings.ToUpper(cmd))
 			return
 		}
 	} else {

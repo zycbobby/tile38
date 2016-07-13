@@ -9,7 +9,6 @@ import (
 
 	"github.com/tidwall/btree"
 	"github.com/tidwall/resp"
-	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/controller/server"
 )
 
@@ -34,7 +33,7 @@ func (c *Controller) cmdStats(msg *server.Message) (res string, err error) {
 			points := col.PointCount()
 			m["num_points"] = points
 			m["in_memory_size"] = col.TotalWeight()
-			m["num_objects"] = col.Count(collection.TypeAll)
+			m["num_objects"] = col.Count()
 			switch msg.OutputType {
 			case server.JSON:
 				ms = append(ms, m)
@@ -93,7 +92,7 @@ func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 	c.cols.Ascend(func(item btree.Item) bool {
 		col := item.(*collectionT).Collection
 		points += col.PointCount()
-		objects += col.Count(collection.TypeAll)
+		objects += col.Count()
 		return true
 	})
 	m["num_points"] = points
@@ -156,7 +155,7 @@ func (c *Controller) statsCollections(line string) (string, error) {
 			points := col.PointCount()
 			m["num_points"] = points
 			m["in_memory_size"] = col.TotalWeight()
-			m["num_objects"] = col.Count(collection.TypeAll)
+			m["num_objects"] = col.Count()
 			ms = append(ms, m)
 		} else {
 			ms = append(ms, nil)

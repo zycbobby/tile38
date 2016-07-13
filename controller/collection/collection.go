@@ -6,18 +6,6 @@ import (
 	"github.com/tidwall/tile38/index"
 )
 
-// ScanType is the classification of objects that are returned from Scan()
-type ScanType int
-
-const (
-	// TypeAll means to return all type during a Scan()
-	TypeAll = ScanType(0)
-	// TypeGeometry means to return only geometries
-	TypeGeometry = ScanType(1)
-	// TypeNonGeometry means to return non-geometries
-	TypeNonGeometry = ScanType(2)
-)
-
 const (
 	idOrdered    = 0
 	valueOrdered = 1
@@ -84,15 +72,8 @@ func New() *Collection {
 }
 
 // Count returns the number of objects in collection.
-func (c *Collection) Count(stype ScanType) int {
-	switch stype {
-	default:
-		return c.objects + c.nobjects
-	case TypeGeometry:
-		return c.objects
-	case TypeNonGeometry:
-		return c.nobjects
-	}
+func (c *Collection) Count() int {
+	return c.objects + c.nobjects
 }
 
 // PointCount returns the number of points (lat/lon coordinates) in collection.
@@ -236,7 +217,7 @@ func (c *Collection) FieldArr() []string {
 }
 
 // Scan iterates though the collection ids. A cursor can be used for paging.
-func (c *Collection) Scan(cursor uint64, stype ScanType, desc bool,
+func (c *Collection) Scan(cursor uint64, desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
 ) (ncursor uint64) {
 	var i uint64
@@ -258,7 +239,7 @@ func (c *Collection) Scan(cursor uint64, stype ScanType, desc bool,
 }
 
 // ScanGreaterOrEqual iterates though the collection starting with specified id. A cursor can be used for paging.
-func (c *Collection) ScanRange(cursor uint64, stype ScanType, start, end string, desc bool,
+func (c *Collection) ScanRange(cursor uint64, start, end string, desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
 ) (ncursor uint64) {
 	var i uint64
@@ -281,7 +262,7 @@ func (c *Collection) ScanRange(cursor uint64, stype ScanType, start, end string,
 }
 
 // SearchValues iterates though the collection values. A cursor can be used for paging.
-func (c *Collection) SearchValues(cursor uint64, stype ScanType, desc bool,
+func (c *Collection) SearchValues(cursor uint64, desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
 ) (ncursor uint64) {
 	var i uint64
@@ -303,7 +284,7 @@ func (c *Collection) SearchValues(cursor uint64, stype ScanType, desc bool,
 }
 
 // SearchValuesRange iterates though the collection values. A cursor can be used for paging.
-func (c *Collection) SearchValuesRange(cursor uint64, stype ScanType, start, end string, desc bool,
+func (c *Collection) SearchValuesRange(cursor uint64, start, end string, desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
 ) (ncursor uint64) {
 	var i uint64
@@ -325,7 +306,7 @@ func (c *Collection) SearchValuesRange(cursor uint64, stype ScanType, start, end
 }
 
 // ScanGreaterOrEqual iterates though the collection starting with specified id. A cursor can be used for paging.
-func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, stype ScanType, desc bool,
+func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
 ) (ncursor uint64) {
 	var i uint64

@@ -229,7 +229,7 @@ func (c *Controller) cmdDel(msg *server.Message) (res string, d commandDetailsT,
 	if col != nil {
 		d.obj, d.fields, ok = col.Remove(d.id)
 		if ok {
-			if col.Count(collection.TypeAll) == 0 {
+			if col.Count() == 0 {
 				c.deleteCol(d.key)
 				d.revert = func() {
 					c.setCol(d.key, col)

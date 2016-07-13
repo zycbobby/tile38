@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/tidwall/resp"
-	"github.com/tidwall/tile38/controller/collection"
 	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
@@ -40,9 +39,8 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 	}
 	sw.writeHead()
 	if sw.col != nil {
-		stype := collection.TypeAll
 		if sw.output == outputCount && len(sw.wheres) == 0 && sw.globEverything == true {
-			count := sw.col.Count(stype) - int(s.cursor)
+			count := sw.col.Count() - int(s.cursor)
 			if count < 0 {
 				count = 0
 			}
@@ -50,14 +48,14 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 		} else {
 			g := glob.Parse(sw.globPattern, s.desc)
 			if g.Limits[0] == "" && g.Limits[1] == "" {
-				s.cursor = sw.col.Scan(s.cursor, stype, s.desc,
+				s.cursor = sw.col.Scan(s.cursor, s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
 						return sw.writeObject(id, o, fields, false)
 					},
 				)
 			} else {
 				s.cursor = sw.col.ScanRange(
-					s.cursor, stype, g.Limits[0], g.Limits[1], s.desc,
+					s.cursor, g.Limits[0], g.Limits[1], s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
 						return sw.writeObject(id, o, fields, false)
 					},

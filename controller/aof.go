@@ -17,7 +17,6 @@ import (
 )
 
 // AsyncHooks indicates that the hooks should happen in the background.
-const AsyncHooks = true
 
 type errAOFHook struct {
 	err error
@@ -128,16 +127,7 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 func (c *Controller) processHooks(d *commandDetailsT) error {
 	if hm, ok := c.hookcols[d.key]; ok {
 		for _, hook := range hm {
-			if AsyncHooks {
-				go hook.Do(d)
-			} else {
-				if err := hook.Do(d); err != nil {
-					if d.revert != nil {
-						d.revert()
-					}
-					return errAOFHook{err}
-				}
-			}
+			go hook.Do(d)
 		}
 	}
 	return nil

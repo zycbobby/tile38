@@ -41,7 +41,6 @@ type commandDetailsT struct {
 	oldObj    geojson.Object
 	oldFields []float64
 	updated   bool
-	revert    func()
 	timestamp time.Time
 }
 
@@ -70,9 +69,11 @@ type Controller struct {
 	hooks     map[string]*Hook            // hook name
 	hookcols  map[string]map[string]*Hook // col key
 	aofconnM  map[net.Conn]bool
+	expires   map[string]map[string]time.Time
 
-	stopWatchingMemory bool
-	outOfMemory        bool
+	stopBackgroundExpiring bool
+	stopWatchingMemory     bool
+	outOfMemory            bool
 }
 
 // ListenAndServe starts a new tile38 server
@@ -90,6 +91,7 @@ func ListenAndServe(host string, port int, dir string) error {
 		hooks:    make(map[string]*Hook),
 		hookcols: make(map[string]map[string]*Hook),
 		aofconnM: make(map[net.Conn]bool),
+		expires:  make(map[string]map[string]time.Time),
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -120,8 +122,10 @@ func ListenAndServe(host string, port int, dir string) error {
 	}()
 	go c.processLives()
 	go c.watchMemory()
+	go c.backgroundExpiring()
 	defer func() {
 		c.mu.Lock()
+		c.stopBackgroundExpiring = true
 		c.stopWatchingMemory = true
 		c.mu.Unlock()
 	}()
@@ -318,7 +322,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 	default:
 		c.mu.RLock()
 		defer c.mu.RUnlock()
-	case "set", "del", "drop", "fset", "flushdb", "sethook", "delhook":
+	case "set", "del", "drop", "fset", "flushdb", "sethook", "delhook", "expire", "persist":
 		// write operations
 		write = true
 		c.mu.Lock()
@@ -329,7 +333,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		if c.config.ReadOnly {
 			return writeErr(errors.New("read only"))
 		}
-	case "get", "keys", "scan", "nearby", "within", "intersects", "hooks", "search":
+	case "get", "keys", "scan", "nearby", "within", "intersects", "hooks", "search", "ttl":
 		// read operations
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -391,11 +395,9 @@ func (c *Controller) reset() {
 }
 
 func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d commandDetailsT, err error) {
-
 	switch msg.Command {
 	default:
 		err = fmt.Errorf("unknown command '%s'", msg.Values[0])
-	// lock
 	case "set":
 		res, d, err = c.cmdSet(msg)
 	case "fset":
@@ -410,6 +412,12 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, d, err = c.cmdSetHook(msg)
 	case "delhook":
 		res, d, err = c.cmdDelHook(msg)
+	case "expire":
+		res, d, err = c.cmdExpire(msg)
+	case "persist":
+		res, d, err = c.cmdPersist(msg)
+	case "ttl":
+		res, d, err = c.cmdTTL(msg)
 	case "hooks":
 		res, err = c.cmdHooks(msg)
 	case "massinsert":

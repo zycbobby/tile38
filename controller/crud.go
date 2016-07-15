@@ -231,18 +231,11 @@ func (c *Controller) cmdDel(msg *server.Message) (res string, d commandDetailsT,
 		if ok {
 			if col.Count() == 0 {
 				c.deleteCol(d.key)
-				d.revert = func() {
-					c.setCol(d.key, col)
-					col.ReplaceOrInsert(d.id, d.obj, nil, d.fields)
-				}
-			} else {
-				d.revert = func() {
-					col.ReplaceOrInsert(d.id, d.obj, nil, d.fields)
-				}
 			}
 			found = true
 		}
 	}
+	c.clearIDExpires(d.key, d.id)
 	d.command = "del"
 	d.updated = found
 	d.timestamp = time.Now()
@@ -274,9 +267,6 @@ func (c *Controller) cmdDrop(msg *server.Message) (res string, d commandDetailsT
 	col := c.getCol(d.key)
 	if col != nil {
 		c.deleteCol(d.key)
-		d.revert = func() {
-			c.setCol(d.key, col)
-		}
 		d.updated = true
 	} else {
 		d.key = "" // ignore the details
@@ -284,6 +274,7 @@ func (c *Controller) cmdDrop(msg *server.Message) (res string, d commandDetailsT
 	}
 	d.command = "drop"
 	d.timestamp = time.Now()
+	c.clearKeyExpires(d.key)
 	switch msg.OutputType {
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
@@ -305,6 +296,7 @@ func (c *Controller) cmdFlushDB(msg *server.Message) (res string, d commandDetai
 		return
 	}
 	c.cols = btree.New(16, 0)
+	c.clearAllExpires()
 	c.hooks = make(map[string]*Hook)
 	c.hookcols = make(map[string]map[string]*Hook)
 	d.command = "flushdb"
@@ -319,7 +311,10 @@ func (c *Controller) cmdFlushDB(msg *server.Message) (res string, d commandDetai
 	return
 }
 
-func (c *Controller) parseSetArgs(vs []resp.Value) (d commandDetailsT, fields []string, values []float64, etype string, evs []resp.Value, err error) {
+func (c *Controller) parseSetArgs(vs []resp.Value) (
+	d commandDetailsT, fields []string, values []float64,
+	expires *float64, etype string, evs []resp.Value, err error,
+) {
 	var ok bool
 	var typ string
 	if vs, d.key, ok = tokenval(vs); !ok || d.key == "" {
@@ -330,7 +325,6 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (d commandDetailsT, fields []
 		err = errInvalidNumberOfArguments
 		return
 	}
-
 	var arg string
 	var nvs []resp.Value
 	fields = make([]string, 0, 8)
@@ -366,6 +360,26 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (d commandDetailsT, fields []
 			values = append(values, value)
 			continue
 		}
+		if lc(arg, "ex") {
+			vs = nvs
+			if expires != nil {
+				err = errInvalidArgument(arg)
+				return
+			}
+			var s string
+			var v float64
+			if vs, s, ok = tokenval(vs); !ok || s == "" {
+				err = errInvalidNumberOfArguments
+				return
+			}
+			v, err = strconv.ParseFloat(s, 64)
+			if err != nil {
+				err = errInvalidArgument(s)
+				return
+			}
+			expires = &v
+			continue
+		}
 		break
 	}
 	if vs, typ, ok = tokenval(vs); !ok || typ == "" {
@@ -378,7 +392,6 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (d commandDetailsT, fields []
 	}
 	etype = typ
 	evs = vs
-
 	switch {
 	default:
 		err = errInvalidArgument(typ)
@@ -525,27 +538,19 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 	vs := msg.Values[1:]
 	var fields []string
 	var values []float64
-	d, fields, values, _, _, err = c.parseSetArgs(vs)
+	var ex *float64
+	d, fields, values, ex, _, _, err = c.parseSetArgs(vs)
 	if err != nil {
 		return
 	}
-	addedcol := false
+	ex = ex
 	col := c.getCol(d.key)
 	if col == nil {
 		col = collection.New()
 		c.setCol(d.key, col)
-		addedcol = true
 	}
+	c.clearIDExpires(d.key, d.id)
 	d.oldObj, d.oldFields, d.fields = col.ReplaceOrInsert(d.id, d.obj, fields, values)
-	d.revert = func() {
-		if addedcol {
-			c.deleteCol(d.key)
-		} else if d.oldObj != nil {
-			col.ReplaceOrInsert(d.id, d.oldObj, nil, d.oldFields)
-		} else {
-			col.Remove(d.id)
-		}
-	}
 	d.command = "set"
 	d.updated = true // perhaps we should do a diff on the previous object?
 	fmap := col.FieldMap()
@@ -554,6 +559,9 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 		d.fmap[key] = idx
 	}
 	d.timestamp = time.Now()
+	if ex != nil {
+		c.expireAt(d.key, d.id, d.timestamp.Add(time.Duration(float64(time.Second)*(*ex))))
+	}
 	switch msg.OutputType {
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
@@ -629,6 +637,143 @@ func (c *Controller) cmdFset(msg *server.Message) (res string, d commandDetailsT
 			res = ":1\r\n"
 		} else {
 			res = ":0\r\n"
+		}
+	}
+	return
+}
+
+func (c *Controller) cmdExpire(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	var key, id, svalue string
+	var ok bool
+	if vs, key, ok = tokenval(vs); !ok || key == "" {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	if vs, id, ok = tokenval(vs); !ok || id == "" {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	if vs, svalue, ok = tokenval(vs); !ok || svalue == "" {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	if len(vs) != 0 {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	var value float64
+	value, err = strconv.ParseFloat(svalue, 64)
+	if err != nil {
+		err = errInvalidArgument(svalue)
+		return
+	}
+	ok = false
+	col := c.getCol(key)
+	if col != nil {
+		_, _, ok = col.Get(id)
+		if ok {
+			c.expireAt(key, id, time.Now().Add(time.Duration(float64(time.Second)*value)))
+		}
+	}
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		if ok {
+			res = ":1\r\n"
+		} else {
+			res = ":0\r\n"
+		}
+	}
+	return
+}
+
+func (c *Controller) cmdPersist(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	var key, id string
+	var ok bool
+	if vs, key, ok = tokenval(vs); !ok || key == "" {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	if vs, id, ok = tokenval(vs); !ok || id == "" {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	if len(vs) != 0 {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	ok = false
+	col := c.getCol(key)
+	if col != nil {
+		_, _, ok = col.Get(id)
+		if ok {
+			c.clearIDExpires(key, id)
+		}
+	}
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		if ok {
+			res = ":1\r\n"
+		} else {
+			res = ":0\r\n"
+		}
+	}
+	return
+}
+
+func (c *Controller) cmdTTL(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	var key, id string
+	var ok bool
+	if vs, key, ok = tokenval(vs); !ok || key == "" {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	if vs, id, ok = tokenval(vs); !ok || id == "" {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	if len(vs) != 0 {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	var v float64
+	ok = false
+	var ok2 bool
+	col := c.getCol(key)
+	if col != nil {
+		_, _, ok = col.Get(id)
+		if ok {
+			var at time.Time
+			at, ok2 = c.getExpires(key, id)
+			if ok2 {
+				v = float64(at.Sub(time.Now())) / float64(time.Second)
+				if v < 0 {
+					v = 0
+				}
+			}
+		}
+	}
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		if ok {
+			if ok2 {
+				res = ":" + strconv.FormatFloat(v, 'f', 0, 64) + "\r\n"
+			} else {
+				res = ":-1\r\n"
+			}
+		} else {
+			res = ":-2\r\n"
 		}
 	}
 	return

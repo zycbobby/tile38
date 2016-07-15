@@ -181,7 +181,14 @@ var commandsJSON = `{
         "multiple": true
       },
       {
-        "name": "value",
+        "command": "EX",
+        "name": ["seconds", "value"],
+        "type": ["string", "double"],
+        "optional": true,
+        "multiple": false
+      },
+	  {
+		"name": "value",
         "enumargs": [
           {
             "name": "OBJECT",
@@ -250,6 +257,58 @@ var commandsJSON = `{
             ]
           }
         ]
+      }
+    ],
+    "since": "1.0.0",
+    "group": "keys"
+  },
+  "EXPIRE": {
+    "summary": "Set a timeout on an id",
+    "complexity": "O(1)",
+    "arguments":[
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "seconds",
+        "type": "double"
+      }
+    ],
+    "since": "1.0.0",
+    "group": "keys"
+  },
+  "TTL": {
+    "summary": "Get a timeout on an id",
+    "complexity": "O(1)",
+    "arguments":[
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      }
+    ],
+    "since": "1.0.0",
+    "group": "keys"
+  },
+  "PERSIST": {
+    "summary": "Remove the existing timeout on an id",
+    "complexity": "O(1)",
+    "arguments":[
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "name": "id",
+        "type": "string"
       }
     ],
     "since": "1.0.0",

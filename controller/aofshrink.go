@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"math"
 	"os"
 	"path"
 	"sort"
@@ -17,8 +18,9 @@ import (
 )
 
 type objFields struct {
-	obj    geojson.Object
-	fields []float64
+	obj     geojson.Object
+	fields  []float64
+	expires time.Duration
 }
 
 const maxKeyGroup = 10
@@ -149,11 +151,20 @@ func (c *Controller) aofshrink() {
 			for {
 				objs := make(map[string]objFields)
 				c.mu.Lock()
+				now := time.Now()
+				exm := c.expires[key]
 				fnames := col.FieldArr() // reload an array of field names to match each object
-				col.ScanGreaterOrEqual(nextID, 1, false,
+				col.ScanGreaterOrEqual(nextID, 0, false,
 					func(id string, obj geojson.Object, fields []float64) bool {
 						if id != nextID {
-							objs[id] = objFields{obj, fields}
+							o := objFields{obj: obj, fields: fields}
+							if exm != nil {
+								at, ok := exm[id]
+								if ok {
+									o.expires = at.Sub(now)
+								}
+							}
+							objs[id] = o
 							nextID = id
 						}
 						return len(objs) < maxIDGroup
@@ -176,6 +187,9 @@ func (c *Controller) aofshrink() {
 						if fvalue != 0 {
 							values = append(values, resp.StringValue("field"), resp.StringValue(fnames[i]), resp.FloatValue(fvalue))
 						}
+					}
+					if obj.expires > 0 {
+						values = append(values, resp.StringValue("ex"), resp.FloatValue(math.Floor(float64(obj.expires)/float64(time.Second)*10)/10))
 					}
 					switch obj := obj.obj.(type) {
 					default:

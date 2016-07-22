@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.3.0] - 2016-07-22
+### Added
+- New EXPIRE, PERSISTS, TTL commands. New EX keyword to SET command.
+- Support for plain strings using `SET ... STRING value.` syntax.
+- New SEARCH command for finding strings. 
+- Scans can now order descending.
+
+### Fixed
+- #28: fix windows cli issue
+
 ## [1.2.0] - 2016-05-24
 ### Added
 - #17: Roaming Geofences for NEARBY command

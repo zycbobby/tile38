@@ -140,7 +140,7 @@ func main() {
 		return
 	}
 
-	if !raw && !tty {
+	if !raw && !tty && runtime.GOOS != "windows" {
 		fi, err := os.Stdout.Stat()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())

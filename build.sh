@@ -75,8 +75,13 @@ package(){
 	bdir=tile38-${VERSION}-$2-$3
 	rm -rf packages/$bdir && mkdir -p packages/$bdir
 	GOOS=$2 GOARCH=$3 ./build.sh
-	mv tile38-server packages/$bdir
-	mv tile38-cli packages/$bdir
+	if [ "$2" == "windows" ]; then
+		mv tile38-server packages/$bdir/tile38-server.exe
+		mv tile38-cli packages/$bdir/tile38-cli.exe
+	else
+		mv tile38-server packages/$bdir
+		mv tile38-cli packages/$bdir
+	fi
 	cp README.md packages/$bdir
 	cd packages
 	if [ "$2" == "linux" ]; then

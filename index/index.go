@@ -99,6 +99,11 @@ func (ix *Index) Count() int {
 	return count
 }
 
+// Bounds returns the minimum bounding rectangle of all items in the index.
+func (ix *Index) Bounds() (MinX, MinY, MaxX, MaxY float64) {
+	return ix.r.Bounds()
+}
+
 // RemoveAll removes all items from the index.
 func (ix *Index) RemoveAll() {
 	ix.r.RemoveAll()

@@ -47,6 +47,63 @@ func orderFields(fmap map[string]int, fields []float64) []fvt {
 	sort.Sort(byField(fvs))
 	return fvs
 }
+func (c *Controller) cmdBounds(msg *server.Message) (string, error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+
+	var ok bool
+	var key string
+	if vs, key, ok = tokenval(vs); !ok || key == "" {
+		return "", errInvalidNumberOfArguments
+	}
+	if len(vs) != 0 {
+		return "", errInvalidNumberOfArguments
+	}
+
+	col := c.getCol(key)
+	if col == nil {
+		if msg.OutputType == server.RESP {
+			return "$-1\r\n", nil
+		}
+		return "", errKeyNotFound
+	}
+
+	vals := make([]resp.Value, 0, 2)
+	var buf bytes.Buffer
+	if msg.OutputType == server.JSON {
+		buf.WriteString(`{"ok":true`)
+	}
+	bbox := geojson.New2DBBox(col.Bounds())
+	if msg.OutputType == server.JSON {
+		buf.WriteString(`,"bounds":`)
+		buf.WriteString(bbox.ExternalJSON())
+	} else {
+		vals = append(vals, resp.ArrayValue([]resp.Value{
+			resp.ArrayValue([]resp.Value{
+				resp.FloatValue(bbox.Min.Y),
+				resp.FloatValue(bbox.Min.X),
+			}),
+			resp.ArrayValue([]resp.Value{
+				resp.FloatValue(bbox.Max.Y),
+				resp.FloatValue(bbox.Max.X),
+			}),
+		}))
+	}
+	switch msg.OutputType {
+	case server.JSON:
+		buf.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
+		return buf.String(), nil
+	case server.RESP:
+		var oval resp.Value
+		oval = vals[0]
+		data, err := oval.MarshalRESP()
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
+	}
+	return "", nil
+}
 
 func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 	start := time.Now()

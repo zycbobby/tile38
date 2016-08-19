@@ -338,6 +338,18 @@ var commandsJSON = `{
     "since": "1.0.0",
     "group": "keys"
   },
+  "BOUNDS": {
+    "summary": "Get the combined bounds of all the objects in a key",
+    "complexity": "O(1)",
+    "arguments":[
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "since": "1.3.0",
+    "group": "keys"
+  },
   "GET": {
     "summary": "Get the object of an id",
     "complexity": "O(1)",

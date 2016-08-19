@@ -86,6 +86,11 @@ func (c *Collection) TotalWeight() int {
 	return c.weight
 }
 
+// Bounds returns the bounds of all the items in the collection.
+func (c *Collection) Bounds() (minX, minY, maxX, maxY float64) {
+	return c.index.Bounds()
+}
+
 // ReplaceOrInsert adds or replaces an object in the collection and returns the fields array.
 // If an item with the same id is already in the collection then the new item will adopt the old item's fields.
 // The fields argument is optional.

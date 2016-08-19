@@ -333,7 +333,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		if c.config.ReadOnly {
 			return writeErr(errors.New("read only"))
 		}
-	case "get", "keys", "scan", "nearby", "within", "intersects", "hooks", "search", "ttl":
+	case "get", "keys", "scan", "nearby", "within", "intersects", "hooks", "search", "ttl", "bounds":
 		// read operations
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -444,6 +444,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, err = c.cmdIntersects(msg)
 	case "search":
 		res, err = c.cmdSearch(msg)
+	case "bounds":
+		res, err = c.cmdBounds(msg)
 	case "get":
 		res, err = c.cmdGet(msg)
 	case "keys":

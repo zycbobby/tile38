@@ -38,7 +38,12 @@ func wp(min, max []float64) *Rect {
 		MaxY: max[1],
 	}
 }
-
+func wpp(x, y float64) *Rect {
+	return &Rect{
+		x, y,
+		x, y,
+	}
+}
 func TestA(t *testing.T) {
 	tr := New()
 	item1 := wp([]float64{10, 10, 10, 10}, []float64{20, 20, 20, 20})
@@ -70,7 +75,18 @@ func TestMemory(t *testing.T) {
 	runtime.ReadMemStats(&m)
 	println(int(m.HeapAlloc)/tr.Count(), "bytes/rect")
 }
-
+func TestBounds(t *testing.T) {
+	tr := New()
+	tr.Insert(wpp(10, 10))
+	tr.Insert(wpp(10, 20))
+	tr.Insert(wpp(10, 30))
+	tr.Insert(wpp(20, 10))
+	tr.Insert(wpp(30, 10))
+	minX, minY, maxX, maxY := tr.Bounds()
+	if minX != 10 || minY != 10 || maxX != 30 || maxY != 30 {
+		t.Fatalf("expected 10,10 30,30, got %v,%v %v,%v\n", minX, minY, maxX, maxY)
+	}
+}
 func BenchmarkInsert(b *testing.B) {
 	rand.Seed(0)
 	tr := New()

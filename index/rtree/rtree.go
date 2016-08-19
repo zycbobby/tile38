@@ -163,6 +163,20 @@ func (tr *RTree) RemoveAll() {
 	tr.root = nil
 }
 
+func (tr *RTree) Bounds() (minX, minY, maxX, maxY float64) {
+	var rect rectT
+	if tr.root != nil {
+		if tr.root.count > 0 {
+			rect = tr.root.branch[0].rect
+			for i := 1; i < tr.root.count; i++ {
+				rect = combineRect(rect, tr.root.branch[i].rect)
+			}
+		}
+	}
+	minX, minY, maxX, maxY = rect.min[0], rect.min[1], rect.max[0], rect.max[1]
+	return
+}
+
 func countRec(node *nodeT, counter int) int {
 	if node.isInternalNode() { // not a leaf node
 		for index := 0; index < node.count; index++ {

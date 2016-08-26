@@ -139,7 +139,7 @@ func (ar *AnyReaderWriter) ReadMessage() (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		if strings.HasSuffix(line, " HTTP/1.1") {
+		if len(line) > 9 && line[len(line)-9:len(line)-3] == " HTTP/" {
 			return ar.readHTTPMessage()
 		}
 	case '$':

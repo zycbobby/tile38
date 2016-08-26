@@ -242,7 +242,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 			_, err := fmt.Fprintf(w, "HTTP/1.1 200 OK\r\n"+
 				"Connection: close\r\n"+
 				"Content-Length: %d\r\n"+
-				"Content-Type: application/json charset=utf-8\r\n"+
+				"Content-Type: application/json; charset=utf-8\r\n"+
 				"\r\n", len(res)+2)
 			if err != nil {
 				return err

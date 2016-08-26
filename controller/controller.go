@@ -247,7 +247,11 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 			if err != nil {
 				return err
 			}
-			_, err = io.WriteString(w, res+"\r\n")
+			_, err = io.WriteString(w, res)
+			if err != nil {
+				return err
+			}
+			_, err = io.WriteString(w, "\r\n")
 			return err
 		case server.RESP:
 			var err error

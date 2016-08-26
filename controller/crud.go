@@ -104,6 +104,34 @@ func (c *Controller) cmdBounds(msg *server.Message) (string, error) {
 	}
 	return "", nil
 }
+func (c *Controller) cmdType(msg *server.Message) (string, error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+
+	var ok bool
+	var key string
+	if vs, key, ok = tokenval(vs); !ok || key == "" {
+		return "", errInvalidNumberOfArguments
+	}
+
+	col := c.getCol(key)
+	if col == nil {
+		if msg.OutputType == server.RESP {
+			return "+none\r\n", nil
+		}
+		return "", errKeyNotFound
+	}
+
+	typ := "hash"
+
+	switch msg.OutputType {
+	case server.JSON:
+		return `{"ok":true,"type":` + string(typ) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}", nil
+	case server.RESP:
+		return "+" + typ + "\r\n", nil
+	}
+	return "", nil
+}
 
 func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 	start := time.Now()

@@ -128,10 +128,11 @@ func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 		}
 		res = string(data)
 	}
-
 	return res, nil
 }
+
 func (c *Controller) writeInfoServer(w *bytes.Buffer) {
+	fmt.Fprintf(w, "tile38_version:%s\r\n", core.Version)
 	fmt.Fprintf(w, "redis_version:%s\r\n", core.Version)                              //Version of the Redis server
 	fmt.Fprintf(w, "uptime_in_seconds:%d\r\n", time.Now().Sub(c.started)/time.Second) //Number of seconds since Redis server start
 }
@@ -247,7 +248,7 @@ func (c *Controller) cmdInfo(msg *server.Message) (res string, err error) {
 		if err != nil {
 			return "", err
 		}
-		res = `{"ok":true,"stats":` + string(data) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+		res = `{"ok":true,"info":` + string(data) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
 	case server.RESP:
 		data, err := resp.StringValue(w.String()).MarshalRESP()
 		if err != nil {

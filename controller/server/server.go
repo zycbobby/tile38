@@ -52,6 +52,8 @@ func ListenAndServe(
 	host string, port int,
 	protected func() bool,
 	handler func(conn *Conn, msg *Message, rd *AnyReaderWriter, w io.Writer, websocket bool) error,
+	opened func(conn *Conn),
+	closed func(conn *Conn),
 ) error {
 	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
@@ -64,7 +66,7 @@ func ListenAndServe(
 			log.Error(err)
 			continue
 		}
-		go handleConn(&Conn{Conn: conn}, protected, handler)
+		go handleConn(&Conn{Conn: conn}, protected, handler, opened, closed)
 	}
 }
 
@@ -79,7 +81,11 @@ func handleConn(
 	conn *Conn,
 	protected func() bool,
 	handler func(conn *Conn, msg *Message, rd *AnyReaderWriter, w io.Writer, websocket bool) error,
+	opened func(conn *Conn),
+	closed func(conn *Conn),
 ) {
+	opened(conn)
+	defer closed(conn)
 	addr := conn.RemoteAddr().String()
 	if core.ShowDebugMessages {
 		log.Debugf("opened connection: %s", addr)

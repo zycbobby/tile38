@@ -70,6 +70,15 @@ type Controller struct {
 	hookcols  map[string]map[string]*Hook // col key
 	aofconnM  map[net.Conn]bool
 	expires   map[string]map[string]time.Time
+	conns     map[*server.Conn]bool
+	started   time.Time
+
+	statsTotalConns    int
+	statsTotalCommands int
+	statsExpired       int
+
+	lastShrinkDuration time.Duration
+	currentShrinkStart time.Time
 
 	stopBackgroundExpiring bool
 	stopWatchingMemory     bool
@@ -92,6 +101,8 @@ func ListenAndServe(host string, port int, dir string) error {
 		hookcols: make(map[string]map[string]*Hook),
 		aofconnM: make(map[net.Conn]bool),
 		expires:  make(map[string]map[string]time.Time),
+		started:  time.Now(),
+		conns:    make(map[*server.Conn]bool),
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -130,6 +141,9 @@ func ListenAndServe(host string, port int, dir string) error {
 		c.mu.Unlock()
 	}()
 	handler := func(conn *server.Conn, msg *server.Message, rd *server.AnyReaderWriter, w io.Writer, websocket bool) error {
+		c.mu.Lock()
+		c.statsTotalCommands++
+		c.mu.Unlock()
 		err := c.handleInputCommand(conn, msg, w)
 		if err != nil {
 			if err.Error() == "going live" {
@@ -153,7 +167,18 @@ func ListenAndServe(host string, port int, dir string) error {
 		c.mu.RUnlock()
 		return is
 	}
-	return server.ListenAndServe(host, port, protected, handler)
+	opened := func(conn *server.Conn) {
+		c.mu.Lock()
+		c.conns[conn] = true
+		c.statsTotalConns++
+		c.mu.Unlock()
+	}
+	closed := func(conn *server.Conn) {
+		c.mu.Lock()
+		delete(c.conns, conn)
+		c.mu.Unlock()
+	}
+	return server.ListenAndServe(host, port, protected, handler, opened, closed)
 }
 
 func (c *Controller) watchMemory() {
@@ -338,7 +363,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		if c.config.ReadOnly {
 			return writeErr(errors.New("read only"))
 		}
-	case "get", "keys", "scan", "nearby", "within", "intersects", "hooks", "search", "ttl", "bounds":
+	case "get", "keys", "scan", "nearby", "within", "intersects", "hooks", "search", "ttl", "bounds", "server", "info":
 		// read operations
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -439,6 +464,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, err = c.cmdStats(msg)
 	case "server":
 		res, err = c.cmdServer(msg)
+	case "info":
+		res, err = c.cmdInfo(msg)
 	case "scan":
 		res, err = c.cmdScan(msg)
 	case "nearby":

@@ -68,6 +68,9 @@ func (c *Controller) backgroundExpiring() {
 				for id, at := range m {
 					if now.After(at) {
 						// issue a DEL command
+						c.mu.Lock()
+						c.statsExpired++
+						c.mu.Unlock()
 						msg := &server.Message{}
 						msg.Values = resp.MultiBulkValue("del", key, id).Array()
 						msg.Command = "del"

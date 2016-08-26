@@ -47,17 +47,20 @@ func (c *Controller) aofshrink() {
 	}()
 	var ferr error // stores the final error
 	c.shrinking = true
+	c.currentShrinkStart = start
 	endpos := int64(c.aofsz) // 1) Log the aofsize at start. Locked
 	c.mu.Unlock()
 	defer func() {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		c.shrinking = false
+		c.lastShrinkDuration = time.Now().Sub(start)
+		c.currentShrinkStart = time.Time{}
 		defer func() {
 			if ferr != nil {
 				log.Errorf("aof shrink failed: %s\n", ferr.Error())
 			} else {
-				log.Printf("aof shrink completed in %s", time.Now().Sub(start))
+				log.Printf("aof shrink completed in %s", c.lastShrinkDuration)
 			}
 		}()
 		if ferr != nil {

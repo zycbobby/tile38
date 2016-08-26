@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.4.1] - 2016-08-26
+### Added
+- #34: Added "BOUNDS key" command
+
+### Fixed
+- #38: Allow for nginx support
+- #39: Reset requirepass 
+
 ## [1.3.0] - 2016-07-22
 ### Added
 - New EXPIRE, PERSISTS, TTL commands. New EX keyword to SET command.

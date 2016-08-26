@@ -242,7 +242,9 @@ func (c *Controller) cmdConfigSet(msg *server.Message) (res string, err error) {
 	}
 	var value string
 	if vs, value, ok = tokenval(vs); !ok {
-		return "", errInvalidNumberOfArguments
+		if strings.ToLower(name) != "requirepass" {
+			return "", errInvalidNumberOfArguments
+		}
 	}
 	if len(vs) != 0 {
 		return "", errInvalidNumberOfArguments

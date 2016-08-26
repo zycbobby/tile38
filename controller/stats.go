@@ -139,9 +139,6 @@ func (c *Controller) writeInfoClients(w *bytes.Buffer) {
 	fmt.Fprintf(w, "connected_clients:%d\r\n", len(c.conns)) // Number of client connections (excluding connections from slaves)
 }
 func (c *Controller) writeInfoMemory(w *bytes.Buffer) {
-	c.mu.RUnlock()
-	runtime.GC()
-	c.mu.RLock()
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 	fmt.Fprintf(w, "used_memory:%d\r\n", mem.Alloc) // total number of bytes allocated by Redis using its allocator (either standard libc, jemalloc, or an alternative allocator such as tcmalloc

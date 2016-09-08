@@ -1,7 +1,5 @@
 package glob
 
-import "path"
-
 type Glob struct {
 	Pattern string
 	Desc    bool
@@ -10,7 +8,7 @@ type Glob struct {
 }
 
 func Match(pattern, name string) (matched bool, err error) {
-	return path.Match(pattern, name)
+	return wildcardMatch(pattern, name)
 }
 
 func IsGlob(pattern string) bool {

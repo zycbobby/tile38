@@ -54,7 +54,6 @@ func OpenAOF(path string) (*AOF, error) {
 	aof.policy = EverySecond
 	go func() {
 		for {
-			time.Sleep(time.Second)
 			aof.mu.Lock()
 			if aof.closed {
 				aof.mu.Unlock()
@@ -64,6 +63,7 @@ func OpenAOF(path string) (*AOF, error) {
 				aof.f.Sync()
 			}
 			aof.mu.Unlock()
+			time.Sleep(time.Second)
 		}
 	}()
 	return aof, nil
@@ -127,9 +127,23 @@ func (aof *AOF) readValues(iterator func(v Value)) error {
 
 // Append writes a value to the end of the file.
 func (aof *AOF) Append(v Value) error {
-	b, err := v.MarshalRESP()
-	if err != nil {
-		return err
+	return aof.AppendMulti([]Value{v})
+}
+
+// AppendMulti writes multiple values to the end of the file.
+// This operation can increase performance over calling multiple Append()s and also has the benefit of transactional writes.
+func (aof *AOF) AppendMulti(vs []Value) error {
+	var bs []byte
+	for _, v := range vs {
+		b, err := v.MarshalRESP()
+		if err != nil {
+			return err
+		}
+		if bs == nil {
+			bs = b
+		} else {
+			bs = append(bs, b...)
+		}
 	}
 	aof.mu.Lock()
 	defer aof.mu.Unlock()
@@ -141,7 +155,7 @@ func (aof *AOF) Append(v Value) error {
 			return err
 		}
 	}
-	_, err = aof.f.Write(b)
+	_, err := aof.f.Write(bs)
 	if err != nil {
 		return err
 	}

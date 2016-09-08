@@ -172,7 +172,10 @@ reading:
 		i := 0
 		for ; i < len(line); i++ {
 			if line[i] == ' ' {
-				values = append(values, resp.StringValue(string(line[:i])))
+				value := string(line[:i])
+				if value != "" {
+					values = append(values, resp.StringValue(value))
+				}
 				line = line[i+1:]
 				continue reading
 			}

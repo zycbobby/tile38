@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tidwall/log"
 	"github.com/tidwall/tile38/controller"
+	"github.com/tidwall/tile38/controller/log"
 )
 
 const port = 21098
@@ -90,6 +90,7 @@ func TestServer(t *testing.T) {
 	t.Run("Set100KB", SubTestSet100KB)
 	t.Run("Set1MB", SubTestSet1MB)
 	t.Run("Set10MB", SubTestSet10MB)
+	//t.Run("Set600MB", SubTestSet600MB)
 }
 
 func SubTestPingPong(t *testing.T) {
@@ -196,6 +197,9 @@ func SubTestSet1MB(t *testing.T) {
 }
 func SubTestSet10MB(t *testing.T) {
 	testSet(t, 10*1024*1024, 5000, 1024)
+}
+func SubTestSet600MB(t *testing.T) {
+	testSet(t, 0x1FFFFFFF-50, 5000, 16*1024)
 }
 func buildCommand(arg ...string) []byte {
 	var b []byte

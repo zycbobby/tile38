@@ -509,29 +509,11 @@ var commandsJSON = `{
           },
           {
             "name": "IDS"
-          },
-          {
-            "name": "OBJECTS"
-          },
-          {
-            "name": "POINTS"
-          },
-          {
-            "name": "BOUNDS"
-          },
-          {
-            "name": "HASHES",
-            "arguments": [
-              {
-                "name": "precision",
-                "type": "integer"
-              }
-            ]
           }
         ]
       }
     ],
-    "since": "1.0.0",
+    "since": "1.4.2",
     "group": "search"
   },
   "SCAN": {

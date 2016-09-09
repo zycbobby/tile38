@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.4.2] - 2016-08-26
+### Fixed
+- #49. Allow fragmented pipeline requests.
+- #51: Allow multispace delim in native proto
+- #50: MATCH with slashes 
+- #43: Linestring nearby search correction
+
 ## [1.4.1] - 2016-08-26
 ### Added
 - #34: Added "BOUNDS key" command

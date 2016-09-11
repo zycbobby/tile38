@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tidwall/buntdb"
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/controller/server"
@@ -94,7 +95,7 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 		}
 		if c.config.FollowHost == "" {
 			// process hooks, for leader only
-			if err := c.processHooks(d); err != nil {
+			if err := c.queueHooks(d); err != nil {
 				return err
 			}
 		}
@@ -124,13 +125,64 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 	return nil
 }
 
-func (c *Controller) processHooks(d *commandDetailsT) error {
+func (c *Controller) queueHooks(d *commandDetailsT) error {
+	// big list of all of the messages
+	var hmsgs []string
+	var hooks []*Hook
+	// find the hook by the key
 	if hm, ok := c.hookcols[d.key]; ok {
 		for _, hook := range hm {
-			go hook.Do(d)
+			// match the fence
+			msgs := FenceMatch(hook.Name, hook.ScanWriter, hook.Fence, d)
+			if len(msgs) > 0 {
+				// append each msg to the big list
+				hmsgs = append(hmsgs, msgs...)
+				hooks = append(hooks, hook)
+			}
 		}
 	}
+	if len(hmsgs) == 0 {
+		return nil
+	}
+
+	// queue the message in the buntdb database
+	err := c.qdb.Update(func(tx *buntdb.Tx) error {
+		for _, msg := range hmsgs {
+			c.qidx++ // increment the log id
+			key := hookLogPrefix + uint64ToString(c.qidx)
+			_, _, err := tx.Set(key, msg, hookLogSetDefaults())
+			if err != nil {
+				return err
+			}
+			log.Debugf("queued hook: %d", c.qidx)
+		}
+		_, _, err := tx.Set("hook:idx", uint64ToString(c.qidx), nil)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	// all the messages have been queued.
+	// notify the hooks
+	for _, hook := range hooks {
+		hook.Signal()
+	}
 	return nil
+}
+
+// Converts string to an integer
+func stringToUint64(s string) uint64 {
+	n, _ := strconv.ParseUint(s, 10, 64)
+	return n
+}
+
+// Converts a uint to a string
+func uint64ToString(u uint64) string {
+	s := strings.Repeat("0", 20) + strconv.FormatUint(u, 10)
+	return s[len(s)-20:]
 }
 
 type liveAOFSwitches struct {

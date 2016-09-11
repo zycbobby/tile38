@@ -237,7 +237,7 @@ func (c *Controller) aofshrink() {
 		values := make([]resp.Value, 0, 3+len(hook.Message.Values))
 		endpoints := make([]string, len(hook.Endpoints))
 		for i, endpoint := range hook.Endpoints {
-			endpoints[i] = endpoint.Original
+			endpoints[i] = endpoint
 		}
 		values = append(values, resp.StringValue("sethook"), resp.StringValue(name), resp.StringValue(strings.Join(endpoints, ",")))
 		values = append(values, hook.Message.Values...)

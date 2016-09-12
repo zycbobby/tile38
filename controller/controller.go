@@ -48,7 +48,7 @@ type commandDetailsT struct {
 	timestamp time.Time
 }
 
-func (col *collectionT) Less(item btree.Item, ctx int) bool {
+func (col *collectionT) Less(item btree.Item, ctx interface{}) bool {
 	return col.Key < item.(*collectionT).Key
 }
 

@@ -17,7 +17,7 @@ type itemT struct {
 	fields []float64
 }
 
-func (i *itemT) Less(item btree.Item, ctx int) bool {
+func (i *itemT) Less(item btree.Item, ctx interface{}) bool {
 	switch ctx {
 	default:
 		return false

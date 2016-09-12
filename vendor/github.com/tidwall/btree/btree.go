@@ -22,7 +22,7 @@
 // See some discussion on the matter here:
 //   http://google-opensource.blogspot.com/2013/01/c-containers-that-save-memory-and-time.html
 // Note, though, that this project is in no way related to the C++ B-Tree
-// implmentation written about there.
+// implementation written about there.
 //
 // Within this tree, each node contains a slice of items and a (possibly nil)
 // slice of children.  For basic numeric values or raw structs, this can cause
@@ -47,13 +47,6 @@
 // support storing multiple equivalent values.
 package btree
 
-import (
-	"fmt"
-	"io"
-	"sort"
-	"strings"
-)
-
 // Item represents a single object in the tree.
 type Item interface {
 	// Less tests whether the current item is less than the given argument.
@@ -64,12 +57,10 @@ type Item interface {
 	//
 	// There is a user-defined ctx argument that is equal to the ctx value which
 	// is set at time of the btree contruction.
-	Less(than Item, ctx int) bool
+	Less(than Item, ctx interface{}) bool
 }
 
-const (
-	DefaultFreeListSize = 32
-)
+const DefaultFreeListSize = 32
 
 // FreeList represents a free list of btree nodes. By default each
 // BTree has its own FreeList, but multiple BTrees can share the same
@@ -110,12 +101,12 @@ type ItemIterator func(i Item) bool
 // New(2), for example, will create a 2-3-4 tree (each node contains 1-3 items
 // and 2-4 children).
 // The ctx param is user-defined.
-func New(degree, ctx int) *BTree {
+func New(degree int, ctx interface{}) *BTree {
 	return NewWithFreeList(degree, NewFreeList(DefaultFreeListSize), ctx)
 }
 
 // NewWithFreeList creates a new B-Tree that uses the given node free list.
-func NewWithFreeList(degree int, f *FreeList, ctx int) *BTree {
+func NewWithFreeList(degree int, f *FreeList, ctx interface{}) *BTree {
 	if degree <= 1 {
 		panic("bad degree")
 	}
@@ -143,8 +134,8 @@ func (s *items) insertAt(index int, item Item) {
 // back.
 func (s *items) removeAt(index int) Item {
 	item := (*s)[index]
-	(*s)[index] = nil
 	copy((*s)[index:], (*s)[index+1:])
+	(*s)[len(*s)-1] = nil
 	*s = (*s)[:len(*s)-1]
 	return item
 }
@@ -161,10 +152,16 @@ func (s *items) pop() (out Item) {
 // find returns the index where the given item should be inserted into this
 // list.  'found' is true if the item already exists in the list at the given
 // index.
-func (s items) find(item Item, ctx int) (index int, found bool) {
-	i := sort.Search(len(s), func(i int) bool {
-		return item.Less(s[i], ctx)
-	})
+func (s items) find(item Item, ctx interface{}) (index int, found bool) {
+	i, j := 0, len(s)
+	for i < j {
+		h := i + (j-i)/2
+		if !item.Less(s[h], ctx) {
+			i = h + 1
+		} else {
+			j = h
+		}
+	}
 	if i > 0 && !s[i-1].Less(item, ctx) {
 		return i - 1, true
 	}
@@ -188,8 +185,8 @@ func (s *children) insertAt(index int, n *node) {
 // back.
 func (s *children) removeAt(index int) *node {
 	n := (*s)[index]
-	(*s)[index] = nil
 	copy((*s)[index:], (*s)[index+1:])
+	(*s)[len(*s)-1] = nil
 	*s = (*s)[:len(*s)-1]
 	return n
 }
@@ -245,7 +242,7 @@ func (n *node) maybeSplitChild(i, maxItems int) bool {
 // insert inserts an item into the subtree rooted at this node, making sure
 // no nodes in the subtree exceed maxItems items.  Should an equivalent item be
 // be found/replaced by insert, it will be returned.
-func (n *node) insert(item Item, maxItems int, ctx int) Item {
+func (n *node) insert(item Item, maxItems int, ctx interface{}) Item {
 	i, found := n.items.find(item, ctx)
 	if found {
 		out := n.items[i]
@@ -273,7 +270,7 @@ func (n *node) insert(item Item, maxItems int, ctx int) Item {
 }
 
 // get finds the given key in the subtree and returns it.
-func (n *node) get(key Item, ctx int) Item {
+func (n *node) get(key Item, ctx interface{}) Item {
 	i, found := n.items.find(key, ctx)
 	if found {
 		return n.items[i]
@@ -321,7 +318,7 @@ const (
 )
 
 // remove removes an item from the subtree rooted at this node.
-func (n *node) remove(item Item, minItems int, typ toRemove, ctx int) Item {
+func (n *node) remove(item Item, minItems int, typ toRemove, ctx interface{}) Item {
 	var i int
 	var found bool
 	switch typ {
@@ -388,7 +385,7 @@ func (n *node) remove(item Item, minItems int, typ toRemove, ctx int) Item {
 // We then simply redo our remove call, and the second time (regardless of
 // whether we're in case 1 or 2), we'll have enough items and can guarantee
 // that we hit case A.
-func (n *node) growChildAndRemove(i int, item Item, minItems int, typ toRemove, ctx int) Item {
+func (n *node) growChildAndRemove(i int, item Item, minItems int, typ toRemove, ctx interface{}) Item {
 	child := n.children[i]
 	if i > 0 && len(n.children[i-1].items) > minItems {
 		// Steal from left child
@@ -438,7 +435,7 @@ const (
 // will force the iterator to include the first item when it equals 'start',
 // thus creating a "greaterOrEqual" or "lessThanEqual" rather than just a
 // "greaterThan" or "lessThan" queries.
-func (n *node) iterate(dir direction, start, stop Item, includeStart bool, hit bool, iter ItemIterator, ctx int) (bool, bool) {
+func (n *node) iterate(dir direction, start, stop Item, includeStart bool, hit bool, iter ItemIterator, ctx interface{}) (bool, bool) {
 	var ok bool
 	switch dir {
 	case ascend:
@@ -497,14 +494,6 @@ func (n *node) iterate(dir direction, start, stop Item, includeStart bool, hit b
 	return hit, true
 }
 
-// Used for testing/debugging purposes.
-func (n *node) print(w io.Writer, level int) {
-	fmt.Fprintf(w, "%sNODE:%v\n", strings.Repeat("  ", level), n.items)
-	for _, c := range n.children {
-		c.print(w, level+1)
-	}
-}
-
 // BTree is an implementation of a B-Tree.
 //
 // BTree stores Item instances in an ordered structure, allowing easy insertion,
@@ -517,7 +506,7 @@ type BTree struct {
 	length   int
 	root     *node
 	freelist *FreeList
-	ctx      int
+	ctx      interface{}
 }
 
 // maxItems returns the max number of items to allow per node.
@@ -596,7 +585,7 @@ func (t *BTree) DeleteMax() Item {
 	return t.deleteItem(nil, removeMax, t.ctx)
 }
 
-func (t *BTree) deleteItem(item Item, typ toRemove, ctx int) Item {
+func (t *BTree) deleteItem(item Item, typ toRemove, ctx interface{}) Item {
 	if t.root == nil || len(t.root.items) == 0 {
 		return nil
 	}
@@ -717,6 +706,6 @@ func (t *BTree) Len() int {
 type Int int
 
 // Less returns true if int(a) < int(b).
-func (a Int) Less(b Item, ctx int) bool {
+func (a Int) Less(b Item, ctx interface{}) bool {
 	return a < b.(Int)
 }

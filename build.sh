@@ -102,6 +102,22 @@ if [ "$1" == "package" ]; then
 	exit
 fi
 
+if [ "$1" == "vendor" ]; then
+	pkg="$2"	
+	if [ "$pkg" == "" ]; then
+		echo "no package specified"
+		exit
+	fi
+	if [ ! -d "$GOPATH/src/$pkg" ]; then
+		echo "invalid package"
+		exit
+	fi
+	rm -rf vendor/$pkg/
+	mkdir -p vendor/$pkg/
+	cp -rf $GOPATH/src/$pkg/* vendor/$pkg/
+	rm -rf vendor/$pkg/.git
+	exit
+fi
 
 # temp directory for storing isolated environment.
 TMP="$(mktemp -d -t tile38.XXXX)"

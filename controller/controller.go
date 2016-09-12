@@ -18,6 +18,7 @@ import (
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
+	"github.com/tidwall/tile38/controller/endpoint"
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/core"
@@ -78,7 +79,7 @@ type Controller struct {
 	conns     map[*server.Conn]bool
 	started   time.Time
 
-	epc *EndpointManager
+	epc *endpoint.EndpointManager
 
 	statsTotalConns    int
 	statsTotalCommands int
@@ -113,7 +114,7 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener) error
 		expires:  make(map[string]map[string]time.Time),
 		started:  time.Now(),
 		conns:    make(map[*server.Conn]bool),
-		epc:      NewEndpointCollection(),
+		epc:      endpoint.NewEndpointManager(),
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err

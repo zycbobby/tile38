@@ -11,6 +11,7 @@ import (
 
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/resp"
+	"github.com/tidwall/tile38/controller/endpoint"
 	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/controller/server"
@@ -284,7 +285,7 @@ type Hook struct {
 	closed     bool
 	opened     bool
 	query      string
-	epm        *EndpointManager
+	epm        *endpoint.EndpointManager
 }
 
 // Open is called when a hook is first created. It calls the manager
@@ -342,12 +343,14 @@ func (h *Hook) manager() {
 	}
 }
 
-// proc processes queued hook logs. returning true will indicate that
-// there's more to do and proc() should be called again asap.
+// proc processes queued hook logs.
+// returning true will indicate that all log entries have been
+// successfully handled.
 func (h *Hook) proc() (ok bool) {
 	var keys, vals []string
 	var ttls []time.Duration
 	err := h.db.Update(func(tx *buntdb.Tx) error {
+
 		// get keys and vals
 		err := tx.AscendGreaterOrEqual("hooks", h.query, func(key, val string) bool {
 			if strings.HasPrefix(key, hookLogPrefix) {
@@ -359,6 +362,7 @@ func (h *Hook) proc() (ok bool) {
 		if err != nil {
 			return err
 		}
+
 		// delete the keys
 		for _, key := range keys {
 			if hookLogTTL > 0 {

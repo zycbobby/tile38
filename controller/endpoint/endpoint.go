@@ -1,4 +1,4 @@
-package controller
+package endpoint
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // EndpointProtocol is the type of protocol that the endpoint represents.
@@ -15,68 +16,6 @@ const (
 	HTTP   = EndpointProtocol("http")   // HTTP
 	Disque = EndpointProtocol("disque") // Disque
 )
-
-type EndpointManager struct {
-	mu        sync.RWMutex // this is intentionally exposed
-	Endpoints map[string]*Endpoint
-}
-
-func NewEndpointCollection() *EndpointManager {
-	return &EndpointManager{
-		Endpoints: make(map[string]*Endpoint),
-	}
-}
-
-// Get finds an endpoint based on its url. If the enpoint does not
-// exist a new only is created.
-func (epc *EndpointManager) Validate(url string) error {
-	_, err := parseEndpoint(url)
-	return err
-	/*
-		pendpoint := epc.Endpoints[url]
-		if pendpoint == nil {
-			pendpoint = endpoint
-			epc.Endpoints[url] = pendpoint
-		}
-		return pendpoint, nil
-	*/
-}
-
-// We use a retain/relase on endoints.
-// The calls are directed to the collection instead of
-// endpoint itself to avoid having a circular reference to
-// the collection.
-func (epc *EndpointManager) Open(endpoint string) {
-	epc.mu.Lock()
-	defer epc.mu.Unlock()
-	/*
-		ep.referenceCount++
-		if ep.referenceCount == 1 {
-			ep.Open()
-		}
-	*/
-}
-
-func (epc *EndpointManager) Close(endpoint string) {
-	epc.mu.Lock()
-	defer epc.mu.Unlock()
-	/*
-		ep.referenceCount--
-		if ep.referenceCount < 0 {
-			panic("reference count below zero")
-		}
-		if ep.referenceCount == 0 {
-			ep.Close()
-			delete(epc.Endpoints, ep.Original)
-		}
-	*/
-}
-func (epc *EndpointManager) Send(endpoint, val string) error {
-	epc.mu.Lock()
-	defer epc.mu.Unlock()
-	return errors.New("unavailable")
-	return nil
-}
 
 // Endpoint represents an endpoint.
 type Endpoint struct {
@@ -92,6 +31,83 @@ type Endpoint struct {
 	}
 }
 
+type EndpointConn interface {
+	Expired() bool
+	Send(val string) error
+}
+
+type EndpointManager struct {
+	mu    sync.RWMutex // this is intentionally exposed
+	conns map[string]EndpointConn
+}
+
+func NewEndpointManager() *EndpointManager {
+	epc := &EndpointManager{
+		conns: make(map[string]EndpointConn),
+	}
+	go epc.Run()
+	return epc
+}
+func (epc *EndpointManager) Run() {
+	for {
+		time.Sleep(time.Second)
+		func() {
+			epc.mu.Lock()
+			defer epc.mu.Unlock()
+			for endpoint, conn := range epc.conns {
+				if conn.Expired() {
+					delete(epc.conns, endpoint)
+				}
+			}
+		}()
+	}
+}
+
+// Get finds an endpoint based on its url. If the enpoint does not
+// exist a new only is created.
+func (epc *EndpointManager) Validate(url string) error {
+	_, err := parseEndpoint(url)
+	return err
+}
+
+func (epc *EndpointManager) Send(endpoint, val string) error {
+	epc.mu.Lock()
+	conn, ok := epc.conns[endpoint]
+	if !ok || conn.Expired() {
+		ep, err := parseEndpoint(endpoint)
+		if err != nil {
+			epc.mu.Unlock()
+			return err
+		}
+		switch ep.Protocol {
+		default:
+			return errors.New("invalid protocol")
+		case HTTP:
+			conn = newHTTPEndpointConn(ep)
+		case Disque:
+			conn = newDisqueEndpointConn(ep)
+		}
+		epc.conns[endpoint] = conn
+	}
+	epc.mu.Unlock()
+	return conn.Send(val)
+}
+
+/*
+func (conn *endpointConn) Expired() bool {
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
+	println("is expired?", conn.ex)
+	return conn.ex
+}
+
+func (conn *endpointConn) Send(val string) error {
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
+
+	return nil
+}
+*/
 /*
 func (ep *Endpoint) Open() {
 	ep.mu.Lock()

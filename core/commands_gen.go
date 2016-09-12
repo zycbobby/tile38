@@ -1282,5 +1282,15 @@ var commandsJSON = `{
       }
     ],
     "group": "webhook"
+  },
+  "PDELHOOK": {
+    "summary": "Removes all hooks matching a pattern",
+    "arguments":[
+      {
+        "name": "pattern",
+        "type": "pattern"
+      }
+    ],
+    "group": "webhook"
   }
 }`

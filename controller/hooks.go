@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -192,6 +193,44 @@ func (c *Controller) cmdDelHook(msg *server.Message) (res string, d commandDetai
 			return ":1\r\n", d, nil
 		}
 		return ":0\r\n", d, nil
+	}
+	return
+}
+
+func (c *Controller) cmdPDelHook(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+
+	var pattern string
+	var ok bool
+	if vs, pattern, ok = tokenval(vs); !ok || pattern == "" {
+		return "", d, errInvalidNumberOfArguments
+	}
+	if len(vs) != 0 {
+		return "", d, errInvalidNumberOfArguments
+	}
+
+	count := 0
+	for name := range c.hooks {
+		match, _ := glob.Match(pattern, name)
+		if match {
+			if h, ok := c.hooks[name]; ok {
+				h.Close()
+				if hm, ok := c.hookcols[h.Key]; ok {
+					delete(hm, h.Name)
+				}
+				delete(c.hooks, h.Name)
+				count++
+			}
+		}
+	}
+	d.timestamp = time.Now()
+
+	switch msg.OutputType {
+	case server.JSON:
+		return server.OKMessage(msg, start), d, nil
+	case server.RESP:
+		return ":" + strconv.FormatInt(int64(count), 10) + "\r\n", d, nil
 	}
 	return
 }

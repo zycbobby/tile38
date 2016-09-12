@@ -389,7 +389,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 	default:
 		c.mu.RLock()
 		defer c.mu.RUnlock()
-	case "set", "del", "drop", "fset", "flushdb", "sethook", "delhook", "expire", "persist":
+	case "set", "del", "drop", "fset", "flushdb", "sethook", "pdelhook", "delhook", "expire", "persist":
 		// write operations
 		write = true
 		c.mu.Lock()
@@ -479,6 +479,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, d, err = c.cmdSetHook(msg)
 	case "delhook":
 		res, d, err = c.cmdDelHook(msg)
+	case "pdelhook":
+		res, d, err = c.cmdPDelHook(msg)
 	case "expire":
 		res, d, err = c.cmdExpire(msg)
 	case "persist":

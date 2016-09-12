@@ -13,7 +13,6 @@ import (
 
 const (
 	disqueExpiresAfter = time.Second * 30
-	disqueDialTimeout  = time.Second * 10
 )
 
 type DisqueEndpointConn struct {
@@ -64,7 +63,7 @@ func (conn *DisqueEndpointConn) Send(msg string) error {
 	if conn.conn == nil {
 		addr := fmt.Sprintf("%s:%d", conn.ep.Disque.Host, conn.ep.Disque.Port)
 		var err error
-		conn.conn, err = net.DialTimeout("tcp", addr, disqueDialTimeout)
+		conn.conn, err = net.Dial("tcp", addr)
 		if err != nil {
 			return err
 		}

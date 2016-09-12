@@ -15,13 +15,18 @@ type EndpointProtocol string
 const (
 	HTTP   = EndpointProtocol("http")   // HTTP
 	Disque = EndpointProtocol("disque") // Disque
+	GRPC   = EndpointProtocol("grpc")   // GRPC
 )
 
 // Endpoint represents an endpoint.
 type Endpoint struct {
 	Protocol EndpointProtocol
 	Original string
-	Disque   struct {
+	GRPC     struct {
+		Host string
+		Port int
+	}
+	Disque struct {
 		Host      string
 		Port      int
 		QueueName string
@@ -86,6 +91,8 @@ func (epc *EndpointManager) Send(endpoint, val string) error {
 			conn = newHTTPEndpointConn(ep)
 		case Disque:
 			conn = newDisqueEndpointConn(ep)
+		case GRPC:
+			conn = newGRPCEndpointConn(ep)
 		}
 		epc.conns[endpoint] = conn
 	}
@@ -93,41 +100,6 @@ func (epc *EndpointManager) Send(endpoint, val string) error {
 	return conn.Send(val)
 }
 
-/*
-func (conn *endpointConn) Expired() bool {
-	conn.mu.Lock()
-	defer conn.mu.Unlock()
-	println("is expired?", conn.ex)
-	return conn.ex
-}
-
-func (conn *endpointConn) Send(val string) error {
-	conn.mu.Lock()
-	defer conn.mu.Unlock()
-
-	return nil
-}
-*/
-/*
-func (ep *Endpoint) Open() {
-	ep.mu.Lock()
-	defer ep.mu.Unlock()
-	println("open " + ep.Original)
-	// Even though open is called we should wait until the a messages
-	// is sent before establishing a network connection.
-}
-
-func (ep *Endpoint) Close() {
-	ep.mu.Lock()
-	defer ep.mu.Unlock()
-	println("close " + ep.Original)
-	// Make sure to forece close the network connection here.
-}
-
-func (ep *Endpoint) Send() error {
-	return nil
-}
-*/
 func parseEndpoint(s string) (Endpoint, error) {
 	var endpoint Endpoint
 	endpoint.Original = s
@@ -140,6 +112,8 @@ func parseEndpoint(s string) (Endpoint, error) {
 		endpoint.Protocol = HTTP
 	case strings.HasPrefix(s, "disque:"):
 		endpoint.Protocol = Disque
+	case strings.HasPrefix(s, "grpc:"):
+		endpoint.Protocol = GRPC
 	}
 	s = s[strings.Index(s, ":")+1:]
 	if !strings.HasPrefix(s, "//") {
@@ -150,6 +124,23 @@ func parseEndpoint(s string) (Endpoint, error) {
 	s = sp[0]
 	if s == "" {
 		return endpoint, errors.New("missing host")
+	}
+	if endpoint.Protocol == GRPC {
+		dp := strings.Split(s, ":")
+		switch len(dp) {
+		default:
+			return endpoint, errors.New("invalid grpc url")
+		case 1:
+			endpoint.GRPC.Host = dp[0]
+			endpoint.GRPC.Port = 80
+		case 2:
+			endpoint.GRPC.Host = dp[0]
+			n, err := strconv.ParseUint(dp[1], 10, 16)
+			if err != nil {
+				return endpoint, errors.New("invalid grpc url")
+			}
+			endpoint.GRPC.Port = int(n)
+		}
 	}
 	if endpoint.Protocol == Disque {
 		dp := strings.Split(s, ":")

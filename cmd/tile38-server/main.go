@@ -5,15 +5,21 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 
+	"golang.org/x/net/context"
+
+	"google.golang.org/grpc"
+
 	"github.com/tidwall/tile38/controller"
 	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/core"
+	"github.com/tidwall/tile38/hservice"
 )
 
 var (
@@ -26,15 +32,21 @@ var (
 	quiet       bool
 )
 
-// Fire up a webhook test server by using the --webhook-consumer-port
+// Fire up a webhook test server by using the --webhook-consumer-http-port
 // for example
-//   $ ./tile38-server --webhook-consumer-port 9999
+//   $ ./tile38-server --webhook-http-consumer-port 9999
 //
 // The create hooks like such...
 //   SETHOOK myhook http://localhost:9999/myhook NEARBY mykey FENCE POINT 33.5 -115.5 1000
 
+type hserver struct{}
+
+func (s *hserver) Send(ctx context.Context, in *hservice.MessageRequest) (*hservice.MessageReply, error) {
+	return &hservice.MessageReply{true}, nil
+}
+
 func main() {
-	if len(os.Args) == 3 && os.Args[1] == "--webhook-consumer-port" {
+	if len(os.Args) == 3 && os.Args[1] == "--webhook-http-consumer-port" {
 		log.Default = log.New(os.Stderr, &log.Config{})
 		port, err := strconv.ParseUint(os.Args[2], 10, 16)
 		if err != nil {
@@ -43,13 +55,32 @@ func main() {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			data, err := ioutil.ReadAll(r.Body)
 			if err != nil {
-				log.Error(err)
-				return
+				log.Fatal(err)
 			}
 			log.HTTPf("http: %s : %s", r.URL.Path, string(data))
 		})
 		log.Infof("webhook server http://localhost:%d/", port)
 		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	if len(os.Args) == 3 && os.Args[1] == "--webhook-grpc-consumer-port" {
+		log.Default = log.New(os.Stderr, &log.Config{})
+		port, err := strconv.ParseUint(os.Args[2], 10, 16)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err != nil {
+			log.Fatal(err)
+		}
+		s := grpc.NewServer()
+		hservice.RegisterHookServiceServer(s, &hserver{})
+		log.Infof("webhook server grpc://localhost:%d/", port)
+		if err := s.Serve(lis); err != nil {
 			log.Fatal(err)
 		}
 		return

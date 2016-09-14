@@ -233,7 +233,7 @@ func (c *Controller) cmdInfo(msg *server.Message) (res string, err error) {
 		}
 		res = `{"ok":true,"info":` + string(data) + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
 	case server.RESP:
-		data, err := resp.StringValue(w.String()).MarshalRESP()
+		data, err := resp.BytesValue(w.Bytes()).MarshalRESP()
 		if err != nil {
 			return "", err
 		}

@@ -398,6 +398,7 @@ func (c *Controller) cmdFlushDB(msg *server.Message) (res string, d commandDetai
 
 func (c *Controller) parseSetArgs(vs []resp.Value) (
 	d commandDetailsT, fields []string, values []float64,
+	xx, nx bool,
 	expires *float64, etype string, evs []resp.Value, err error,
 ) {
 	var ok bool
@@ -463,6 +464,24 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (
 				return
 			}
 			expires = &v
+			continue
+		}
+		if lc(arg, "xx") {
+			vs = nvs
+			if nx {
+				err = errInvalidArgument(arg)
+				return
+			}
+			xx = true
+			continue
+		}
+		if lc(arg, "nx") {
+			vs = nvs
+			if xx {
+				err = errInvalidArgument(arg)
+				return
+			}
+			nx = true
 			continue
 		}
 		break
@@ -621,24 +640,35 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 	}
 	start := time.Now()
 	vs := msg.Values[1:]
+	var fmap map[string]int
 	var fields []string
 	var values []float64
+	var xx, nx bool
 	var ex *float64
-	d, fields, values, ex, _, _, err = c.parseSetArgs(vs)
+	d, fields, values, xx, nx, ex, _, _, err = c.parseSetArgs(vs)
 	if err != nil {
 		return
 	}
 	ex = ex
 	col := c.getCol(d.key)
 	if col == nil {
+		if xx {
+			goto notok
+		}
 		col = collection.New()
 		c.setCol(d.key, col)
+	}
+	if nx {
+		_, _, ok := col.Get(d.id)
+		if ok {
+			goto notok
+		}
 	}
 	c.clearIDExpires(d.key, d.id)
 	d.oldObj, d.oldFields, d.fields = col.ReplaceOrInsert(d.id, d.obj, fields, values)
 	d.command = "set"
 	d.updated = true // perhaps we should do a diff on the previous object?
-	fmap := col.FieldMap()
+	fmap = col.FieldMap()
 	d.fmap = make(map[string]int)
 	for key, idx := range fmap {
 		d.fmap[key] = idx
@@ -652,6 +682,14 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
 	case server.RESP:
 		res = "+OK\r\n"
+	}
+	return
+notok:
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":false,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		res = "$-1\r\n"
 	}
 	return
 }

@@ -187,6 +187,18 @@ var commandsJSON = `{
         "optional": true,
         "multiple": false
       },
+      {
+        "name": "type",
+        "optional": true,
+        "enumargs": [
+          {
+            "name": "NX"
+          },
+          {
+            "name": "XX"
+          }
+		]
+      },
 	  {
 		"name": "value",
         "enumargs": [

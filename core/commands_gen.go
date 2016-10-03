@@ -182,8 +182,8 @@ var commandsJSON = `{
       },
       {
         "command": "EX",
-        "name": ["seconds", "value"],
-        "type": ["string", "double"],
+        "name": ["seconds"],
+        "type": ["double"],
         "optional": true,
         "multiple": false
       },

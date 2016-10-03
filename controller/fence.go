@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"math"
 	"strconv"
 	"strings"
 
@@ -196,7 +197,7 @@ func fenceMatchRoam(c *Controller, fence *liveFenceSwitches, tkey, tid string, o
 		return
 	}
 	p := obj.CalculatedPoint()
-	col.Nearby(0, 0, p.Y, p.X, fence.roam.meters,
+	col.Nearby(0, 0, p.Y, p.X, fence.roam.meters, math.Inf(-1), math.Inf(+1),
 		func(id string, obj geojson.Object, fields []float64) bool {
 			var match bool
 			if id == tid {

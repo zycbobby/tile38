@@ -1,26 +1,30 @@
 package index
 
-import "github.com/tidwall/tile38/index/rtree"
+import (
+	"math"
+
+	"github.com/tidwall/tile38/index/rtree"
+)
 
 // Item represents an index item.
 type Item interface {
-	Point() (x, y float64)
-	Rect() (minX, minY, maxX, maxY float64)
+	Point() (x, y, z float64)
+	Rect() (minX, minY, minZ, maxX, maxY, maxZ float64)
 }
 
 // FlexItem can represent a point or a rectangle
 type FlexItem struct {
-	MinX, MinY, MaxX, MaxY float64
+	MinX, MinY, MinZ, MaxX, MaxY, MaxZ float64
 }
 
 // Rect returns the rectangle
-func (item *FlexItem) Rect() (minX, minY, maxX, maxY float64) {
-	return item.MinX, item.MinY, item.MaxX, item.MaxY
+func (item *FlexItem) Rect() (minX, minY, minZ, maxX, maxY, maxZ float64) {
+	return item.MinX, item.MinY, item.MinZ, item.MaxX, item.MaxY, item.MaxZ
 }
 
 // Point returns the point
-func (item *FlexItem) Point() (x, y float64) {
-	return item.MinX, item.MinY
+func (item *FlexItem) Point() (x, y, z float64) {
+	return item.MinX, item.MinY, item.MinZ
 }
 
 // Index is a geospatial index
@@ -43,11 +47,11 @@ func New() *Index {
 
 // Insert inserts an item into the index
 func (ix *Index) Insert(item Item) {
-	minX, minY, maxX, maxY := item.Rect()
+	minX, minY, minZ, maxX, maxY, maxZ := item.Rect()
 	if minX == maxX && minY == maxY {
 		x, y, normd := normPoint(minY, minX)
 		if normd {
-			nitem := &rtree.Rect{MinX: x, MinY: y, MaxX: x, MaxY: y}
+			nitem := &rtree.Rect{MinX: x, MinY: y, MinZ: minZ, MaxX: x, MaxY: y, MaxZ: maxZ}
 			ix.nr[nitem] = item
 			ix.nrr[item] = []*rtree.Rect{nitem}
 			ix.r.Insert(nitem)
@@ -60,7 +64,7 @@ func (ix *Index) Insert(item Item) {
 			var nitems []*rtree.Rect
 			for i := range mins {
 				minX, minY, maxX, maxY := mins[i][0], mins[i][1], maxs[i][0], maxs[i][1]
-				nitem := &rtree.Rect{MinX: minX, MinY: minY, MaxX: maxX, MaxY: maxY}
+				nitem := &rtree.Rect{MinX: minX, MinY: minY, MinZ: minZ, MaxX: maxX, MaxY: maxY, MaxZ: maxZ}
 				ix.nr[nitem] = item
 				nitems = append(nitems, nitem)
 				ix.r.Insert(nitem)
@@ -92,7 +96,7 @@ func (ix *Index) Remove(item Item) {
 // Count counts all items in the index.
 func (ix *Index) Count() int {
 	count := 0
-	ix.Search(0, -90, -180, 90, 180, func(item Item) bool {
+	ix.Search(0, -90, -180, 90, 180, math.Inf(-1), math.Inf(+1), func(item Item) bool {
 		count++
 		return true
 	})
@@ -100,7 +104,7 @@ func (ix *Index) Count() int {
 }
 
 // Bounds returns the minimum bounding rectangle of all items in the index.
-func (ix *Index) Bounds() (MinX, MinY, MaxX, MaxY float64) {
+func (ix *Index) Bounds() (MinX, MinY, MinZ, MaxX, MaxY, MaxZ float64) {
 	return ix.r.Bounds()
 }
 
@@ -120,7 +124,7 @@ func (ix *Index) getRTreeItem(item rtree.Item) Item {
 }
 
 // Search returns all items that intersect the bounding box.
-func (ix *Index) Search(cursor uint64, swLat, swLon, neLat, neLon float64, iterator func(item Item) bool) (ncursor uint64) {
+func (ix *Index) Search(cursor uint64, swLat, swLon, neLat, neLon, minZ, maxZ float64, iterator func(item Item) bool) (ncursor uint64) {
 	var idx uint64
 	var active = true
 	var idm = make(map[Item]bool)
@@ -130,7 +134,7 @@ func (ix *Index) Search(cursor uint64, swLat, swLon, neLat, neLon float64, itera
 		// There is only one rectangle.
 		// It's possible that a r rect may span multiple entries. Check mulm map for spanning rects.
 		if active {
-			ix.r.Search(mins[0][0], mins[0][1], maxs[0][0], maxs[0][1], func(item rtree.Item) bool {
+			ix.r.Search(mins[0][0], mins[0][1], minZ, maxs[0][0], maxs[0][1], maxZ, func(item rtree.Item) bool {
 				if idx >= cursor {
 					iitm := ix.getRTreeItem(item)
 					if iitm != nil {
@@ -152,7 +156,7 @@ func (ix *Index) Search(cursor uint64, swLat, swLon, neLat, neLon float64, itera
 		// There are multiple rectangles. Duplicates might occur.
 		for i := range mins {
 			if active {
-				ix.r.Search(mins[i][0], mins[i][1], maxs[i][0], maxs[i][1], func(item rtree.Item) bool {
+				ix.r.Search(mins[i][0], mins[i][1], minZ, maxs[i][0], maxs[i][1], maxZ, func(item rtree.Item) bool {
 					if idx >= cursor {
 						iitm := ix.getRTreeItem(item)
 						if iitm != nil {

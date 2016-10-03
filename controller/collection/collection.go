@@ -36,13 +36,13 @@ func (i *itemT) Less(item btree.Item, ctx interface{}) bool {
 	}
 }
 
-func (i *itemT) Rect() (minX, minY, maxX, maxY float64) {
+func (i *itemT) Rect() (minX, minY, minZ, maxX, maxY, maxZ float64) {
 	bbox := i.object.CalculatedBBox()
-	return bbox.Min.X, bbox.Min.Y, bbox.Max.X, bbox.Max.Y
+	return bbox.Min.X, bbox.Min.Y, bbox.Min.Z, bbox.Max.X, bbox.Max.Y, bbox.Max.Z
 }
 
-func (i *itemT) Point() (x, y float64) {
-	x, y, _, _ = i.Rect()
+func (i *itemT) Point() (x, y, z float64) {
+	x, y, z, _, _, _ = i.Rect()
 	return
 }
 
@@ -87,7 +87,7 @@ func (c *Collection) TotalWeight() int {
 }
 
 // Bounds returns the bounds of all the items in the collection.
-func (c *Collection) Bounds() (minX, minY, maxX, maxY float64) {
+func (c *Collection) Bounds() (minX, minY, minZ, maxX, maxY, maxZ float64) {
 	return c.index.Bounds()
 }
 
@@ -333,7 +333,7 @@ func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, desc bool,
 }
 
 func (c *Collection) geoSearch(cursor uint64, bbox geojson.BBox, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
-	return c.index.Search(cursor, bbox.Min.Y, bbox.Min.X, bbox.Max.Y, bbox.Max.X, func(item index.Item) bool {
+	return c.index.Search(cursor, bbox.Min.Y, bbox.Min.X, bbox.Max.Y, bbox.Max.X, bbox.Min.Z, bbox.Max.Z, func(item index.Item) bool {
 		var iitm *itemT
 		iitm, ok := item.(*itemT)
 		if !ok {
@@ -347,12 +347,13 @@ func (c *Collection) geoSearch(cursor uint64, bbox geojson.BBox, iterator func(i
 }
 
 // Nearby returns all object that are nearby a point.
-func (c *Collection) Nearby(cursor uint64, sparse uint8, lat, lon, meters float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) Nearby(cursor uint64, sparse uint8, lat, lon, meters, minZ, maxZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
 	center := geojson.Position{X: lon, Y: lat, Z: 0}
 	bbox := geojson.BBoxesFromCenter(lat, lon, meters)
 	bboxes := bbox.Sparse(sparse)
 	if sparse > 0 {
 		for _, bbox := range bboxes {
+			bbox.Min.Z, bbox.Max.Z = minZ, maxZ
 			c.geoSearch(cursor, bbox, func(id string, obj geojson.Object, fields []float64) bool {
 				if obj.Nearby(center, meters) {
 					if iterator(id, obj, fields) {
@@ -364,6 +365,7 @@ func (c *Collection) Nearby(cursor uint64, sparse uint8, lat, lon, meters float6
 		}
 		return 0
 	}
+	bbox.Min.Z, bbox.Max.Z = minZ, maxZ
 	return c.geoSearch(cursor, bbox, func(id string, obj geojson.Object, fields []float64) bool {
 		if obj.Nearby(center, meters) {
 			return iterator(id, obj, fields)
@@ -373,12 +375,12 @@ func (c *Collection) Nearby(cursor uint64, sparse uint8, lat, lon, meters float6
 }
 
 // Within returns all object that are fully contained within an object or bounding box. Set obj to nil in order to use the bounding box.
-func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon, minZ, maxZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
 	var bbox geojson.BBox
 	if obj != nil {
 		bbox = obj.CalculatedBBox()
 	} else {
-		bbox = geojson.BBox{Min: geojson.Position{X: minLon, Y: minLat, Z: 0}, Max: geojson.Position{X: maxLon, Y: maxLat, Z: 0}}
+		bbox = geojson.BBox{Min: geojson.Position{X: minLon, Y: minLat, Z: minZ}, Max: geojson.Position{X: maxLon, Y: maxLat, Z: maxZ}}
 	}
 	bboxes := bbox.Sparse(sparse)
 	if sparse > 0 {
@@ -421,12 +423,12 @@ func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, min
 }
 
 // Intersects returns all object that are intersect an object or bounding box. Set obj to nil in order to use the bounding box.
-func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon, maxZ, minZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
 	var bbox geojson.BBox
 	if obj != nil {
 		bbox = obj.CalculatedBBox()
 	} else {
-		bbox = geojson.BBox{Min: geojson.Position{X: minLon, Y: minLat, Z: 0}, Max: geojson.Position{X: maxLon, Y: maxLat, Z: 0}}
+		bbox = geojson.BBox{Min: geojson.Position{X: minLon, Y: minLat, Z: minZ}, Max: geojson.Position{X: maxLon, Y: maxLat, Z: maxZ}}
 	}
 	var bboxes []geojson.BBox
 	if sparse > 0 {
@@ -436,8 +438,8 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 		for y := bbox.Min.Y; y < bbox.Max.Y; y += ypart {
 			for x := bbox.Min.X; x < bbox.Max.X; x += xpart {
 				bboxes = append(bboxes, geojson.BBox{
-					Min: geojson.Position{X: x, Y: y, Z: 0},
-					Max: geojson.Position{X: x + xpart, Y: y + ypart, Z: 0},
+					Min: geojson.Position{X: x, Y: y, Z: minZ},
+					Max: geojson.Position{X: x + xpart, Y: y + ypart, Z: maxZ},
 				})
 			}
 		}

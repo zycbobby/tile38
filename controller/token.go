@@ -117,6 +117,19 @@ func (where whereT) match(value float64) bool {
 	return true
 }
 
+func zMinMaxFromWheres(wheres []whereT) (minZ, maxZ float64) {
+	for _, w := range wheres {
+		if w.field == "z" {
+			minZ = w.min
+			maxZ = w.max
+			return
+		}
+	}
+	minZ = math.Inf(-1)
+	maxZ = math.Inf(+1)
+	return
+}
+
 type searchScanBaseTokens struct {
 	key       string
 	cursor    uint64

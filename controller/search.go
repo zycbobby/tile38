@@ -264,6 +264,8 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	if s.fence {
 		return "", s
 	}
+
+	minZ, maxZ := zMinMaxFromWheres(s.wheres)
 	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.limit, s.wheres, s.nofields)
 	if err != nil {
 		return "", err
@@ -273,7 +275,7 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	}
 	sw.writeHead()
 	if sw.col != nil {
-		s.cursor = sw.col.Nearby(s.cursor, s.sparse, s.lat, s.lon, s.meters, func(id string, o geojson.Object, fields []float64) bool {
+		s.cursor = sw.col.Nearby(s.cursor, s.sparse, s.lat, s.lon, s.meters, minZ, maxZ, func(id string, o geojson.Object, fields []float64) bool {
 			return sw.writeObject(id, o, fields, false)
 		})
 	}
@@ -316,14 +318,15 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 		wr.WriteString(`{"ok":true`)
 	}
 	sw.writeHead()
+	minZ, maxZ := zMinMaxFromWheres(s.wheres)
 	if cmd == "within" {
-		s.cursor = sw.col.Within(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon,
+		s.cursor = sw.col.Within(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
 			func(id string, o geojson.Object, fields []float64) bool {
 				return sw.writeObject(id, o, fields, false)
 			},
 		)
 	} else if cmd == "intersects" {
-		s.cursor = sw.col.Intersects(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon,
+		s.cursor = sw.col.Intersects(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
 			func(id string, o geojson.Object, fields []float64) bool {
 				return sw.writeObject(id, o, fields, false)
 			},

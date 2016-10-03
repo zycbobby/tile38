@@ -38,10 +38,10 @@ func wp(min, max []float64) *Rect {
 		MaxY: max[1],
 	}
 }
-func wpp(x, y float64) *Rect {
+func wpp(x, y, z float64) *Rect {
 	return &Rect{
-		x, y,
-		x, y,
+		x, y, z,
+		x, y, z,
 	}
 }
 func TestA(t *testing.T) {
@@ -51,7 +51,7 @@ func TestA(t *testing.T) {
 	tr.Insert(item1)
 	tr.Insert(item2)
 	var itemA Item
-	tr.Search(21, 20, 25, 25, func(item Item) bool {
+	tr.Search(21, 20, 0, 25, 25, 0, func(item Item) bool {
 		itemA = item
 		return true
 	})
@@ -77,14 +77,14 @@ func TestMemory(t *testing.T) {
 }
 func TestBounds(t *testing.T) {
 	tr := New()
-	tr.Insert(wpp(10, 10))
-	tr.Insert(wpp(10, 20))
-	tr.Insert(wpp(10, 30))
-	tr.Insert(wpp(20, 10))
-	tr.Insert(wpp(30, 10))
-	minX, minY, maxX, maxY := tr.Bounds()
-	if minX != 10 || minY != 10 || maxX != 30 || maxY != 30 {
-		t.Fatalf("expected 10,10 30,30, got %v,%v %v,%v\n", minX, minY, maxX, maxY)
+	tr.Insert(wpp(10, 10, 0))
+	tr.Insert(wpp(10, 20, 0))
+	tr.Insert(wpp(10, 30, 0))
+	tr.Insert(wpp(20, 10, 0))
+	tr.Insert(wpp(30, 10, 0))
+	minX, minY, minZ, maxX, maxY, maxZ := tr.Bounds()
+	if minX != 10 || minY != 10 || minZ != 0 || maxX != 30 || maxY != 30 || maxZ != 0 {
+		t.Fatalf("expected 10,10,0 30,30,0, got %v,%v %v,%v\n", minX, minY, minZ, maxX, maxY, maxZ)
 	}
 }
 func BenchmarkInsert(b *testing.B) {

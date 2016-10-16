@@ -56,38 +56,41 @@ func (c *Controller) getExpires(key, id string) (at time.Time, ok bool) {
 // per second.
 func (c *Controller) backgroundExpiring() {
 	for {
-		c.mu.Lock()
-		if c.stopBackgroundExpiring {
-			c.mu.Unlock()
-			return
-		}
-		// Only excute for leaders. Followers should ignore.
-		if c.config.FollowHost == "" {
-			now := time.Now()
-			for key, m := range c.expires {
-				for id, at := range m {
-					if now.After(at) {
-						// issue a DEL command
-						c.mu.Lock()
-						c.statsExpired++
-						c.mu.Unlock()
-						msg := &server.Message{}
-						msg.Values = resp.MultiBulkValue("del", key, id).Array()
-						msg.Command = "del"
-						_, d, err := c.cmdDel(msg)
-						if err != nil {
-							log.Fatal(err)
-							continue
-						}
-						if err := c.writeAOF(resp.ArrayValue(msg.Values), &d); err != nil {
-							log.Fatal(err)
-							continue
+		ok := func() bool {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			if c.stopBackgroundExpiring {
+				return false
+			}
+			// Only excute for leaders. Followers should ignore.
+			if c.config.FollowHost == "" {
+				now := time.Now()
+				for key, m := range c.expires {
+					for id, at := range m {
+						if now.After(at) {
+							// issue a DEL command
+							c.statsExpired++
+							msg := &server.Message{}
+							msg.Values = resp.MultiBulkValue("del", key, id).Array()
+							msg.Command = "del"
+							_, d, err := c.cmdDel(msg)
+							if err != nil {
+								log.Fatal(err)
+								continue
+							}
+							if err := c.writeAOF(resp.ArrayValue(msg.Values), &d); err != nil {
+								log.Fatal(err)
+								continue
+							}
 						}
 					}
 				}
 			}
+			return true
+		}()
+		if !ok {
+			return
 		}
-		c.mu.Unlock()
 		time.Sleep(time.Second / 5)
 	}
 }

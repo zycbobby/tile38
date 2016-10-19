@@ -1,6 +1,12 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
+
+## [1.5.1] - 2016-10-19
+### Fixed
+- #67: Call the EXPIRE command hangs the server
+- #64: Missing points in 'Nearby' queries
+
 ## [1.5.0] - 2016-10-03
 ### Added
 - #61: Optimized queries on 3d objects

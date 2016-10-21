@@ -42,6 +42,7 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 ### Getting Tile38
 
 The easiest way to get Tile38 is to use one of the pre-built release binaries which are available for OSX, Linux, and Windows. Instructions for using these binaries are on the GitHub [releases page](https://github.com/tidwall/tile38/releases).
+TIle38 is also available as a [Docker image](https://hub.docker.com/r/tile38/tile38/) which is built on top of [Alpine Linux](https://alpinelinux.org/).
 
 If you want to try the latest version, you can build Tile38 from the master branch.
 

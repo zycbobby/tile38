@@ -293,7 +293,7 @@ Tile38 uses the [Redis RESP](http://redis.io/topics/protocol) protocol natively.
 - Perl: [perl-redis](https://github.com/PerlRedis/perl-redis)
 - PHP: [phpredis](https://github.com/phpredis/phpredis)
 - Python: [redis-py](https://github.com/andymccurdy/redis-py)
-- Ruby: [redis-rb](https://github.com/redis/redis-rb)
+- Ruby: [redic](https://github.com/amakawa/redic), [redis-rb](https://github.com/redis/redis-rb)
 - Rust: [redis-rs](https://github.com/mitsuhiko/redis-rs)
 - Scala: [scala-redis](https://github.com/debasishg/scala-redis)
 - Swift: [Redbird](https://github.com/czechboy0/Redbird)

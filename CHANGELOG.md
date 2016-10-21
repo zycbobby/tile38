@@ -2,6 +2,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.5.2] - 2016-10-20
+### Fixed
+- #70: Invalid results for INTERSECTS query
+
 ## [1.5.1] - 2016-10-19
 ### Fixed
 - #67: Call the EXPIRE command hangs the server

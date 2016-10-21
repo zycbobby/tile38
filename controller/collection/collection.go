@@ -423,7 +423,7 @@ func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, min
 }
 
 // Intersects returns all object that are intersect an object or bounding box. Set obj to nil in order to use the bounding box.
-func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon, maxZ, minZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon, minZ, maxZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
 	var bbox geojson.BBox
 	if obj != nil {
 		bbox = obj.CalculatedBBox()

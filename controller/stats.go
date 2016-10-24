@@ -109,6 +109,7 @@ func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 	if points != 0 {
 		avgsz = int(mem.HeapAlloc) / points
 	}
+	m["mem_alloc"] = mem.Alloc
 	m["heap_size"] = mem.HeapAlloc
 	m["max_heap_size"] = c.config.MaxMemory
 	m["avg_item_size"] = avgsz

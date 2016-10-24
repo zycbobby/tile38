@@ -67,6 +67,7 @@ func (tr *RTree) Bounds() (minX, minY, minZ, maxX, maxY, maxZ float64) {
 			}
 		}
 	}
-	minX, minY, minZ, maxX, maxY, maxZ = rect.min[0], rect.min[1], rect.min[2], rect.max[0], rect.max[1], rect.max[2]
+	minX, minY, minZ = float64(rect.min[0]), float64(rect.min[1]), float64(rect.min[2])
+	maxX, maxY, maxZ = float64(rect.max[0]), float64(rect.max[1]), float64(rect.max[2])
 	return
 }

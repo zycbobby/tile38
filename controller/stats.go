@@ -33,10 +33,10 @@ func (c *Controller) cmdStats(msg *server.Message) (res string, err error) {
 		col := c.getCol(key)
 		if col != nil {
 			m := make(map[string]interface{})
-			points := col.PointCount()
-			m["num_points"] = points
+			m["num_points"] = col.PointCount()
 			m["in_memory_size"] = col.TotalWeight()
 			m["num_objects"] = col.Count()
+			m["num_strings"] = col.StringCount()
 			switch msg.OutputType {
 			case server.JSON:
 				ms = append(ms, m)
@@ -92,14 +92,17 @@ func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 	m["in_memory_size"] = sz
 	points := 0
 	objects := 0
+	strings := 0
 	c.cols.Ascend(func(item btree.Item) bool {
 		col := item.(*collectionT).Collection
 		points += col.PointCount()
 		objects += col.Count()
+		strings += col.StringCount()
 		return true
 	})
 	m["num_points"] = points
 	m["num_objects"] = objects
+	m["num_strings"] = strings
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 	avgsz := 0

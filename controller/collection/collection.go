@@ -64,8 +64,8 @@ var counter uint64
 func New() *Collection {
 	col := &Collection{
 		index:    index.New(),
-		items:    btree.New(16, idOrdered),
-		values:   btree.New(16, valueOrdered),
+		items:    btree.New(48, idOrdered),
+		values:   btree.New(48, valueOrdered),
 		fieldMap: make(map[string]int),
 	}
 	return col
@@ -74,6 +74,11 @@ func New() *Collection {
 // Count returns the number of objects in collection.
 func (c *Collection) Count() int {
 	return c.objects + c.nobjects
+}
+
+// StringCount returns the number of string values.
+func (c *Collection) StringCount() int {
+	return c.nobjects
 }
 
 // PointCount returns the number of points (lat/lon coordinates) in collection.

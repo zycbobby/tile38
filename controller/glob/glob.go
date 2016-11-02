@@ -1,5 +1,7 @@
 package glob
 
+import "strings"
+
 type Glob struct {
 	Pattern string
 	Desc    bool
@@ -24,7 +26,7 @@ func IsGlob(pattern string) bool {
 
 func Parse(pattern string, desc bool) *Glob {
 	g := &Glob{Pattern: pattern, Desc: desc, Limits: []string{"", ""}}
-	if pattern == "*" {
+	if strings.HasPrefix(pattern, "*") {
 		g.IsGlob = true
 		return g
 	}

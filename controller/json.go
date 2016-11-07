@@ -1,10 +1,6 @@
 package controller
 
-import (
-	"encoding/json"
-
-	"github.com/tidwall/cast"
-)
+import "encoding/json"
 
 func jsonString(s string) string {
 	for i := 0; i < len(s); i++ {
@@ -15,7 +11,7 @@ func jsonString(s string) string {
 	}
 	b := make([]byte, len(s)+2)
 	b[0] = '"'
-	copy(b[1:], cast.ToBytes(s))
+	copy(b[1:], s)
 	b[len(b)-1] = '"'
-	return cast.ToString(b)
+	return string(b)
 }

@@ -403,10 +403,10 @@ func (c *Controller) cmdFlushDB(msg *server.Message) (res string, d commandDetai
 func (c *Controller) parseSetArgs(vs []resp.Value) (
 	d commandDetailsT, fields []string, values []float64,
 	xx, nx bool,
-	expires *float64, etype string, evs []resp.Value, err error,
+	expires *float64, etype []byte, evs []resp.Value, err error,
 ) {
 	var ok bool
-	var typ string
+	var typ []byte
 	if vs, d.key, ok = tokenval(vs); !ok || d.key == "" {
 		err = errInvalidNumberOfArguments
 		return
@@ -415,16 +415,14 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (
 		err = errInvalidNumberOfArguments
 		return
 	}
-	var arg string
+	var arg []byte
 	var nvs []resp.Value
-	fields = make([]string, 0, 8)
-	values = make([]float64, 0, 8)
 	for {
-		if nvs, arg, ok = tokenval(vs); !ok || arg == "" {
+		if nvs, arg, ok = tokenvalbytes(vs); !ok || len(arg) == 0 {
 			err = errInvalidNumberOfArguments
 			return
 		}
-		if lc(arg, "field") {
+		if lcb(arg, "field") {
 			vs = nvs
 			var name string
 			var svalue string
@@ -450,10 +448,10 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (
 			values = append(values, value)
 			continue
 		}
-		if lc(arg, "ex") {
+		if lcb(arg, "ex") {
 			vs = nvs
 			if expires != nil {
-				err = errInvalidArgument(arg)
+				err = errInvalidArgument(string(arg))
 				return
 			}
 			var s string
@@ -470,19 +468,19 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (
 			expires = &v
 			continue
 		}
-		if lc(arg, "xx") {
+		if lcb(arg, "xx") {
 			vs = nvs
 			if nx {
-				err = errInvalidArgument(arg)
+				err = errInvalidArgument(string(arg))
 				return
 			}
 			xx = true
 			continue
 		}
-		if lc(arg, "nx") {
+		if lcb(arg, "nx") {
 			vs = nvs
 			if xx {
-				err = errInvalidArgument(arg)
+				err = errInvalidArgument(string(arg))
 				return
 			}
 			nx = true
@@ -490,7 +488,7 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (
 		}
 		break
 	}
-	if vs, typ, ok = tokenval(vs); !ok || typ == "" {
+	if vs, typ, ok = tokenvalbytes(vs); !ok || len(typ) == 0 {
 		err = errInvalidNumberOfArguments
 		return
 	}
@@ -502,16 +500,16 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (
 	evs = vs
 	switch {
 	default:
-		err = errInvalidArgument(typ)
+		err = errInvalidArgument(string(typ))
 		return
-	case lc(typ, "string"):
+	case lcb(typ, "string"):
 		var str string
 		if vs, str, ok = tokenval(vs); !ok {
 			err = errInvalidNumberOfArguments
 			return
 		}
 		d.obj = geojson.String(str)
-	case lc(typ, "point"):
+	case lcb(typ, "point"):
 		var slat, slon, sz string
 		if vs, slat, ok = tokenval(vs); !ok || slat == "" {
 			err = errInvalidNumberOfArguments
@@ -554,7 +552,7 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (
 			}
 			d.obj = sp
 		}
-	case lc(typ, "bounds"):
+	case lcb(typ, "bounds"):
 		var sminlat, sminlon, smaxlat, smaxlon string
 		if vs, sminlat, ok = tokenval(vs); !ok || sminlat == "" {
 			err = errInvalidNumberOfArguments
@@ -605,7 +603,7 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (
 			},
 		}
 		d.obj = g
-	case lc(typ, "hash"):
+	case lcb(typ, "hash"):
 		var sp geojson.SimplePoint
 		var shash string
 		if vs, shash, ok = tokenval(vs); !ok || shash == "" {
@@ -620,7 +618,7 @@ func (c *Controller) parseSetArgs(vs []resp.Value) (
 		sp.X = lon
 		sp.Y = lat
 		d.obj = sp
-	case lc(typ, "object"):
+	case lcb(typ, "object"):
 		var object string
 		if vs, object, ok = tokenval(vs); !ok || object == "" {
 			err = errInvalidNumberOfArguments
@@ -682,6 +680,7 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 		c.expireAt(d.key, d.id, d.timestamp.Add(time.Duration(float64(time.Second)*(*ex))))
 	}
 	switch msg.OutputType {
+	default:
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
 	case server.RESP:
@@ -690,6 +689,7 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 	return
 notok:
 	switch msg.OutputType {
+	default:
 	case server.JSON:
 		res = `{"ok":false,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
 	case server.RESP:

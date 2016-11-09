@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,8 @@ func (err errAOFHook) Error() string {
 	return fmt.Sprintf("hook: %v", err.err)
 }
 
+var errInvalidAOF = errors.New("invalid aof file")
+
 func (c *Controller) loadAOF() error {
 	fi, err := c.f.Stat()
 	if err != nil {
@@ -50,31 +53,101 @@ func (c *Controller) loadAOF() error {
 		log.Infof("AOF loaded %d commands: %.2fs, %.0f/s, %s",
 			count, float64(d)/float64(time.Second), ps, byteSpeed)
 	}()
-	rd := resp.NewReader(c.f)
+	var msg server.Message
+	rd := bufio.NewReader(c.f)
 	for {
-		v, _, n, err := rd.ReadMultiBulk()
+		var nn int
+		ch, err := rd.ReadByte()
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
-		values := v.Array()
-		if len(values) == 0 {
-			return errors.New("multibulk missing command component")
+		nn += 1
+		if ch != '*' {
+			return errInvalidAOF
 		}
-		msg := &server.Message{
-			Command: strings.ToLower(values[0].String()),
-			Values:  values,
+		ns, err := rd.ReadString('\n')
+		if err != nil {
+			return err
 		}
-		if _, _, err := c.command(msg, nil); err != nil {
+		nn += len(ns)
+		if len(ns) < 2 || ns[len(ns)-2] != '\r' {
+			return errInvalidAOF
+		}
+		n, err := strconv.ParseUint(ns[:len(ns)-2], 10, 64)
+		if err != nil {
+			return err
+		}
+		if int(n) == 0 {
+			continue
+		}
+		msg.Values = msg.Values[:0]
+		for i := 0; i < int(n); i++ {
+			ch, err := rd.ReadByte()
+			if err != nil {
+				return err
+			}
+			if ch != '$' {
+				return errInvalidAOF
+			}
+			ns, err := rd.ReadString('\n')
+			if err != nil {
+				return err
+			}
+			if len(ns) < 2 || ns[len(ns)-2] != '\r' {
+				return errInvalidAOF
+			}
+			n, err := strconv.ParseUint(ns[:len(ns)-2], 10, 64)
+			if err != nil {
+				return err
+			}
+			b := make([]byte, int(n))
+			_, err = io.ReadFull(rd, b)
+			if err != nil {
+				return err
+			}
+			if ch, err := rd.ReadByte(); err != nil {
+				return err
+			} else if ch != '\r' {
+				return errInvalidAOF
+			}
+			if ch, err := rd.ReadByte(); err != nil {
+				return err
+			} else if ch != '\n' {
+				return errInvalidAOF
+			}
+			msg.Values = append(msg.Values, resp.BytesValue(b))
+			if i == 0 {
+				msg.Command = qlower(b)
+			}
+			nn += 1 + len(ns) + int(n) + 2
+		}
+		if _, _, err := c.command(&msg, nil); err != nil {
 			if commandErrIsFatal(err) {
 				return err
 			}
 		}
-		c.aofsz += n
+		c.aofsz += nn
 		count++
 	}
+}
+func qlower(s []byte) string {
+	if len(s) == 3 {
+		if s[0] == 'S' && s[1] == 'E' && s[2] == 'T' {
+			return "set"
+		}
+		if s[0] == 'D' && s[1] == 'E' && s[2] == 'L' {
+			return "del"
+		}
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 'A' || s[i] <= 'Z' {
+			return strings.ToLower(string(s))
+		}
+	}
+	return string(s)
 }
 
 func commandErrIsFatal(err error) bool {

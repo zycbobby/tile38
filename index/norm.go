@@ -1,13 +1,16 @@
 package index
 
+import "math"
+
 // normPoint takes the latitude and longitude of one point and return the x,y position on a world map.
 // The map bounds are minimum -180,-90 and maximum 180,90. These values are x,y; not lat,lon.
-func normPoint(lat, lon float64) (x float64, y float64, normd bool) {
-	// Check if the rect is completely in bounds. This is likely to be the vast majority of cases.
+func normPoint(lat, lon float64) (x, y float64, normd bool) {
+	// Check if the rect is completely in bounds.
+	// This is likely to be the vast majority of cases.
 	if lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90 {
 		return lon, lat, false
 	}
-	// TODO: replace loops with math/mod.
+	lat = math.Mod(lat, 360)
 	for lat < -90 || lat > 90 {
 		if lat < -90 {
 			lat = -90 - (90 + lat)
@@ -18,6 +21,7 @@ func normPoint(lat, lon float64) (x float64, y float64, normd bool) {
 			lon = 180 + lon
 		}
 	}
+	lon = math.Mod(lon, 360)
 	for lon < -180 {
 		lon += 360
 	}

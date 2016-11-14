@@ -383,6 +383,9 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 					},
 				)
 			} else {
+				// must disable globSingle for string value type matching because
+				// globSingle is only for ID matches, not values.
+				sw.globSingle = false
 				s.cursor = sw.col.SearchValuesRange(
 					s.cursor, g.Limits[0], g.Limits[1], s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {

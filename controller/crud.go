@@ -660,9 +660,9 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 		col = collection.New()
 		c.setCol(d.key, col)
 	}
-	if nx {
+	if xx || nx {
 		_, _, ok := col.Get(d.id)
-		if ok {
+		if (nx && ok) || (xx && !ok) {
 			goto notok
 		}
 	}
@@ -691,7 +691,12 @@ notok:
 	switch msg.OutputType {
 	default:
 	case server.JSON:
-		res = `{"ok":false,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+		if nx {
+			err = errIDAlreadyExists
+		} else {
+			err = errIDNotFound
+		}
+		return
 	case server.RESP:
 		res = "$-1\r\n"
 	}

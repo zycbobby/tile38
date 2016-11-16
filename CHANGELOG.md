@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.5.3] - 2016-11-16
+### Added
+- #4: Official docker support
+### Fixed
+- #77: NX/XX bug
+- #76: Match on prefix star
+- #82: Allow for precise search for strings
+- #83: Faster congruent modulo for points
+
 ## [1.5.2] - 2016-10-20
 ### Fixed
 - #70: Invalid results for INTERSECTS query

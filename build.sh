@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="1.5.3"
+VERSION="1.5.4"
 PROTECTED_MODE="no"
 
 # Hardcode some values to the core package
@@ -83,6 +83,8 @@ package(){
 		mv tile38-cli packages/$bdir
 	fi
 	cp README.md packages/$bdir
+	cp CHANGELOG.md packages/$bdir
+	cp LICENSE packages/$bdir
 	cd packages
 	if [ "$2" == "linux" ]; then
 		tar -zcf $bdir.tar.gz $bdir

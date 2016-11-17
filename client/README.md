@@ -56,7 +56,7 @@ func main(){
     }()
     time.Sleep(time.Second / 2) // wait a moment
 
-    // Retreive the point we just set.
+    // Retrieve the point we just set.
     go func() {
         conn, err := pool.Get() // get a conn from the pool
         if err != nil {
@@ -71,4 +71,4 @@ func main(){
     }()
     time.Sleep(time.Second / 2) // wait a moment
 }
-```
+```:q

@@ -2,6 +2,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.5.4] - 2016-11-17
+### Fixed
+- #84: Hotfix - roaming fence deadlock
+
 ## [1.5.3] - 2016-11-16
 ### Added
 - #4: Official docker support

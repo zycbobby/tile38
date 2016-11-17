@@ -48,7 +48,7 @@ func TileXYToBounds(tileX, tileY int64, levelOfDetail uint64) (minLat, minLon, m
 	return
 }
 
-// QuadKeyToBounds convers a quadkey to bounds
+// QuadKeyToBounds converts a quadkey to bounds
 func QuadKeyToBounds(quadkey string) (minLat, minLon, maxLat, maxLon float64, err error) {
 	for i := 0; i < len(quadkey); i++ {
 		switch quadkey[i] {

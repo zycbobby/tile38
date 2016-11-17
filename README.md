@@ -5,7 +5,7 @@
 </p>
 <p align="center">
 <a href="https://travis-ci.org/tidwall/tile38"><img src="https://travis-ci.org/tidwall/tile38.svg?branch=master" alt="Build Status"></a>
-<a href="https://github.com/tidwall/tile38/releases"><img src="https://img.shields.io/badge/version-1.5.3-green.svg" alt="Version"></a>
+<a href="https://github.com/tidwall/tile38/releases"><img src="https://img.shields.io/badge/version-1.5.4-green.svg" alt="Version"></a>
 </p>
 
 Tile38 is an open source (MIT licensed), in-memory geolocation data store, spatial index, and realtime geofence. It supports a variety of object types including lat/lon points, bounding boxes, XYZ tiles, Geohashes, and GeoJSON. 
@@ -26,7 +26,7 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 - Spatial index with [search](#searching) methods such as Nearby, Within, and Intersects.
 - Realtime [geofencing](#geofencing) through persistent sockets or [webhooks](http://tile38.com/commands/sethook).
 - Object types of [lat/lon](#latlon-point), [bbox](#bounding-box), [Geohash](#geohash), [GeoJSON](#geojson), [QuadKey](#quadkey), and [XYZ tile](#xyz-tile).
-- Support for lots of [Clients Libraries](#client-libraries) written in many different langauges.
+- Support for lots of [Clients Libraries](#client-libraries) written in many different languages.
 - Variety of protocols, including [http](#http) (curl), [websockets](#websockets), [telnet](#telnet), and the [Redis RESP](http://redis.io/topics/protocol).
 - Server responses are [RESP](http://redis.io/topics/protocol) or [JSON](http://www.json.org).
 - Full [command line interface](#cli).
@@ -203,7 +203,7 @@ The `detect` may be one of the following values.
 All object types except for XYZ Tiles and QuadKeys can be stored in a collection. XYZ Tiles and QuadKeys are reserved for the SEARCH keyword only.
 
 #### Lat/lon point
-The most basic object type is a point that is composed of a latitude and a longitude. There is an optional `z` member that may be used for auxilary data such as elevation or a timestamp.
+The most basic object type is a point that is composed of a latitude and a longitude. There is an optional `z` member that may be used for auxiliary data such as elevation or a timestamp.
 ```
 set fleet truck1 point 33.5123 -112.2693     # plain lat/lon
 set fleet truck1 point 33.5123 -112.2693 225 # lat/lon with z member

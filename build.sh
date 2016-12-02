@@ -154,7 +154,8 @@ if [ "$1" == "test" ]; then
 		kill $PID &
 	}
 	trap testend EXIT
-	go test $(go list ./... | grep -v /vendor/)
+	cd tests && go test && cd ..
+	go test $(go list ./... | grep -v /vendor/ | grep -v /tests)
 fi
 
 # cover if requested

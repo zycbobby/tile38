@@ -839,19 +839,20 @@ func (c *Controller) cmdPersist(msg *server.Message) (res string, d commandDetai
 		err = errInvalidNumberOfArguments
 		return
 	}
+	var bit int
 	ok = false
 	col := c.getCol(key)
 	if col != nil {
 		_, _, ok = col.Get(id)
 		if ok {
-			c.clearIDExpires(key, id)
+			bit = c.clearIDExpires(key, id)
 		}
 	}
 	switch msg.OutputType {
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
 	case server.RESP:
-		if ok {
+		if ok && bit == 1 {
 			res = ":1\r\n"
 		} else {
 			res = ":0\r\n"
@@ -900,7 +901,7 @@ func (c *Controller) cmdTTL(msg *server.Message) (res string, d commandDetailsT,
 	case server.RESP:
 		if ok {
 			if ok2 {
-				res = ":" + strconv.FormatFloat(v, 'f', 0, 64) + "\r\n"
+				res = ":" + strconv.FormatInt(int64(v), 10) + "\r\n"
 			} else {
 				res = ":-1\r\n"
 			}

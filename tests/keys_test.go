@@ -164,20 +164,21 @@ func keys_SET_test(mc *mockServer) error {
 		},
 	)
 }
+
 func keys_STATS_test(mc *mockServer) error {
 	return mc.DoBatch([][]interface{}{
 		{"STATS", "mykey"}, {"[nil]"},
 		{"SET", "mykey", "myid", "STRING", "value"}, {"OK"},
-		{"STATS", "mykey"}, {"[[in_memory_size 9 num_objects 1 num_points 0]]"},
+		{"STATS", "mykey"}, {"[[in_memory_size 9 num_objects 1 num_points 0 num_strings 1]]"},
 		{"SET", "mykey", "myid2", "STRING", "value"}, {"OK"},
-		{"STATS", "mykey"}, {"[[in_memory_size 19 num_objects 2 num_points 0]]"},
+		{"STATS", "mykey"}, {"[[in_memory_size 19 num_objects 2 num_points 0 num_strings 2]]"},
 		{"SET", "mykey", "myid3", "OBJECT", `{"type":"Point","coordinates":[-115,33]}`}, {"OK"},
-		{"STATS", "mykey"}, {"[[in_memory_size 40 num_objects 3 num_points 1]]"},
+		{"STATS", "mykey"}, {"[[in_memory_size 40 num_objects 3 num_points 1 num_strings 2]]"},
 		{"DEL", "mykey", "myid"}, {1},
-		{"STATS", "mykey"}, {"[[in_memory_size 31 num_objects 2 num_points 1]]"},
+		{"STATS", "mykey"}, {"[[in_memory_size 31 num_objects 2 num_points 1 num_strings 1]]"},
 		{"DEL", "mykey", "myid3"}, {1},
-		{"STATS", "mykey"}, {"[[in_memory_size 10 num_objects 1 num_points 0]]"},
-		{"STATS", "mykey", "mykey2"}, {"[[in_memory_size 10 num_objects 1 num_points 0] nil]"},
+		{"STATS", "mykey"}, {"[[in_memory_size 10 num_objects 1 num_points 0 num_strings 1]]"},
+		{"STATS", "mykey", "mykey2"}, {"[[in_memory_size 10 num_objects 1 num_points 0 num_strings 1] nil]"},
 		{"DEL", "mykey", "myid2"}, {1},
 		{"STATS", "mykey"}, {"[nil]"},
 		{"STATS", "mykey", "mykey2"}, {"[nil nil]"},

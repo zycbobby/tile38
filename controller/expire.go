@@ -14,15 +14,16 @@ func (c *Controller) clearAllExpires() {
 }
 
 // clearIDExpires will clear a single item from the expires list.
-func (c *Controller) clearIDExpires(key, id string) {
+func (c *Controller) clearIDExpires(key, id string) int {
 	m := c.expires[key]
 	if m == nil {
-		return
+		return 0
 	}
 	delete(m, id)
 	if len(m) == 0 {
 		delete(c.expires, key)
 	}
+	return 1
 }
 
 // clearKeyExpires will clear all items that are marked as expires from a single key.

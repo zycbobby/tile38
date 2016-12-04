@@ -40,14 +40,6 @@ func TestAll(t *testing.T) {
 	}
 	defer mc.Close()
 	runSubTest(t, "keys", mc, subTestKeys)
-	/*
-		runSubTest(t, "keys", mc, subTestKeys)
-		runSubTest(t, "json", mc, subTestJSON)
-		runSubTest(t, "indexes", mc, subTestIndexes)
-		runSubTest(t, "transactions", mc, subTestTransactions)
-		runSubTest(t, "scripts", mc, subTestScripts)
-		runSubTest(t, "raft", mc, subTestRaft)
-	*/
 }
 
 func runSubTest(t *testing.T, name string, mc *mockServer, test func(t *testing.T, mc *mockServer)) {

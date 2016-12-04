@@ -14,6 +14,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/tidwall/tile38/controller"
 	tlog "github.com/tidwall/tile38/controller/log"
+	"github.com/tidwall/tile38/core"
 )
 
 var errTimeout = errors.New("timeout")
@@ -46,6 +47,7 @@ func mockOpenServer() (*mockServer, error) {
 	if os.Getenv("PRINTLOG") == "1" {
 		logOutput = os.Stderr
 	}
+	core.DevMode = true
 	s := &mockServer{port: port}
 	tlog.Default = tlog.New(logOutput, nil)
 	go func() {

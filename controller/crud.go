@@ -670,12 +670,15 @@ func (c *Controller) cmdSet(msg *server.Message) (res string, d commandDetailsT,
 	d.oldObj, d.oldFields, d.fields = col.ReplaceOrInsert(d.id, d.obj, fields, values)
 	d.command = "set"
 	d.updated = true // perhaps we should do a diff on the previous object?
-	fmap = col.FieldMap()
-	d.fmap = make(map[string]int)
-	for key, idx := range fmap {
-		d.fmap[key] = idx
-	}
 	d.timestamp = time.Now()
+	if msg.ConnType != server.Null || msg.OutputType != server.Null {
+		// likely loaded from aof at server startup, ignore field remapping.
+		fmap = col.FieldMap()
+		d.fmap = make(map[string]int)
+		for key, idx := range fmap {
+			d.fmap[key] = idx
+		}
+	}
 	if ex != nil {
 		c.expireAt(d.key, d.id, d.timestamp.Add(time.Duration(float64(time.Second)*(*ex))))
 	}

@@ -93,7 +93,10 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 
 	cmsg := &server.Message{}
 	*cmsg = *msg
-	cmsg.Values = commandvs
+	cmsg.Values = make([]resp.Value, len(commandvs))
+	for i := 0; i < len(commandvs); i++ {
+		cmsg.Values[i] = commandvs[i]
+	}
 	cmsg.Command = strings.ToLower(cmsg.Values[0].String())
 
 	hook := &Hook{

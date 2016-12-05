@@ -72,6 +72,7 @@ type Controller struct {
 	lcond     *sync.Cond
 	fcup      bool                        // follow caught up
 	shrinking bool                        // aof shrinking flag
+	shrinklog [][]string                  // aof shrinking log
 	hooks     map[string]*Hook            // hook name
 	hookcols  map[string]map[string]*Hook // col key
 	aofconnM  map[net.Conn]bool
@@ -416,8 +417,15 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		// this is local connection operation. Locks not needed.
 	case "massinsert":
 		// dev operation
-		// ** danger zone **
-		// no locks! DEV MODE ONLY
+		c.mu.Lock()
+		defer c.mu.Unlock()
+	case "shutdown":
+		// dev operation
+		c.mu.Lock()
+		defer c.mu.Unlock()
+	case "aofshrink":
+		c.mu.RLock()
+		defer c.mu.RUnlock()
 	}
 
 	res, d, err := c.command(msg, w)
@@ -489,6 +497,12 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, d, err = c.cmdTTL(msg)
 	case "hooks":
 		res, err = c.cmdHooks(msg)
+	case "shutdown":
+		if !core.DevMode {
+			err = fmt.Errorf("unknown command '%s'", msg.Values[0])
+			return
+		}
+		log.Fatal("shutdown requested by developer")
 	case "massinsert":
 		if !core.DevMode {
 			err = fmt.Errorf("unknown command '%s'", msg.Values[0])

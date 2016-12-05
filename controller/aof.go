@@ -173,6 +173,13 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 			}
 		}
 	}
+	if c.shrinking {
+		var values []string
+		for _, value := range value.Array() {
+			values = append(values, value.String())
+		}
+		c.shrinklog = append(c.shrinklog, values)
+	}
 	data, err := value.MarshalRESP()
 	if err != nil {
 		return err

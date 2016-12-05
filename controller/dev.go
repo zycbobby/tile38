@@ -2,10 +2,10 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -79,14 +79,12 @@ func (c *Controller) cmdMassInsert(msg *server.Message) (res string, err error) 
 		return "", errInvalidArgument(snumPoints)
 	}
 	docmd := func(values []resp.Value) error {
-		c.mu.Lock()
-		defer c.mu.Unlock()
 		nmsg := &server.Message{}
 		*nmsg = *msg
 		nmsg.Values = values
 		nmsg.Command = strings.ToLower(values[0].String())
-
-		_, d, err := c.command(nmsg, nil)
+		var d commandDetailsT
+		_, d, err = c.command(nmsg, nil)
 		if err != nil {
 			return err
 		}
@@ -97,37 +95,38 @@ func (c *Controller) cmdMassInsert(msg *server.Message) (res string, err error) 
 	}
 	rand.Seed(time.Now().UnixNano())
 	objs = int(n)
-	var wg sync.WaitGroup
 	var k uint64
-	wg.Add(cols)
 	for i := 0; i < cols; i++ {
 		key := "mi:" + strconv.FormatInt(int64(i), 10)
-		go func(key string) {
-			defer func() {
-				wg.Done()
-			}()
-
+		func(key string) {
+			// lock cycle
 			for j := 0; j < objs; j++ {
 				id := strconv.FormatInt(int64(j), 10)
-				lat, lon := randMassInsertPosition(minLat, minLon, maxLat, maxLon)
-				values := make([]resp.Value, 0, 16)
-				values = append(values, resp.StringValue("set"), resp.StringValue(key), resp.StringValue(id))
-				if useRandField {
-					values = append(values, resp.StringValue("FIELD"), resp.StringValue("field"), resp.FloatValue(rand.Float64()*10))
+				var values []resp.Value
+				if j%8 == 0 {
+					lat, lon := randMassInsertPosition(minLat, minLon, maxLat, maxLon)
+					values = make([]resp.Value, 0, 16)
+					values = append(values, resp.StringValue("set"), resp.StringValue(key), resp.StringValue(id))
+					if useRandField {
+						values = append(values, resp.StringValue("FIELD"), resp.StringValue("fname"), resp.FloatValue(rand.Float64()*10))
+					}
+					values = append(values, resp.StringValue("POINT"), resp.FloatValue(lat), resp.FloatValue(lon))
+				} else {
+					values = append(values, resp.StringValue("set"),
+						resp.StringValue(key), resp.StringValue(id),
+						resp.StringValue("STRING"), resp.StringValue(fmt.Sprintf("str%v", j)))
 				}
-				values = append(values, resp.StringValue("POINT"), resp.FloatValue(lat), resp.FloatValue(lon))
 				if err := docmd(values); err != nil {
 					log.Fatal(err)
 					return
 				}
 				atomic.AddUint64(&k, 1)
-				if j%10000 == 10000-1 {
+				if j%1000 == 1000-1 {
 					log.Infof("massinsert: %s %d/%d", key, atomic.LoadUint64(&k), cols*objs)
 				}
 			}
 		}(key)
 	}
-	wg.Wait()
 	log.Infof("massinsert: done %d objects", atomic.LoadUint64(&k))
 	return server.OKMessage(msg, start), nil
 }

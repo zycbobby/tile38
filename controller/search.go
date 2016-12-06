@@ -22,6 +22,7 @@ type liveFenceSwitches struct {
 	maxLat, maxLon   float64
 	cmd              string
 	roam             roamSwitches
+	groups           map[string]string
 }
 
 type roamSwitches struct {

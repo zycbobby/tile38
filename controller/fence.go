@@ -127,25 +127,46 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 	}
 	sw.mu.Unlock()
 
+	if fence.groups == nil {
+		fence.groups = make(map[string]string)
+	}
+	groupkey := details.key + ":" + details.id
+	var group string
+	var ok bool
+	if detect == "enter" {
+		group = bsonID()
+		fence.groups[groupkey] = group
+	} else if detect == "cross" {
+		group = bsonID()
+		delete(fence.groups, groupkey)
+	} else {
+		group, ok = fence.groups[groupkey]
+		if !ok {
+			group = bsonID()
+			fence.groups[groupkey] = group
+		}
+	}
+
 	jskey := jsonString(details.key)
 
 	ores := res
 	msgs := make([]string, 0, 2)
 	if fence.detect == nil || fence.detect[detect] {
 		if strings.HasPrefix(ores, "{") {
-			res = `{"command":"` + details.command + `","detect":"` + detect + `","hook":` + jshookName + `,"key":` + jskey + `,"time":` + jstime + `,` + ores[1:]
+			res = `{"command":"` + details.command + `","group":"` + group + `","detect":"` + detect + `","hook":` + jshookName + `,"key":` + jskey + `,"time":` + jstime + `,` + ores[1:]
 		}
 		msgs = append(msgs, res)
 	}
 	switch detect {
 	case "enter":
 		if fence.detect == nil || fence.detect["inside"] {
-			msgs = append(msgs, `{"command":"`+details.command+`","detect":"inside","hook":`+jshookName+`,"key":`+jskey+`,"time":`+jstime+`,`+ores[1:])
+			msgs = append(msgs, `{"command":"`+details.command+`","group":"`+group+`","detect":"inside","hook":`+jshookName+`,"key":`+jskey+`,"time":`+jstime+`,`+ores[1:])
 		}
 	case "exit", "cross":
 		if fence.detect == nil || fence.detect["outside"] {
-			msgs = append(msgs, `{"command":"`+details.command+`","detect":"outside","hook":`+jshookName+`,"key":`+jskey+`,"time":`+jstime+`,`+ores[1:])
+			msgs = append(msgs, `{"command":"`+details.command+`","group":"`+group+`","detect":"outside","hook":`+jshookName+`,"key":`+jskey+`,"time":`+jstime+`,`+ores[1:])
 		}
+
 	case "roam":
 		if len(msgs) > 0 {
 			var nmsgs []string

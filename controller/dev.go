@@ -104,6 +104,10 @@ func (c *Controller) cmdMassInsert(msg *server.Message) (res string, err error) 
 				id := strconv.FormatInt(int64(j), 10)
 				var values []resp.Value
 				if j%8 == 0 {
+					values = append(values, resp.StringValue("set"),
+						resp.StringValue(key), resp.StringValue(id),
+						resp.StringValue("STRING"), resp.StringValue(fmt.Sprintf("str%v", j)))
+				} else {
 					lat, lon := randMassInsertPosition(minLat, minLon, maxLat, maxLon)
 					values = make([]resp.Value, 0, 16)
 					values = append(values, resp.StringValue("set"), resp.StringValue(key), resp.StringValue(id))
@@ -111,10 +115,6 @@ func (c *Controller) cmdMassInsert(msg *server.Message) (res string, err error) 
 						values = append(values, resp.StringValue("FIELD"), resp.StringValue("fname"), resp.FloatValue(rand.Float64()*10))
 					}
 					values = append(values, resp.StringValue("POINT"), resp.FloatValue(lat), resp.FloatValue(lon))
-				} else {
-					values = append(values, resp.StringValue("set"),
-						resp.StringValue(key), resp.StringValue(id),
-						resp.StringValue("STRING"), resp.StringValue(fmt.Sprintf("str%v", j)))
 				}
 				if err := docmd(values); err != nil {
 					log.Fatal(err)

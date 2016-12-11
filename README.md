@@ -5,12 +5,10 @@
 </p>
 <p align="center">
 <a href="https://travis-ci.org/tidwall/tile38"><img src="https://travis-ci.org/tidwall/tile38.svg?branch=master" alt="Build Status"></a>
-<a href="https://github.com/tidwall/tile38/releases"><img src="https://img.shields.io/badge/version-1.5.4-green.svg" alt="Version"></a>
+<a href="https://github.com/tidwall/tile38/releases"><img src="https://img.shields.io/badge/version-1.6.0-green.svg" alt="Version"></a>
 </p>
 
 Tile38 is an open source (MIT licensed), in-memory geolocation data store, spatial index, and realtime geofence. It supports a variety of object types including lat/lon points, bounding boxes, XYZ tiles, Geohashes, and GeoJSON. 
-
-
 
 <p align="center">
 <i>This README is quick start document. You can find detailed documentation at <a href="http://tile38.com">http://tile38.com</a>.</i><br><br>

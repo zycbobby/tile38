@@ -36,6 +36,7 @@ func TestRandomData(t *testing.T) {
 		}
 		lstr = string(b[:n])
 		GetBytes([]byte(lstr), "zzzz")
+		Parse(lstr)
 	}
 }
 
@@ -104,19 +105,22 @@ var basicJSON = `{"age":100, "name":{"here":"B\\\"R"},
 	"loggy":{
 		"programmers": [
     	    {
-    	        "firstName": "Brett", 
-    	        "lastName": "McLaughlin", 
-    	        "email": "aaaa"
-    	    }, 
+    	        "firstName": "Brett",
+    	        "lastName": "McLaughlin",
+    	        "email": "aaaa",
+				"tag": "good"
+    	    },
     	    {
-    	        "firstName": "Jason", 
-    	        "lastName": "Hunter", 
-    	        "email": "bbbb"
-    	    }, 
+    	        "firstName": "Jason",
+    	        "lastName": "Hunter",
+    	        "email": "bbbb",
+				"tag": "bad"
+    	    },
     	    {
-    	        "firstName": "Elliotte", 
-    	        "lastName": "Harold", 
-    	        "email": "cccc"
+    	        "firstName": "Elliotte",
+    	        "lastName": "Harold",
+    	        "email": "cccc",
+				"tag":, "good"
     	    },
 			{
 				"firstName": 1002.3,
@@ -151,12 +155,63 @@ func get(json, path string) Result {
 
 func TestBasic(t *testing.T) {
 	var mtok Result
-
-	mtok = get(basicJSON, `loggy.programmers.#[age=101].firstName`)
-	if mtok.String() != "1002.3" {
-		t.Fatalf("expected %v, got %v", "1002,3", mtok.String())
+	mtok = get(basicJSON, `loggy.programmers.#[tag="good"].firstName`)
+	if mtok.String() != "Brett" {
+		t.Fatalf("expected %v, got %v", "Brett", mtok.String())
+	}
+	mtok = get(basicJSON, `loggy.programmers.#[tag="good"]#.firstName`)
+	if mtok.String() != `["Brett","Elliotte"]` {
+		t.Fatalf("expected %v, got %v", `["Brett","Elliotte"]`, mtok.String())
 	}
 
+	mtok = get(basicJSON, `loggy.programmers`)
+	var count int
+	mtok.ForEach(func(key, value Result) bool {
+		if key.Exists() {
+			t.Fatalf("expected %v, got %v", false, key.Exists())
+		}
+		count++
+		if count == 3 {
+			return false
+		}
+		if count == 1 {
+			i := 0
+			value.ForEach(func(key, value Result) bool {
+				switch i {
+				case 0:
+					if key.String() != "firstName" || value.String() != "Brett" {
+						t.Fatalf("expected %v/%v got %v/%v", "firstName", "Brett", key.String(), value.String())
+					}
+				case 1:
+					if key.String() != "lastName" || value.String() != "McLaughlin" {
+						t.Fatalf("expected %v/%v got %v/%v", "lastName", "McLaughlin", key.String(), value.String())
+					}
+				case 2:
+					if key.String() != "email" || value.String() != "aaaa" {
+						t.Fatalf("expected %v/%v got %v/%v", "email", "aaaa", key.String(), value.String())
+					}
+				}
+				i++
+				return true
+			})
+		}
+		return true
+	})
+	if count != 3 {
+		t.Fatalf("expected %v, got %v", 3, count)
+	}
+	mtok = get(basicJSON, `loggy.programmers.#[age=101].firstName`)
+	if mtok.String() != "1002.3" {
+		t.Fatalf("expected %v, got %v", "1002.3", mtok.String())
+	}
+	mtok = get(basicJSON, `loggy.programmers.#[firstName != "Brett"].firstName`)
+	if mtok.String() != "Jason" {
+		t.Fatalf("expected %v, got %v", "Jason", mtok.String())
+	}
+	mtok = get(basicJSON, `loggy.programmers.#[firstName % "Bre*"].email`)
+	if mtok.String() != "aaaa" {
+		t.Fatalf("expected %v, got %v", "aaaa", mtok.String())
+	}
 	mtok = get(basicJSON, `loggy.programmers.#[firstName == "Brett"].email`)
 	if mtok.String() != "aaaa" {
 		t.Fatalf("expected %v, got %v", "aaaa", mtok.String())
@@ -444,6 +499,119 @@ func TestUnmarshalMap(t *testing.T) {
 	}
 }
 
+func TestSingleArrayValue(t *testing.T) {
+	var json = `{"key": "value","key2":[1,2,3,4,"A"]}`
+	var result = Get(json, "key")
+	var array = result.Array()
+	if len(array) != 1 {
+		t.Fatal("array is empty")
+	}
+	if array[0].String() != "value" {
+		t.Fatal("got %s, should be %s", array[0].String(), "value")
+	}
+
+	array = Get(json, "key2.#").Array()
+	if len(array) != 1 {
+		t.Fatal("got '%v', expected '%v'", len(array), 1)
+	}
+
+	array = Get(json, "key3").Array()
+	if len(array) != 0 {
+		t.Fatal("got '%v', expected '%v'", len(array), 0)
+	}
+
+}
+
+var manyJSON = `  {
+	"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{
+	"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{
+	"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{
+	"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{
+	"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{
+	"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{
+	"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"hello":"world"
+	}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
+	"position":{"type":"Point","coordinates":[-115.24,33.09]},
+	"loves":["world peace"],
+	"name":{"last":"Anderson","first":"Nancy"},
+	"age":31
+	"":{"a":"emptya","b":"emptyb"},
+	"name.last":"Yellow",
+	"name.first":"Cat",
+}`
+
+func combine(results []Result) string {
+	return fmt.Sprintf("%v", results)
+}
+func TestManyBasic(t *testing.T) {
+	testWatchForFallback = true
+	defer func() {
+		testWatchForFallback = false
+	}()
+	testMany := func(shouldFallback bool, expect string, paths ...string) {
+		results := GetMany(
+			manyJSON,
+			paths...,
+		)
+		if len(results) != len(paths) {
+			t.Fatalf("expected %v, got %v", len(paths), len(results))
+		}
+		if fmt.Sprintf("%v", results) != expect {
+			t.Fatalf("expected %v, got %v", expect, results)
+		}
+		return
+		if testLastWasFallback != shouldFallback {
+			t.Fatalf("expected %v, got %v", shouldFallback, testLastWasFallback)
+		}
+	}
+	testMany(false, "[Point]", "position.type")
+	testMany(false, `[emptya ["world peace"] 31]`, ".a", "loves", "age")
+	testMany(false, `[["world peace"]]`, "loves")
+	testMany(false, `[{"last":"Anderson","first":"Nancy"} Nancy]`, "name", "name.first")
+	testMany(true, `[null]`, strings.Repeat("a.", 40)+"hello")
+	res := Get(manyJSON, strings.Repeat("a.", 48)+"a")
+	testMany(true, `[`+res.String()+`]`, strings.Repeat("a.", 48)+"a")
+	// these should fallback
+	testMany(true, `[Cat Nancy]`, "name\\.first", "name.first")
+	testMany(true, `[world]`, strings.Repeat("a.", 70)+"hello")
+}
+
+func TestRandomMany(t *testing.T) {
+	var lstr string
+	defer func() {
+		if v := recover(); v != nil {
+			println("'" + hex.EncodeToString([]byte(lstr)) + "'")
+			println("'" + lstr + "'")
+			panic(v)
+		}
+	}()
+	rand.Seed(time.Now().UnixNano())
+	b := make([]byte, 512)
+	for i := 0; i < 50000; i++ {
+		n, err := rand.Read(b[:rand.Int()%len(b)])
+		if err != nil {
+			t.Fatal(err)
+		}
+		lstr = string(b[:n])
+		paths := make([]string, rand.Int()%64)
+		for i := range paths {
+			var b []byte
+			n := rand.Int() % 5
+			for j := 0; j < n; j++ {
+				if j > 0 {
+					b = append(b, '.')
+				}
+				nn := rand.Int() % 10
+				for k := 0; k < nn; k++ {
+					b = append(b, 'a'+byte(rand.Int()%26))
+				}
+			}
+			paths[i] = string(b)
+		}
+		GetMany(lstr, paths...)
+	}
+}
+
 type BenchStruct struct {
 	Widget struct {
 		Window struct {
@@ -464,6 +632,19 @@ var benchPaths = []string{
 	"widget.text.onMouseUp",
 }
 
+var benchManyPaths = []string{
+	"widget.window.name",
+	"widget.image.hOffset",
+	"widget.text.onMouseUp",
+	"widget.window.title",
+	"widget.image.alignment",
+	"widget.text.style",
+	"widget.window.height",
+	"widget.image.src",
+	"widget.text.data",
+	"widget.text.size",
+}
+
 func BenchmarkGJSONGet(t *testing.B) {
 	t.ReportAllocs()
 	t.ResetTimer()
@@ -475,6 +656,51 @@ func BenchmarkGJSONGet(t *testing.B) {
 		}
 	}
 	t.N *= len(benchPaths) // because we are running against 3 paths
+}
+func BenchmarkGJSONGetMany4Paths(t *testing.B) {
+	benchmarkGJSONGetManyN(t, 4)
+}
+func BenchmarkGJSONGetMany8Paths(t *testing.B) {
+	benchmarkGJSONGetManyN(t, 8)
+}
+func BenchmarkGJSONGetMany16Paths(t *testing.B) {
+	benchmarkGJSONGetManyN(t, 16)
+}
+func BenchmarkGJSONGetMany32Paths(t *testing.B) {
+	benchmarkGJSONGetManyN(t, 32)
+}
+func BenchmarkGJSONGetMany64Paths(t *testing.B) {
+	benchmarkGJSONGetManyN(t, 64)
+}
+func BenchmarkGJSONGetMany128Paths(t *testing.B) {
+	benchmarkGJSONGetManyN(t, 128)
+}
+func BenchmarkGJSONGetMany256Paths(t *testing.B) {
+	benchmarkGJSONGetManyN(t, 256)
+}
+func BenchmarkGJSONGetMany512Paths(t *testing.B) {
+	benchmarkGJSONGetManyN(t, 512)
+}
+func benchmarkGJSONGetManyN(t *testing.B, n int) {
+	var paths []string
+	for len(paths) < n {
+		paths = append(paths, benchManyPaths...)
+	}
+	paths = paths[:n]
+	t.ReportAllocs()
+	t.ResetTimer()
+	for i := 0; i < t.N; i++ {
+		results := GetMany(exampleJSON, paths...)
+		if len(results) == 0 {
+			t.Fatal("did not find the value")
+		}
+		for j := 0; j < len(results); j++ {
+			if results[j].Type == Null {
+				t.Fatal("did not find the value")
+			}
+		}
+	}
+	t.N *= len(paths) // because we are running against 3 paths
 }
 
 func BenchmarkGJSONUnmarshalMap(t *testing.B) {

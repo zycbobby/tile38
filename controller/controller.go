@@ -390,7 +390,8 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 	default:
 		c.mu.RLock()
 		defer c.mu.RUnlock()
-	case "set", "del", "drop", "fset", "flushdb", "sethook", "pdelhook", "delhook", "expire", "persist":
+	case "set", "del", "drop", "fset", "flushdb", "sethook", "pdelhook", "delhook",
+		"expire", "persist", "jset":
 		// write operations
 		write = true
 		c.mu.Lock()
@@ -401,7 +402,8 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		if c.config.ReadOnly {
 			return writeErr(errors.New("read only"))
 		}
-	case "get", "keys", "scan", "nearby", "within", "intersects", "hooks", "search", "ttl", "bounds", "server", "info", "type":
+	case "get", "keys", "scan", "nearby", "within", "intersects", "hooks", "search",
+		"ttl", "bounds", "server", "info", "type", "jget":
 		// read operations
 		c.mu.RLock()
 		defer c.mu.RUnlock()
@@ -533,6 +535,12 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, err = c.cmdBounds(msg)
 	case "get":
 		res, err = c.cmdGet(msg)
+	case "jget":
+		res, err = c.cmdJget(msg)
+	case "jset":
+		res, d, err = c.cmdJset(msg)
+	case "jdel":
+		res, d, err = c.cmdJdel(msg)
 	case "type":
 		res, err = c.cmdType(msg)
 	case "keys":

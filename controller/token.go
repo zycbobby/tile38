@@ -16,6 +16,7 @@ var errInvalidNumberOfArguments = errors.New("invalid number of arguments")
 var errKeyNotFound = errors.New("key not found")
 var errIDNotFound = errors.New("id not found")
 var errIDAlreadyExists = errors.New("id already exists")
+var errPathNotFound = errors.New("path not found")
 
 func errInvalidArgument(arg string) error {
 	return fmt.Errorf("invalid argument '%s'", arg)

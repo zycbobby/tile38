@@ -178,8 +178,15 @@ func (c *Controller) cmdJset(msg *server.Message) (res string, d commandDetailsT
 	if createcol {
 		c.setCol(key, col)
 	}
+
+	d.key = key
+	d.id = id
+	d.obj = geojson.String(json)
+	d.timestamp = time.Now()
+	d.updated = true
+
 	c.clearIDExpires(key, id)
-	col.ReplaceOrInsert(id, geojson.String(json), nil, nil)
+	col.ReplaceOrInsert(d.id, d.obj, nil, nil)
 	switch msg.OutputType {
 	case server.JSON:
 		var buf bytes.Buffer
@@ -244,8 +251,15 @@ func (c *Controller) cmdJdel(msg *server.Message) (res string, d commandDetailsT
 		// SET key id OBJECT json
 		return c.cmdSet(&nmsg)
 	}
-	c.clearIDExpires(key, id)
-	col.ReplaceOrInsert(id, geojson.String(json), nil, nil)
+
+	d.key = key
+	d.id = id
+	d.obj = geojson.String(json)
+	d.timestamp = time.Now()
+	d.updated = true
+
+	c.clearIDExpires(d.key, d.id)
+	col.ReplaceOrInsert(d.id, d.obj, nil, nil)
 	switch msg.OutputType {
 	case server.JSON:
 		var buf bytes.Buffer

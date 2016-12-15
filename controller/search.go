@@ -31,6 +31,7 @@ type roamSwitches struct {
 	id      string
 	pattern bool
 	meters  float64
+	scan    string
 }
 
 func (s liveFenceSwitches) Error() string {
@@ -241,6 +242,19 @@ func (c *Controller) cmdSearchArgs(cmd string, vs []resp.Value, types []string) 
 		if s.roam.meters, err = strconv.ParseFloat(smeters, 64); err != nil {
 			err = errInvalidArgument(smeters)
 			return
+		}
+
+		var scan string
+		if vs, scan, ok = tokenval(vs); ok {
+			if strings.ToLower(scan) != "scan" {
+				err = errInvalidArgument(scan)
+				return
+			}
+			if vs, scan, ok = tokenval(vs); !ok || scan == "" {
+				err = errInvalidNumberOfArguments
+				return
+			}
+			s.roam.scan = scan
 		}
 	}
 	if len(vs) != 0 {

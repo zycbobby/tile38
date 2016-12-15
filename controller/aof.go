@@ -207,7 +207,7 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 
 func (c *Controller) queueHooks(d *commandDetailsT) error {
 	// big list of all of the messages
-	var hmsgs []string
+	var hmsgs [][]byte
 	var hooks []*Hook
 	// find the hook by the key
 	if hm, ok := c.hookcols[d.key]; ok {
@@ -230,7 +230,7 @@ func (c *Controller) queueHooks(d *commandDetailsT) error {
 		for _, msg := range hmsgs {
 			c.qidx++ // increment the log id
 			key := hookLogPrefix + uint64ToString(c.qidx)
-			_, _, err := tx.Set(key, msg, hookLogSetDefaults())
+			_, _, err := tx.Set(key, string(msg), hookLogSetDefaults())
 			if err != nil {
 				return err
 			}

@@ -3,7 +3,6 @@ package controller
 import (
 	"math"
 	"strconv"
-	"strings"
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/tile38/controller/glob"
@@ -14,26 +13,26 @@ import (
 var tmfmt = "2006-01-02T15:04:05.999999999Z07:00"
 
 // FenceMatch executes a fence match returns back json messages for fence detection.
-func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) []string {
+func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) [][]byte {
 	msgs := fenceMatch(hookName, sw, fence, details)
 	if len(fence.accept) == 0 {
 		return msgs
 	}
-	nmsgs := make([]string, 0, len(msgs))
+	nmsgs := make([][]byte, 0, len(msgs))
 	for _, msg := range msgs {
-		if fence.accept[gjson.Get(msg, "command").String()] {
+		if fence.accept[gjson.GetBytes(msg, "command").String()] {
 			nmsgs = append(nmsgs, msg)
 		}
 	}
 	return nmsgs
 }
 
-func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) []string {
+func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) [][]byte {
 	jshookName := jsonString(hookName)
 	jstime := jsonString(details.timestamp.Format(tmfmt))
 	pattern := fence.glob
 	if details.command == "drop" {
-		return []string{`{"command":"drop","hook":` + jshookName + `,"time":` + jstime + `}`}
+		return [][]byte{[]byte(`{"command":"drop","hook":` + jshookName + `,"time":` + jstime + `}`)}
 	}
 	match := true
 	if pattern != "" && pattern != "*" {
@@ -114,7 +113,7 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 		}
 	}
 	if details.command == "del" {
-		return []string{`{"command":"del","hook":` + jshookName + `,"id":` + jsonString(details.id) + `,"time":` + jstime + `}`}
+		return [][]byte{[]byte(`{"command":"del","hook":` + jshookName + `,"id":` + jsonString(details.id) + `,"time":` + jstime + `}`)}
 	}
 	if details.fmap == nil {
 		return nil
@@ -129,16 +128,14 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 		return nil
 	}
 
-	res := sw.wr.String()
-	resb := make([]byte, len(res))
-	copy(resb, res)
+	res := make([]byte, sw.wr.Len())
+	copy(res, sw.wr.Bytes())
 	sw.wr.Reset()
-	res = string(resb)
-	if strings.HasPrefix(res, ",") {
+	if len(res) > 0 && res[0] == ',' {
 		res = res[1:]
 	}
 	if sw.output == outputIDs {
-		res = `{"id":` + res + `}`
+		res = []byte(`{"id":` + string(res) + `}`)
 	}
 	sw.mu.Unlock()
 
@@ -164,35 +161,89 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 
 	jskey := jsonString(details.key)
 
-	ores := res
-	msgs := make([]string, 0, 4)
+	msgs := make([][]byte, 0, 4)
 	if fence.detect == nil || fence.detect[detect] {
-		if strings.HasPrefix(ores, "{") {
-			res = `{"command":"` + details.command + `","group":"` + group + `","detect":"` + detect + `","hook":` + jshookName + `,"key":` + jskey + `,"time":` + jstime + `,` + ores[1:]
+		if len(res) > 0 && res[0] == '{' {
+			res = makemsg(details.command, group, detect, jshookName, jskey, jstime, res[1:])
 		}
 		msgs = append(msgs, res)
 	}
 	switch detect {
 	case "enter":
 		if fence.detect == nil || fence.detect["inside"] {
-			msgs = append(msgs, `{"command":"`+details.command+`","group":"`+group+`","detect":"inside","hook":`+jshookName+`,"key":`+jskey+`,"time":`+jstime+`,`+ores[1:])
+			msgs = append(msgs, makemsg(details.command, group, "inside", jshookName, jskey, jstime, res[1:]))
 		}
 	case "exit", "cross":
 		if fence.detect == nil || fence.detect["outside"] {
-			msgs = append(msgs, `{"command":"`+details.command+`","group":"`+group+`","detect":"outside","hook":`+jshookName+`,"key":`+jskey+`,"time":`+jstime+`,`+ores[1:])
+			msgs = append(msgs, makemsg(details.command, group, "outside", jshookName, jskey, jstime, res[1:]))
 		}
-
 	case "roam":
 		if len(msgs) > 0 {
-			var nmsgs []string
+			var nmsgs [][]byte
 			msg := msgs[0][:len(msgs[0])-1]
 			for i, id := range roamids {
-				nmsgs = append(nmsgs, msg+`,"nearby":{"key":`+jsonString(roamkeys[i])+`,"id":`+jsonString(id)+`,"meters":`+strconv.FormatFloat(roammeters[i], 'f', -1, 64)+`}}`)
+
+				nmsg := append([]byte(nil), msg...)
+				nmsg = append(nmsg, `,"nearby":{"key":`...)
+				nmsg = append(nmsg, jsonString(roamkeys[i])...)
+				nmsg = append(nmsg, `,"id":`...)
+				nmsg = append(nmsg, jsonString(id)...)
+				nmsg = append(nmsg, `,"meters":`...)
+				nmsg = append(nmsg, strconv.FormatFloat(roammeters[i], 'f', -1, 64)...)
+
+				if fence.roam.scan != "" {
+					nmsg = append(nmsg, `,"scan":[`...)
+
+					func() {
+						sw.c.mu.Lock()
+						defer sw.c.mu.Unlock()
+						col := sw.c.getCol(roamkeys[i])
+						if col != nil {
+							obj, _, ok := col.Get(id)
+							if ok {
+								nmsg = append(nmsg, `{"id":`+jsonString(id)+`,"self":true,"object":`+obj.JSON()+`}`...)
+							}
+							pattern := id + fence.roam.scan
+							iterator := func(oid string, o geojson.Object, fields []float64) bool {
+								if oid == id {
+									return true
+								}
+								if matched, _ := glob.Match(pattern, oid); matched {
+									nmsg = append(nmsg, `,{"id":`+jsonString(oid)+`,"object":`+o.JSON()+`}`...)
+								}
+								return true
+							}
+							g := glob.Parse(pattern, false)
+							if g.Limits[0] == "" && g.Limits[1] == "" {
+								col.Scan(0, false, iterator)
+							} else {
+								col.ScanRange(0, g.Limits[0], g.Limits[1], false, iterator)
+							}
+						}
+					}()
+					nmsg = append(nmsg, ']')
+				}
+
+				nmsg = append(nmsg, '}')
+				nmsg = append(nmsg, '}')
+				nmsgs = append(nmsgs, nmsg)
 			}
 			msgs = nmsgs
 		}
 	}
 	return msgs
+}
+
+func makemsg(command, group, detect, jshookName, jskey, jstime string, tail []byte) []byte {
+	var buf []byte
+	buf = append(append(buf, `{"command":"`...), command...)
+	buf = append(append(buf, `","group":"`...), group...)
+	buf = append(append(buf, `","detect":"`...), detect...)
+	buf = append(append(buf, `","hook":`...), jshookName...)
+	buf = append(append(buf, `,"key":`...), jskey...)
+	buf = append(append(buf, `,"time":`...), jstime...)
+	buf = append(append(buf, ','), tail...)
+	return buf
 }
 
 func fenceMatchObject(fence *liveFenceSwitches, obj geojson.Object) bool {

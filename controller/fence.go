@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
@@ -14,11 +15,25 @@ var tmfmt = "2006-01-02T15:04:05.999999999Z07:00"
 
 // FenceMatch executes a fence match returns back json messages for fence detection.
 func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) []string {
+	msgs := fenceMatch(hookName, sw, fence, details)
+	if len(fence.accept) == 0 {
+		return msgs
+	}
+	nmsgs := make([]string, 0, len(msgs))
+	for _, msg := range msgs {
+		if fence.accept[gjson.Get(msg, "command").String()] {
+			nmsgs = append(nmsgs, msg)
+		}
+	}
+	return nmsgs
+}
+
+func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) []string {
 	jshookName := jsonString(hookName)
 	jstime := jsonString(details.timestamp.Format(tmfmt))
 	pattern := fence.glob
 	if details.command == "drop" {
-		return []string{`{"cmd":"drop","hook":` + jshookName + `,"time":` + jstime + `}`}
+		return []string{`{"command":"drop","hook":` + jshookName + `,"time":` + jstime + `}`}
 	}
 	match := true
 	if pattern != "" && pattern != "*" {
@@ -150,7 +165,7 @@ func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 	jskey := jsonString(details.key)
 
 	ores := res
-	msgs := make([]string, 0, 2)
+	msgs := make([]string, 0, 4)
 	if fence.detect == nil || fence.detect[detect] {
 		if strings.HasPrefix(ores, "{") {
 			res = `{"command":"` + details.command + `","group":"` + group + `","detect":"` + detect + `","hook":` + jshookName + `,"key":` + jskey + `,"time":` + jstime + `,` + ores[1:]

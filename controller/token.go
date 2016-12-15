@@ -164,6 +164,7 @@ type searchScanBaseTokens struct {
 	lineout   string
 	fence     bool
 	detect    map[string]bool
+	accept    map[string]bool
 	glob      string
 	wheres    []whereT
 	nofields  bool
@@ -278,6 +279,30 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 					return
 				}
 				t.fence = true
+				continue
+			} else if (wtok[0] == 'C' || wtok[0] == 'c') && strings.ToLower(wtok) == "commands" {
+				vs = nvs
+				if t.accept != nil {
+					err = errDuplicateArgument(strings.ToUpper(wtok))
+					return
+				}
+				t.accept = make(map[string]bool)
+				var peek string
+				if vs, peek, ok = tokenval(vs); !ok || peek == "" {
+					err = errInvalidNumberOfArguments
+					return
+				}
+				for _, s := range strings.Split(peek, ",") {
+					part := strings.TrimSpace(strings.ToLower(s))
+					if t.accept[part] {
+						err = errDuplicateArgument(s)
+						return
+					}
+					t.accept[part] = true
+				}
+				if len(t.accept) == 0 {
+					t.accept = nil
+				}
 				continue
 			} else if (wtok[0] == 'D' || wtok[0] == 'd') && strings.ToLower(wtok) == "detect" {
 				vs = nvs

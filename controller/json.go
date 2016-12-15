@@ -86,7 +86,6 @@ func (c *Controller) cmdJget(msg *server.Message) (string, error) {
 	switch msg.OutputType {
 	case server.JSON:
 		if res.Exists() {
-			var val string
 			buf.WriteString(`,"value":` + jsonString(val))
 		}
 		buf.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -552,7 +553,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 	case "aofmd5":
 		res, err = c.cmdAOFMD5(msg)
 	case "gc":
-		go runtime.GC()
+		runtime.GC()
+		debug.FreeOSMemory()
 		res = server.OKMessage(msg, time.Now())
 	case "aofshrink":
 		go c.aofshrink()

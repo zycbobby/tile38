@@ -195,6 +195,7 @@ func (mc *mockServer) DoExpect(expect interface{}, commandName string, args ...i
 		}
 		return err
 	}
+	oresp := resp
 	resp = normalize(resp)
 	if expect == nil && resp != nil {
 		return fmt.Errorf("expected '%v', got '%v'", expect, resp)
@@ -224,6 +225,9 @@ func (mc *mockServer) DoExpect(expect interface{}, commandName string, args ...i
 		} else {
 			resp = string([]byte(b))
 		}
+	}
+	if fn, ok := expect.(func(v, org interface{}) (resp, expect interface{})); ok {
+		resp, expect = fn(resp, oresp)
 	}
 	if fn, ok := expect.(func(v interface{}) (resp, expect interface{})); ok {
 		resp, expect = fn(resp)

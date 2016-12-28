@@ -15,6 +15,19 @@ import (
 	"github.com/tidwall/tile38/geojson"
 )
 
+func appendJSONString(b []byte, s string) []byte {
+	for i := 0; i < len(s); i++ {
+		if s[i] < ' ' || s[i] == '\\' || s[i] == '"' || s[i] > 126 {
+			d, _ := json.Marshal(s)
+			return append(b, string(d)...)
+		}
+	}
+	b = append(b, '"')
+	b = append(b, s...)
+	b = append(b, '"')
+	return b
+}
+
 func jsonString(s string) string {
 	for i := 0; i < len(s); i++ {
 		if s[i] < ' ' || s[i] == '\\' || s[i] == '"' || s[i] > 126 {

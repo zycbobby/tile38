@@ -1,8 +1,18 @@
 package tests
 
 import (
+	"fmt"
+	"math"
+	"math/rand"
+	"os/exec"
+	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	"github.com/tidwall/gjson"
 )
 
 func subTestKeys(t *testing.T, mc *mockServer) {
@@ -17,6 +27,7 @@ func subTestKeys(t *testing.T, mc *mockServer) {
 	runStep(t, mc, "SET", keys_SET_test)
 	runStep(t, mc, "STATS", keys_STATS_test)
 	runStep(t, mc, "TTL", keys_TTL_test)
+	runStep(t, mc, "SET EX", keys_SET_EX_test)
 }
 
 func keys_BOUNDS_test(mc *mockServer) error {
@@ -191,4 +202,124 @@ func keys_TTL_test(mc *mockServer) error {
 		{time.Second / 4}, {}, // sleep
 		{"TTL", "mykey", "myid"}, {1},
 	})
+}
+
+type PSAUX struct {
+	User    string
+	PID     int
+	CPU     float64
+	Mem     float64
+	VSZ     int
+	RSS     int
+	TTY     string
+	Stat    string
+	Start   string
+	Time    string
+	Command string
+}
+
+func atoi(s string) int {
+	n, _ := strconv.ParseInt(s, 10, 64)
+	return int(n)
+}
+func atof(s string) float64 {
+	n, _ := strconv.ParseFloat(s, 64)
+	return float64(n)
+}
+func psaux(pid int) PSAUX {
+	var res []byte
+	res, err := exec.Command("ps", "aux").CombinedOutput()
+	if err != nil {
+		return PSAUX{}
+	}
+	pids := strconv.FormatInt(int64(pid), 10)
+	for _, line := range strings.Split(string(res), "\n") {
+		var words []string
+		for _, word := range strings.Split(line, " ") {
+			if word != "" {
+				words = append(words, word)
+			}
+			if len(words) > 11 {
+				if words[1] == pids {
+					return PSAUX{
+						User:    words[0],
+						PID:     atoi(words[1]),
+						CPU:     atof(words[2]),
+						Mem:     atof(words[3]),
+						VSZ:     atoi(words[4]),
+						RSS:     atoi(words[5]),
+						TTY:     words[6],
+						Stat:    words[7],
+						Start:   words[8],
+						Time:    words[9],
+						Command: words[10],
+					}
+				}
+			}
+		}
+	}
+	return PSAUX{}
+}
+func keys_SET_EX_test(mc *mockServer) (err error) {
+	rand.Seed(time.Now().UnixNano())
+	mc.conn.Do("GC")
+	mc.conn.Do("OUTPUT", "json")
+	var json string
+	json, err = redis.String(mc.conn.Do("SERVER"))
+	if err != nil {
+		return
+	}
+	heap := gjson.Get(json, "stats.heap_size").Int()
+	//released := gjson.Get(json, "stats.heap_released").Int()
+	//fmt.Printf("%v %v %v\n", heap, released, psaux(int(gjson.Get(json, "stats.pid").Int())).VSZ)
+	mc.conn.Do("OUTPUT", "resp")
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 20000; i++ {
+			val := fmt.Sprintf("val:%d", i)
+			//			fmt.Printf("id: %s\n", val)
+			var resp string
+			var lat, lon float64
+			lat = rand.Float64()*180 - 90
+			lon = rand.Float64()*360 - 180
+			resp, err = redis.String(mc.conn.Do("SET", "mykey", val, "EX", 1+rand.Float64(), "POINT", lat, lon))
+			if err != nil {
+				return
+			}
+			if resp != "OK" {
+				err = fmt.Errorf("expected 'OK', got '%s'", resp)
+				return
+			}
+		}
+	}()
+	wg.Wait()
+	time.Sleep(time.Second * 3)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		mc.conn.Do("GC")
+		mc.conn.Do("OUTPUT", "json")
+		var json string
+		json, err = redis.String(mc.conn.Do("SERVER"))
+		if err != nil {
+			return
+		}
+		mc.conn.Do("OUTPUT", "resp")
+		heap2 := gjson.Get(json, "stats.heap_size").Int()
+		//released := gjson.Get(json, "stats.heap_released").Int()
+		//fmt.Printf("%v %v %v\n", heap2, released, psaux(int(gjson.Get(json, "stats.pid").Int())).VSZ)
+		if math.Abs(float64(heap)-float64(heap2)) > 100000 {
+			err = fmt.Errorf("garbage not collecting, possible leak")
+			return
+		}
+	}()
+	wg.Wait()
+	if err != nil {
+		return
+	}
+	mc.conn.Do("FLUSHDB")
+	return nil
 }

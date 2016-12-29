@@ -28,6 +28,7 @@ func subTestKeys(t *testing.T, mc *mockServer) {
 	runStep(t, mc, "STATS", keys_STATS_test)
 	runStep(t, mc, "TTL", keys_TTL_test)
 	runStep(t, mc, "SET EX", keys_SET_EX_test)
+	runStep(t, mc, "PDEL", keys_PDEL_test)
 }
 
 func keys_BOUNDS_test(mc *mockServer) error {
@@ -322,4 +323,25 @@ func keys_SET_EX_test(mc *mockServer) (err error) {
 	}
 	mc.conn.Do("FLUSHDB")
 	return nil
+}
+
+func keys_PDEL_test(mc *mockServer) error {
+	return mc.DoBatch([][]interface{}{
+		{"SET", "mykey", "myid1a", "POINT", 33, -115}, {"OK"},
+		{"SET", "mykey", "myid1b", "POINT", 33, -115}, {"OK"},
+		{"SET", "mykey", "myid2a", "POINT", 33, -115}, {"OK"},
+		{"SET", "mykey", "myid2b", "POINT", 33, -115}, {"OK"},
+		{"SET", "mykey", "myid3a", "POINT", 33, -115}, {"OK"},
+		{"SET", "mykey", "myid3b", "POINT", 33, -115}, {"OK"},
+		{"SET", "mykey", "myid4a", "POINT", 33, -115}, {"OK"},
+		{"SET", "mykey", "myid4b", "POINT", 33, -115}, {"OK"},
+		{"PDEL", "mykeyNA", "*"}, {0},
+		{"PDEL", "mykey", "myid1a"}, {1},
+		{"PDEL", "mykey", "myid1a"}, {0},
+		{"PDEL", "mykey", "myid1*"}, {1},
+		{"PDEL", "mykey", "myid2*"}, {2},
+		{"PDEL", "mykey", "*b"}, {2},
+		{"PDEL", "mykey", "*"}, {2},
+		{"PDEL", "mykey", "*"}, {0},
+	})
 }

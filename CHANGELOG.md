@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.7.0] - 2016-12-29
+### Added
+- #104: PDEL command - Selete objects that match a pattern (@GameFreedom)
+- #99: COMMAND keyword for masking geofences by command type (@amorskoy)
+- #96: SCAN keyword for roaming geofences
+- fba34a9: JSET, JGET, JDEL commands
+
+### Fixed
+- #107: Memory leak (@amorskoy)
+- #98: Output json fix
+
 ## [1.6.0] - 2016-12-11
 ### Added
 - #87: Fencing event grouping (@huangpeizhi)

@@ -1349,5 +1349,78 @@ var commandsJSON = `{
       }
     ],
     "group": "keys"
+  },
+  "JGET": {
+    "summary": "Get a value from a JSON document",
+    "complexity": "O(1)",
+    "arguments":[
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "path",
+        "type": "string"
+      },
+      {
+        "command": "RAW",
+        "name": [],
+        "type": [],
+        "optional": true
+      }
+    ],
+    "group": "keys"
+  },
+  "JSET": {
+    "summary": "Set a value in a JSON document",
+    "complexity": "O(1)",
+    "arguments":[
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "path",
+        "type": "string"
+      },
+      {
+        "name": "value",
+        "type": "string"
+      },
+      {
+        "command": "RAW",
+        "name": [],
+        "type": [],
+        "optional": true
+      }
+    ],
+    "group": "keys"
+  },
+  "JDEL": {
+    "summary": "Delete a value from a JSON document",
+    "complexity": "O(1)",
+    "arguments":[
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "path",
+        "type": "string"
+      }
+    ],
+    "group": "keys"
   }
 }`

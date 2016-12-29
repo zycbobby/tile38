@@ -4,7 +4,7 @@
     width="200" height="200" border="0" alt="Tile38"></a>
 </p>
 <p align="center">
-<a href="https://github.com/tidwall/tile38/releases"><img src="https://img.shields.io/badge/version-1.6.0-green.svg" alt="Version"></a>
+<a href="https://github.com/tidwall/tile38/releases"><img src="https://img.shields.io/badge/version-1.7.0-green.svg" alt="Version"></a>
 <a href="https://travis-ci.org/tidwall/tile38"><img src="https://travis-ci.org/tidwall/tile38.svg?branch=master" alt="Build Status"></a>
 <a href="https://hub.docker.com/r/tile38/tile38"><img src="https://img.shields.io/badge/docker-ready-blue.svg" alt="Docker Ready"></a>
 </p>

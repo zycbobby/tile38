@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="1.6.0"
+VERSION="1.7.0"
 PROTECTED_MODE="no"
 
 # Hardcode some values to the core package
@@ -12,6 +12,13 @@ fi
 LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.BuildTime=$(date +%FT%T%z)"
 if [ "$PROTECTED_MODE" == "no" ]; then
 	LDFLAGS="$LDFLAGS -X github.com/tidwall/tile38/core.ProtectedMode=no"
+fi
+
+if [ "$1" == "update-version" ]; then
+	# update the versions in the README.md and Dockerfile
+	sed -i '' "s/version-.\..\../version-$VERSION/g" README.md
+	sed -i '' "s/ENV\ TILE38_VERSION\ .\..\../ENV TILE38_VERSION $VERSION/g" docker/Dockerfile
+	exit
 fi
 
 # Check go install

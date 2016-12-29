@@ -168,8 +168,18 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 		}
 		if c.config.FollowHost == "" {
 			// process hooks, for leader only
-			if err := c.queueHooks(d); err != nil {
-				return err
+			if d.parent {
+				// process children only
+				for _, d := range d.children {
+					if err := c.queueHooks(d); err != nil {
+						return err
+					}
+				}
+			} else {
+				// process parent
+				if err := c.queueHooks(d); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -198,7 +208,13 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 	if d != nil {
 		// write to live connection streams
 		c.lcond.L.Lock()
-		c.lstack = append(c.lstack, d)
+		if d.parent {
+			for _, d := range d.children {
+				c.lstack = append(c.lstack, d)
+			}
+		} else {
+			c.lstack = append(c.lstack, d)
+		}
 		c.lcond.Broadcast()
 		c.lcond.L.Unlock()
 	}

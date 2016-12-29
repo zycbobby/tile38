@@ -47,6 +47,10 @@ type commandDetailsT struct {
 	oldFields []float64
 	updated   bool
 	timestamp time.Time
+
+	parent   bool               // when true, only children are forwarded
+	pattern  string             // PDEL key pattern
+	children []*commandDetailsT // for multi actions such as "PDEL"
 }
 
 func (col *collectionT) Less(item btree.Item, ctx interface{}) bool {
@@ -392,7 +396,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		c.mu.RLock()
 		defer c.mu.RUnlock()
 	case "set", "del", "drop", "fset", "flushdb", "sethook", "pdelhook", "delhook",
-		"expire", "persist", "jset":
+		"expire", "persist", "jset", "pdel":
 		// write operations
 		write = true
 		c.mu.Lock()
@@ -482,6 +486,8 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 		res, d, err = c.cmdFset(msg)
 	case "del":
 		res, d, err = c.cmdDel(msg)
+	case "pdel":
+		res, d, err = c.cmdPdel(msg)
 	case "drop":
 		res, d, err = c.cmdDrop(msg)
 	case "flushdb":

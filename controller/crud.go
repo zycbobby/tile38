@@ -10,6 +10,7 @@ import (
 	"github.com/tidwall/btree"
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/collection"
+	"github.com/tidwall/tile38/controller/glob"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/geojson/geohash"
@@ -337,6 +338,81 @@ func (c *Controller) cmdDel(msg *server.Message) (res string, d commandDetailsT,
 		} else {
 			res = ":0\r\n"
 		}
+	}
+	return
+}
+
+func (c *Controller) cmdPdel(msg *server.Message) (res string, d commandDetailsT, err error) {
+	start := time.Now()
+	vs := msg.Values[1:]
+	var ok bool
+	if vs, d.key, ok = tokenval(vs); !ok || d.key == "" {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	if vs, d.pattern, ok = tokenval(vs); !ok || d.pattern == "" {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	if len(vs) != 0 {
+		err = errInvalidNumberOfArguments
+		return
+	}
+	now := time.Now()
+	iter := func(id string, o geojson.Object, fields []float64) bool {
+		if match, _ := glob.Match(d.pattern, id); match {
+			d.children = append(d.children, &commandDetailsT{
+				command:   "del",
+				updated:   true,
+				timestamp: now,
+				key:       d.key,
+				id:        id,
+			})
+		}
+		return true
+	}
+
+	col := c.getCol(d.key)
+	if col != nil {
+		g := glob.Parse(d.pattern, false)
+		if g.Limits[0] == "" && g.Limits[1] == "" {
+			col.Scan(0, false, iter)
+		} else {
+			col.ScanRange(0, g.Limits[0], g.Limits[1], false, iter)
+		}
+		var atLeastOneNotDeleted bool
+		for i, dc := range d.children {
+			dc.obj, dc.fields, ok = col.Remove(dc.id)
+			if !ok {
+				d.children[i].command = "?"
+				atLeastOneNotDeleted = true
+			} else {
+				d.children[i] = dc
+			}
+			c.clearIDExpires(d.key, dc.id)
+		}
+		if atLeastOneNotDeleted {
+			var nchildren []*commandDetailsT
+			for _, dc := range d.children {
+				if dc.command == "del" {
+					nchildren = append(nchildren, dc)
+				}
+			}
+			d.children = nchildren
+		}
+		if col.Count() == 0 {
+			c.deleteCol(d.key)
+		}
+	}
+	d.command = "pdel"
+	d.updated = len(d.children) > 0
+	d.timestamp = now
+	d.parent = true
+	switch msg.OutputType {
+	case server.JSON:
+		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+	case server.RESP:
+		res = ":" + strconv.FormatInt(int64(len(d.children)), 10) + "\r\n"
 	}
 	return
 }

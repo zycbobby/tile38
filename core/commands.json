@@ -509,6 +509,12 @@
         "optional": true
       },
       {
+        "command": "COMMAND",
+        "name": ["which"],
+        "type": ["string"],
+        "optional": true
+      },
+      {
         "name": "type",
         "optional": true,
         "enumargs": [
@@ -635,6 +641,12 @@
       {
         "command": "DETECT",
         "name": ["what"],
+        "type": ["string"],
+        "optional": true
+      },
+      {
+        "command": "COMMAND",
+        "name": ["which"],
         "type": ["string"],
         "optional": true
       },
@@ -809,6 +821,12 @@
       {
         "command": "DETECT",
         "name": ["what"],
+        "type": ["string"],
+        "optional": true
+      },
+      {
+        "command": "COMMAND",
+        "name": ["which"],
         "type": ["string"],
         "optional": true
       },
@@ -1105,6 +1123,12 @@
         "optional": true
       },
       {
+        "command": "COMMAND",
+        "name": ["which"],
+        "type": ["string"],
+        "optional": true
+      },
+      {
         "name": "param",
         "type": "string",
         "variadic": true
@@ -1142,5 +1166,19 @@
       }
     ],
     "group": "webhook"
+  },
+  "PDEL": {
+    "summary": "Removes all objects matching a pattern",
+    "arguments":[
+      {
+        "name": "key",
+        "type": "string"
+      },
+	  {
+        "name": "pattern",
+        "type": "pattern"
+      }
+    ],
+    "group": "keys"
   }
 }

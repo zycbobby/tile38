@@ -229,7 +229,7 @@ func (c *Controller) queueHooks(d *commandDetailsT) error {
 	if hm, ok := c.hookcols[d.key]; ok {
 		for _, hook := range hm {
 			// match the fence
-			msgs := FenceMatch(hook.Name, hook.ScanWriter, hook.Fence, d)
+			msgs := FenceMatch(hook.Name, hook.ScanWriter, hook.Fence, hook.Metas, d)
 			if len(msgs) > 0 {
 				// append each msg to the big list
 				hmsgs = append(hmsgs, msgs...)

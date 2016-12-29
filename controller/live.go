@@ -162,7 +162,7 @@ func (c *Controller) goLive(inerr error, conn net.Conn, rd *server.AnyReaderWrit
 			}
 			fence := lb.fence
 			lb.cond.L.Unlock()
-			msgs := FenceMatch("", sw, fence, details)
+			msgs := FenceMatch("", sw, fence, nil, details)
 			for _, msg := range msgs {
 				if err := writeMessage(conn, []byte(msg), true, connType, websocket); err != nil {
 					return nil // nil return is fine here

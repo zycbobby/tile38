@@ -1267,6 +1267,13 @@ var commandsJSON = `{
         "type": "string"
       },
       {
+        "command": "META",
+        "name": ["name", "value"],
+        "type": ["string", "string"],
+        "optional": true,
+		"multiple": true
+      },
+      {
         "enum": ["NEARBY", "WITHIN", "INTERSECTS"]
       },
       {

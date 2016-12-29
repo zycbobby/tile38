@@ -32,7 +32,7 @@ var (
 	quiet       bool
 )
 
-// Fire up a webhook test server by using the --webhook-consumer-http-port
+// Fire up a webhook test server by using the --webhook-http-consumer-port
 // for example
 //   $ ./tile38-server --webhook-http-consumer-port 9999
 //

@@ -66,21 +66,36 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 		}
 		endpoints = append(endpoints, url)
 	}
-
-	commandvs := vs
-	if vs, cmd, ok = tokenval(vs); !ok || cmd == "" {
-		return "", d, errInvalidNumberOfArguments
-	}
-
-	cmdlc := strings.ToLower(cmd)
+	var commandvs []resp.Value
+	var cmdlc string
 	var types []string
-	switch cmdlc {
-	default:
-		return "", d, errInvalidArgument(cmd)
-	case "nearby":
-		types = nearbyTypes
-	case "within", "intersects":
-		types = withinOrIntersectsTypes
+	metaMap := make(map[string]string)
+	for {
+		commandvs = vs
+		if vs, cmd, ok = tokenval(vs); !ok || cmd == "" {
+			return "", d, errInvalidNumberOfArguments
+		}
+		cmdlc = strings.ToLower(cmd)
+		switch cmdlc {
+		default:
+			return "", d, errInvalidArgument(cmd)
+		case "meta":
+			var metakey string
+			var metaval string
+			if vs, metakey, ok = tokenval(vs); !ok || metakey == "" {
+				return "", d, errInvalidNumberOfArguments
+			}
+			if vs, metaval, ok = tokenval(vs); !ok || metaval == "" {
+				return "", d, errInvalidNumberOfArguments
+			}
+			metaMap[metakey] = metaval
+			continue
+		case "nearby":
+			types = nearbyTypes
+		case "within", "intersects":
+			types = withinOrIntersectsTypes
+		}
+		break
 	}
 	s, err := c.cmdSearchArgs(cmdlc, vs, types)
 	if err != nil {
@@ -99,6 +114,12 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 	}
 	cmsg.Command = strings.ToLower(cmsg.Values[0].String())
 
+	metas := make([]FenceMeta, 0, len(metaMap))
+	for key, val := range metaMap {
+		metas = append(metas, FenceMeta{key, val})
+	}
+	sort.Sort(hookMetaByName(metas))
+
 	hook := &Hook{
 		Key:       s.key,
 		Name:      name,
@@ -107,6 +128,7 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 		Message:   cmsg,
 		db:        c.qdb,
 		epm:       c.epc,
+		Metas:     metas,
 	}
 	hook.cond = sync.NewCond(&hook.mu)
 
@@ -117,27 +139,15 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 	}
 
 	if h, ok := c.hooks[name]; ok {
-		// lets see if the previous hook matches the new hook
-		if h.Key == hook.Key && h.Name == hook.Name {
-			if len(h.Endpoints) == len(hook.Endpoints) {
-				match := true
-				for i, endpoint := range h.Endpoints {
-					if endpoint != hook.Endpoints[i] {
-						match = false
-						break
-					}
-				}
-				if match && resp.ArrayValue(h.Message.Values).Equals(resp.ArrayValue(hook.Message.Values)) {
-					// it was a match so we do nothing. But let's signal just
-					// for good measure.
-					h.Signal()
-					switch msg.OutputType {
-					case server.JSON:
-						return server.OKMessage(msg, start), d, nil
-					case server.RESP:
-						return ":0\r\n", d, nil
-					}
-				}
+		if h.Equals(hook) {
+			// it was a match so we do nothing. But let's signal just
+			// for good measure.
+			h.Signal()
+			switch msg.OutputType {
+			case server.JSON:
+				return server.OKMessage(msg, start), d, nil
+			case server.RESP:
+				return ":0\r\n", d, nil
 			}
 		}
 		h.Close()
@@ -323,11 +333,52 @@ type Hook struct {
 	Message    *server.Message
 	Fence      *liveFenceSwitches
 	ScanWriter *scanWriter
+	Metas      []FenceMeta
 	db         *buntdb.DB
 	closed     bool
 	opened     bool
 	query      string
 	epm        *endpoint.EndpointManager
+}
+
+func (h *Hook) Equals(hook *Hook) bool {
+	if h.Key != hook.Key ||
+		h.Name != hook.Name ||
+		len(h.Endpoints) != len(hook.Endpoints) ||
+		len(h.Metas) != len(hook.Metas) {
+		return false
+	}
+	for i, endpoint := range h.Endpoints {
+		if endpoint != hook.Endpoints[i] {
+			return false
+		}
+	}
+	for i, meta := range h.Metas {
+		if meta.Name != hook.Metas[i].Name ||
+			meta.Value != hook.Metas[i].Value {
+			return false
+		}
+	}
+	return resp.ArrayValue(h.Message.Values).Equals(
+		resp.ArrayValue(hook.Message.Values))
+}
+
+type FenceMeta struct {
+	Name, Value string
+}
+
+type hookMetaByName []FenceMeta
+
+func (arr hookMetaByName) Len() int {
+	return len(arr)
+}
+
+func (arr hookMetaByName) Less(a, b int) bool {
+	return arr[a].Name < arr[b].Name
+}
+
+func (arr hookMetaByName) Swap(a, b int) {
+	arr[a], arr[b] = arr[b], arr[a]
 }
 
 // Open is called when a hook is first created. It calls the manager

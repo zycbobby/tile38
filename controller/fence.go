@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"math"
 	"strconv"
 	"time"
@@ -13,13 +12,8 @@ import (
 )
 
 // FenceMatch executes a fence match returns back json messages for fence detection.
-func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) [][]byte {
-	overall := time.Now()
-	defer func() {
-		return
-		fmt.Printf(">> %v\n", time.Since(overall))
-	}()
-	msgs := fenceMatch(hookName, sw, fence, details)
+func FenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas []FenceMeta, details *commandDetailsT) [][]byte {
+	msgs := fenceMatch(hookName, sw, fence, metas, details)
 	if len(fence.accept) == 0 {
 		return msgs
 	}
@@ -42,10 +36,31 @@ func jsonTimeFormat(t time.Time) string {
 	b = appendJSONTimeFormat(b, t)
 	return string(b)
 }
-
-func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, details *commandDetailsT) [][]byte {
+func appendHookDetails(b []byte, hookName string, metas []FenceMeta) []byte {
+	if len(hookName) > 0 {
+		b = append(b, `,"hook":`...)
+		b = appendJSONString(b, hookName)
+	}
+	if len(metas) > 0 {
+		b = append(b, `,"meta":{`...)
+		for i, meta := range metas {
+			if i > 0 {
+				b = append(b, ',')
+			}
+			b = appendJSONString(b, meta.Name)
+			b = append(b, ':')
+			b = appendJSONString(b, meta.Value)
+		}
+		b = append(b, '}')
+	}
+	return b
+}
+func hookJSONString(hookName string, metas []FenceMeta) string {
+	return string(appendHookDetails(nil, hookName, metas))
+}
+func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas []FenceMeta, details *commandDetailsT) [][]byte {
 	if details.command == "drop" {
-		return [][]byte{[]byte(`{"command":"drop","hook":` + jsonString(hookName) + `,"time":` + jsonTimeFormat(details.timestamp) + `}`)}
+		return [][]byte{[]byte(`{"command":"drop"` + hookJSONString(hookName, metas) + `,"time":` + jsonTimeFormat(details.timestamp) + `}`)}
 	}
 	if len(fence.glob) > 0 && !(len(fence.glob) == 1 && fence.glob[0] == '*') {
 		match, _ := glob.Match(fence.glob, details.id)
@@ -65,7 +80,7 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 		}
 	}
 	if details.command == "del" {
-		return [][]byte{[]byte(`{"command":"del","hook":` + jsonString(hookName) + `,"id":` + jsonString(details.id) + `,"time":` + jsonTimeFormat(details.timestamp) + `}`)}
+		return [][]byte{[]byte(`{"command":"del"` + hookJSONString(hookName, metas) + `,"id":` + jsonString(details.id) + `,"time":` + jsonTimeFormat(details.timestamp) + `}`)}
 	}
 
 	var roamkeys, roamids []string
@@ -174,18 +189,18 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 	msgs := make([][]byte, 0, 4)
 	if fence.detect == nil || fence.detect[detect] {
 		if len(res) > 0 && res[0] == '{' {
-			res = makemsg(details.command, group, detect, hookName, details.key, details.timestamp, res[1:])
+			res = makemsg(details.command, group, detect, hookName, metas, details.key, details.timestamp, res[1:])
 		}
 		msgs = append(msgs, res)
 	}
 	switch detect {
 	case "enter":
 		if fence.detect == nil || fence.detect["inside"] {
-			msgs = append(msgs, makemsg(details.command, group, "inside", hookName, details.key, details.timestamp, res[1:]))
+			msgs = append(msgs, makemsg(details.command, group, "inside", hookName, metas, details.key, details.timestamp, res[1:]))
 		}
 	case "exit", "cross":
 		if fence.detect == nil || fence.detect["outside"] {
-			msgs = append(msgs, makemsg(details.command, group, "outside", hookName, details.key, details.timestamp, res[1:]))
+			msgs = append(msgs, makemsg(details.command, group, "outside", hookName, metas, details.key, details.timestamp, res[1:]))
 		}
 	case "roam":
 		if len(msgs) > 0 {
@@ -244,12 +259,13 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, detai
 	return msgs
 }
 
-func makemsg(command, group, detect, hookName string, key string, t time.Time, tail []byte) []byte {
+func makemsg(command, group, detect, hookName string, metas []FenceMeta, key string, t time.Time, tail []byte) []byte {
 	var buf []byte
 	buf = append(append(buf, `{"command":"`...), command...)
 	buf = append(append(buf, `","group":"`...), group...)
 	buf = append(append(buf, `","detect":"`...), detect...)
-	buf = appendJSONString(append(buf, `","hook":`...), hookName)
+	buf = append(buf, '"')
+	buf = appendHookDetails(buf, hookName, metas)
 	buf = appendJSONString(append(buf, `,"key":`...), key)
 	buf = appendJSONTimeFormat(append(buf, `,"time":`...), t)
 	buf = append(append(buf, ','), tail...)

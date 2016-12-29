@@ -56,12 +56,15 @@ func (c *Controller) getExpires(key, id string) (at time.Time, ok bool) {
 // It's runs through every item that has been marked as expires five times
 // per second.
 func (c *Controller) backgroundExpiring() {
+	const stop = 0
+	const delay = 1
+	const nodelay = 2
 	for {
-		ok := func() bool {
-			c.mu.Lock()
-			defer c.mu.Unlock()
+		op := func() int {
+			c.mu.RLock()
+			defer c.mu.RUnlock()
 			if c.stopBackgroundExpiring {
-				return false
+				return stop
 			}
 			// Only excute for leaders. Followers should ignore.
 			if c.config.FollowHost == "" {
@@ -70,28 +73,52 @@ func (c *Controller) backgroundExpiring() {
 					for id, at := range m {
 						if now.After(at) {
 							// issue a DEL command
+							c.mu.RUnlock()
+							c.mu.Lock()
+
+							// double check because locks were swapped
+							var del bool
+							if m2, ok := c.expires[key]; ok {
+								if at2, ok := m2[id]; ok {
+									if now.After(at2) {
+										del = true
+									}
+								}
+							}
+							if !del {
+								return nodelay
+							}
 							c.statsExpired++
 							msg := &server.Message{}
 							msg.Values = resp.MultiBulkValue("del", key, id).Array()
 							msg.Command = "del"
 							_, d, err := c.cmdDel(msg)
 							if err != nil {
+								c.mu.Unlock()
 								log.Fatal(err)
 								continue
 							}
 							if err := c.writeAOF(resp.ArrayValue(msg.Values), &d); err != nil {
+								c.mu.Unlock()
 								log.Fatal(err)
 								continue
 							}
+							c.mu.Unlock()
+							c.mu.RLock()
+							return nodelay
 						}
 					}
 				}
 			}
-			return true
+			return delay
 		}()
-		if !ok {
+		switch op {
+		case stop:
 			return
+		case delay:
+			time.Sleep(time.Millisecond * 100)
+		case nodelay:
+			time.Sleep(time.Microsecond)
 		}
-		time.Sleep(time.Second / 5)
 	}
 }

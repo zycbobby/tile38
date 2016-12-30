@@ -1,9 +1,11 @@
 package collection
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/tidwall/tile38/geojson"
 )
@@ -86,4 +88,22 @@ func TestManyCollections(t *testing.T) {
 		//println(id)
 		return true
 	})
+}
+
+func BenchmarkInsert(t *testing.B) {
+	rand.Seed(time.Now().UnixNano())
+	ids := make([]string, t.N)
+	points := make([]geojson.Object, t.N)
+	for i := 0; i < t.N; i++ {
+		points[i] = geojson.SimplePoint{
+			Y: rand.Float64()*180 - 90,
+			X: rand.Float64()*360 - 180,
+		}
+		ids[i] = fmt.Sprintf("%d", i)
+	}
+	col := New()
+	t.ResetTimer()
+	for i := 0; i < t.N; i++ {
+		col.ReplaceOrInsert(ids[i], points[i], nil, nil)
+	}
 }

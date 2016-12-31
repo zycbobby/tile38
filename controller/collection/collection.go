@@ -172,9 +172,9 @@ func (c *Collection) ReplaceOrInsert(id string, obj geojson.Object, fields []str
 			c.weight += len(newFields) * 8
 		}
 	} else {
-		if len(fields) == 0 {
-			panic("if fields is empty, make it nil")
-		}
+		//if len(fields) == 0 {
+		//	panic("if fields is empty, make it nil")
+		//}
 		// map field name to value
 		for i, field := range fields {
 			c.setField(newItem, field, values[i])

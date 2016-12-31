@@ -90,20 +90,101 @@ func TestManyCollections(t *testing.T) {
 	})
 }
 
+type testPointItem struct {
+	id     string
+	object geojson.Object
+}
+
 func BenchmarkInsert(t *testing.B) {
 	rand.Seed(time.Now().UnixNano())
-	ids := make([]string, t.N)
-	points := make([]geojson.Object, t.N)
+	items := make([]testPointItem, t.N)
 	for i := 0; i < t.N; i++ {
-		points[i] = geojson.SimplePoint{
-			Y: rand.Float64()*180 - 90,
-			X: rand.Float64()*360 - 180,
+		items[i] = testPointItem{
+			fmt.Sprintf("%d", i),
+			geojson.SimplePoint{
+				Y: rand.Float64()*180 - 90,
+				X: rand.Float64()*360 - 180,
+			},
 		}
-		ids[i] = fmt.Sprintf("%d", i)
 	}
 	col := New()
 	t.ResetTimer()
 	for i := 0; i < t.N; i++ {
-		col.ReplaceOrInsert(ids[i], points[i], nil, nil)
+		col.ReplaceOrInsert(items[i].id, items[i].object, nil, nil)
+	}
+}
+
+func BenchmarkReplace(t *testing.B) {
+	rand.Seed(time.Now().UnixNano())
+	items := make([]testPointItem, t.N)
+	for i := 0; i < t.N; i++ {
+		items[i] = testPointItem{
+			fmt.Sprintf("%d", i),
+			geojson.SimplePoint{
+				Y: rand.Float64()*180 - 90,
+				X: rand.Float64()*360 - 180,
+			},
+		}
+	}
+	col := New()
+	for i := 0; i < t.N; i++ {
+		col.ReplaceOrInsert(items[i].id, items[i].object, nil, nil)
+	}
+	t.ResetTimer()
+	for _, i := range rand.Perm(t.N) {
+		o, _, _ := col.ReplaceOrInsert(items[i].id, items[i].object, nil, nil)
+		if o != items[i].object {
+			t.Fatal("shoot!")
+		}
+	}
+}
+
+func BenchmarkGet(t *testing.B) {
+	rand.Seed(time.Now().UnixNano())
+	items := make([]testPointItem, t.N)
+	for i := 0; i < t.N; i++ {
+		items[i] = testPointItem{
+			fmt.Sprintf("%d", i),
+			geojson.SimplePoint{
+				Y: rand.Float64()*180 - 90,
+				X: rand.Float64()*360 - 180,
+			},
+		}
+	}
+	col := New()
+	for i := 0; i < t.N; i++ {
+		col.ReplaceOrInsert(items[i].id, items[i].object, nil, nil)
+	}
+	t.ResetTimer()
+	for _, i := range rand.Perm(t.N) {
+		o, _, _ := col.Get(items[i].id)
+		if o != items[i].object {
+			t.Fatal("shoot!")
+		}
+	}
+}
+
+func BenchmarkRemove(t *testing.B) {
+	rand.Seed(time.Now().UnixNano())
+	items := make([]testPointItem, t.N)
+	for i := 0; i < t.N; i++ {
+		items[i] = testPointItem{
+			fmt.Sprintf("%d", i),
+			geojson.SimplePoint{
+				Y: rand.Float64()*180 - 90,
+				X: rand.Float64()*360 - 180,
+			},
+		}
+	}
+	col := New()
+	for i := 0; i < t.N; i++ {
+		col.ReplaceOrInsert(items[i].id, items[i].object, nil, nil)
+	}
+	t.ResetTimer()
+	for _, i := range rand.Perm(t.N) {
+		o, _, _ := col.Remove(items[i].id)
+		if o != items[i].object {
+			t.Fatal("shoot!")
+		}
 	}
 }

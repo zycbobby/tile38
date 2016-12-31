@@ -101,26 +101,63 @@ func (c *Collection) Bounds() (minX, minY, minZ, maxX, maxY, maxZ float64) {
 // The fields argument is optional.
 // The return values are the old object, the old fields, and the new fields
 func (c *Collection) ReplaceOrInsert(id string, obj geojson.Object, fields []string, values []float64) (oldObject geojson.Object, oldFields []float64, newFields []float64) {
-	nitem, oldItem := c.insertOrReplace(id, obj)
-	if oldItem != nil {
+	var oldItem *itemT
+	var newItem *itemT = &itemT{id: id, object: obj}
+	// add the new item to main btree and remove the old one if needed
+	oldItemPtr := c.items.ReplaceOrInsert(newItem)
+	if oldItemPtr != nil {
+		// the old item was removed, now let's remove from the rtree
+		// or strings tree.
+		oldItem = oldItemPtr.(*itemT)
+		if obj.IsGeometry() {
+			// geometry
+			c.index.Remove(oldItem)
+			c.objects--
+		} else {
+			// string
+			c.values.Delete(oldItem)
+			c.nobjects--
+		}
+		// decrement the point count
+		c.points -= oldItem.object.PositionCount()
+
+		// decrement the weights
+		c.weight -= len(oldItem.fields) * 8
+		c.weight -= oldItem.object.Weight() + len(oldItem.id)
+
+		// references
 		oldObject = oldItem.object
 		oldFields = oldItem.fields
-		nitem.fields = oldFields
-		c.weight += len(nitem.fields) * 8
+		newItem.fields = oldFields
 	}
-	if fields == nil && len(values) > 0 {
-		// directly set the field values, update weight
-		c.weight -= len(nitem.fields) * 8
-		nitem.fields = values
-		c.weight += len(nitem.fields) * 8
+	// insert the new item into the rtree or strings tree.
+	if obj.IsGeometry() {
+		c.index.Insert(newItem)
+		c.objects++
+	} else {
+		c.values.ReplaceOrInsert(newItem)
+		c.nobjects++
+	}
+	// increment the point count
+	c.points += obj.PositionCount()
 
+	// add the new weights
+	c.weight += len(newItem.fields) * 8
+	c.weight += obj.Weight() + len(id)
+	if fields == nil {
+		if len(values) > 0 {
+			// directly set the field values, update weight
+			c.weight -= len(newItem.fields) * 8
+			newItem.fields = values
+			c.weight += len(newItem.fields) * 8
+		}
 	} else {
 		// map field name to value
 		for i, field := range fields {
-			c.setField(nitem, field, values[i])
+			c.setField(newItem, field, values[i])
 		}
 	}
-	return oldObject, oldFields, nitem.fields
+	return oldObject, oldFields, newItem.fields
 }
 
 func (c *Collection) remove(id string) (item *itemT, ok bool) {
@@ -142,34 +179,19 @@ func (c *Collection) remove(id string) (item *itemT, ok bool) {
 	return item, true
 }
 
-func (c *Collection) insertOrReplace(id string, obj geojson.Object) (item, prev *itemT) {
+func (c *Collection) insert(id string, obj geojson.Object) (item *itemT) {
 	item = &itemT{id: id, object: obj}
-	old := c.items.ReplaceOrInsert(item)
-	if old != nil {
-		prev = old.(*itemT)
-		if item.object.IsGeometry() {
-			c.index.Remove(prev)
-			c.index.Insert(item)
-		} else {
-			c.values.ReplaceOrInsert(item)
-		}
-		c.weight -= len(prev.fields) * 8
-		c.weight -= prev.object.Weight() + len(prev.id)
-		c.points -= prev.object.PositionCount()
-		c.weight += obj.Weight() + len(id)
-		c.points += obj.PositionCount()
+	if obj.IsGeometry() {
+		c.index.Insert(item)
+		c.objects++
 	} else {
-		if obj.IsGeometry() {
-			c.index.Insert(item)
-			c.objects++
-		} else {
-			c.values.ReplaceOrInsert(item)
-			c.nobjects++
-		}
-		c.weight += obj.Weight() + len(id)
-		c.points += obj.PositionCount()
+		c.values.ReplaceOrInsert(item)
+		c.nobjects++
 	}
-	return item, prev
+	c.items.ReplaceOrInsert(item)
+	c.weight += obj.Weight() + len(id)
+	c.points += obj.PositionCount()
+	return item
 }
 
 // Remove removes an object and returns it.

@@ -671,7 +671,7 @@ var commandsJSON = `{
         "optional": true
       },
       {
-        "command": "COMMAND",
+        "command": "COMMANDS",
         "name": ["which"],
         "type": ["string"],
         "optional": true

@@ -503,7 +503,7 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 	case "persist":
 		res, d, err = c.cmdPersist(msg)
 	case "ttl":
-		res, d, err = c.cmdTTL(msg)
+		res, err = c.cmdTTL(msg)
 	case "hooks":
 		res, err = c.cmdHooks(msg)
 	case "shutdown":

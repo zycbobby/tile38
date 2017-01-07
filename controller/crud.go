@@ -940,7 +940,7 @@ func (c *Controller) cmdPersist(msg *server.Message) (res string, d commandDetai
 	return
 }
 
-func (c *Controller) cmdTTL(msg *server.Message) (res string, d commandDetailsT, err error) {
+func (c *Controller) cmdTTL(msg *server.Message) (res string, err error) {
 	start := time.Now()
 	vs := msg.Values[1:]
 	var key, id string
@@ -976,7 +976,17 @@ func (c *Controller) cmdTTL(msg *server.Message) (res string, d commandDetailsT,
 	}
 	switch msg.OutputType {
 	case server.JSON:
-		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+		if ok {
+			var ttl string
+			if ok2 {
+				ttl = strconv.FormatFloat(v, 'f', -1, 64)
+			} else {
+				ttl = "-1"
+			}
+			res = `{"ok":true,"ttl":` + ttl + `,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+		} else {
+			return "", errIDNotFound
+		}
 	case server.RESP:
 		if ok {
 			if ok2 {

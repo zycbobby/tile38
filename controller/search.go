@@ -291,7 +291,18 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	sw.writeHead()
 	if sw.col != nil {
 		s.cursor = sw.col.Nearby(s.cursor, s.sparse, s.lat, s.lon, s.meters, minZ, maxZ, func(id string, o geojson.Object, fields []float64) bool {
-			return sw.writeObject(id, o, fields, false)
+			// Calculate distance if we need to
+			distance := 0.0
+			if s.distance {
+				distance = o.CalculatedPoint().DistanceTo(geojson.Position{X: s.lon, Y: s.lat, Z: 0})
+			}
+
+			return sw.writeObject(ScanWriterParams{
+				id: id,
+				o: o,
+				fields: fields,
+				distance: distance,
+			})
 		})
 	}
 	sw.writeFoot(s.cursor)
@@ -337,13 +348,21 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 	if cmd == "within" {
 		s.cursor = sw.col.Within(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
 			func(id string, o geojson.Object, fields []float64) bool {
-				return sw.writeObject(id, o, fields, false)
+				return sw.writeObject(ScanWriterParams{
+					id: id,
+					o: o,
+					fields: fields,
+				})
 			},
 		)
 	} else if cmd == "intersects" {
 		s.cursor = sw.col.Intersects(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
 			func(id string, o geojson.Object, fields []float64) bool {
-				return sw.writeObject(id, o, fields, false)
+				return sw.writeObject(ScanWriterParams{
+					id: id,
+					o: o,
+					fields: fields,
+				})
 			},
 		)
 	}
@@ -394,7 +413,11 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 			if g.Limits[0] == "" && g.Limits[1] == "" {
 				s.cursor = sw.col.SearchValues(s.cursor, s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
-						return sw.writeObject(id, o, fields, false)
+						return sw.writeObject(ScanWriterParams{
+							id: id,
+							o: o,
+							fields: fields,
+						})
 					},
 				)
 			} else {
@@ -404,7 +427,11 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 				s.cursor = sw.col.SearchValuesRange(
 					s.cursor, g.Limits[0], g.Limits[1], s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
-						return sw.writeObject(id, o, fields, false)
+						return sw.writeObject(ScanWriterParams{
+							id: id,
+							o: o,
+							fields: fields,
+						})
 					},
 				)
 			}

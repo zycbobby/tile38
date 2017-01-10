@@ -50,14 +50,22 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 			if g.Limits[0] == "" && g.Limits[1] == "" {
 				s.cursor = sw.col.Scan(s.cursor, s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
-						return sw.writeObject(id, o, fields, false)
+						return sw.writeObject(ScanWriterParams{
+							id: id,
+							o: o,
+							fields: fields,
+						})
 					},
 				)
 			} else {
 				s.cursor = sw.col.ScanRange(
 					s.cursor, g.Limits[0], g.Limits[1], s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
-						return sw.writeObject(id, o, fields, false)
+						return sw.writeObject(ScanWriterParams{
+							id: id,
+							o: o,
+							fields: fields,
+						})
 					},
 				)
 			}

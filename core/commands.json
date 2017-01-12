@@ -45,7 +45,7 @@
             "arguments":[
               {
                 "name": "geojson",
-                "type": "geojson"    
+                "type": "geojson"
               }
             ]
           },
@@ -54,11 +54,11 @@
             "arguments":[
               {
                 "name": "lat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "lon",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "z",
@@ -72,19 +72,19 @@
             "arguments":[
               {
                 "name": "minlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "minlon",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlon",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -93,7 +93,7 @@
             "arguments":[
               {
                 "name": "geohash",
-                "type": "geohash"    
+                "type": "geohash"
               }
             ]
           },
@@ -102,7 +102,7 @@
             "arguments":[
               {
                 "name": "value",
-                "type": "string"    
+                "type": "string"
               }
             ]
           }
@@ -483,6 +483,12 @@
         "type": "pattern",
         "optional": true
       },
+			{
+				"command": "DISTANCE",
+				"name": [],
+				"type": [],
+				"optional": true
+			},
       {
         "command": "WHERE",
         "name": ["field","min","max"],
@@ -569,15 +575,15 @@
             "arguments":[
               {
                 "name": "key",
-                "type": "string"    
+                "type": "string"
               },
               {
                 "name": "pattern",
-                "type": "pattern"    
+                "type": "pattern"
               },
               {
                 "name": "meters",
-                "type": "double"    
+                "type": "double"
               }
             ]
           }
@@ -701,19 +707,19 @@
             "arguments":[
               {
                 "name": "minlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "minlon",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlon",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -722,7 +728,7 @@
             "arguments":[
               {
                 "name": "geojson",
-                "type": "geojson"    
+                "type": "geojson"
               }
             ]
           },
@@ -731,15 +737,15 @@
             "arguments":[
               {
                 "name": "x",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "y",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "z",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -748,7 +754,7 @@
             "arguments":[
               {
                 "name": "quadkey",
-                "type": "string"    
+                "type": "string"
               }
             ]
           },
@@ -881,19 +887,19 @@
             "arguments":[
               {
                 "name": "minlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "minlon",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlon",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -902,7 +908,7 @@
             "arguments":[
               {
                 "name": "geojson",
-                "type": "geojson"    
+                "type": "geojson"
               }
             ]
           },
@@ -911,15 +917,15 @@
             "arguments":[
               {
                 "name": "x",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "y",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "z",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -928,7 +934,7 @@
             "arguments":[
               {
                 "name": "quadkey",
-                "type": "string"    
+                "type": "string"
               }
             ]
           },
@@ -952,7 +958,7 @@
     "arguments":[
       {
         "name": "parameter",
-        "type": "string"    
+        "type": "string"
       }
     ],
     "group": "server"
@@ -962,7 +968,7 @@
     "arguments":[
       {
         "name": "parameter",
-        "type": "string"    
+        "type": "string"
       },
       {
         "name": "value",

@@ -149,7 +149,13 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas
 	sw.fmap = details.fmap
 	sw.fullFields = true
 	sw.msg.OutputType = server.JSON
-	sw.writeObject(details.id, details.obj, details.fields, true)
+	sw.writeObject(ScanWriterParams{
+		id:details.id,
+		o: details.obj,
+		fields: details.fields,
+		noLock: true,
+	})
+	
 	if sw.wr.Len() == 0 {
 		sw.mu.Unlock()
 		return nil

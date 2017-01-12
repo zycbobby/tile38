@@ -54,6 +54,14 @@ type scanWriter struct {
 	matchValues    bool
 }
 
+type ScanWriterParams struct {
+	id string
+	o geojson.Object
+	fields []float64
+	distance float64
+	noLock bool
+}
+
 func (c *Controller) newScanWriter(
 	wr *bytes.Buffer, msg *server.Message, key string, output outputT,
 	precision uint64, globPattern string, matchValues bool,
@@ -233,24 +241,25 @@ func (sw *scanWriter) fieldMatch(fields []float64, o geojson.Object) ([]float64,
 	return sw.fvals, true
 }
 
-func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64, noLock bool) bool {
-	if !noLock {
+//id string, o geojson.Object, fields []float64, noLock bool
+func (sw *scanWriter) writeObject(opts ScanWriterParams) bool {
+	if !opts.noLock {
 		sw.mu.Lock()
 		defer sw.mu.Unlock()
 	}
 	keepGoing := true
 	if !sw.globEverything {
 		if sw.globSingle {
-			if sw.globPattern != id {
+			if sw.globPattern != opts.id {
 				return true
 			}
 			keepGoing = false // return current object and stop iterating
 		} else {
 			var val string
 			if sw.matchValues {
-				val = o.String()
+				val = opts.o.String()
 			} else {
-				val = id
+				val = opts.id
 			}
 			ok, _ := glob.Match(sw.globPattern, val)
 			if !ok {
@@ -258,7 +267,7 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 			}
 		}
 	}
-	nfields, ok := sw.fieldMatch(fields, o)
+	nfields, ok := sw.fieldMatch(opts.fields, opts.o)
 	if !ok {
 		return true
 	}
@@ -282,12 +291,12 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 					jsfields = `,"fields":{`
 					var i int
 					for field, idx := range sw.fmap {
-						if len(fields) > idx {
-							if fields[idx] != 0 {
+						if len(opts.fields) > idx {
+							if opts.fields[idx] != 0 {
 								if i > 0 {
 									jsfields += `,`
 								}
-								jsfields += jsonString(field) + ":" + strconv.FormatFloat(fields[idx], 'f', -1, 64)
+								jsfields += jsonString(field) + ":" + strconv.FormatFloat(opts.fields[idx], 'f', -1, 64)
 								i++
 							}
 						}
@@ -307,38 +316,44 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 			}
 		}
 		if sw.output == outputIDs {
-			wr.WriteString(jsonString(id))
+			wr.WriteString(jsonString(opts.id))
 		} else {
-			wr.WriteString(`{"id":` + jsonString(id))
+			wr.WriteString(`{"id":` + jsonString(opts.id))
 			switch sw.output {
 			case outputObjects:
-				wr.WriteString(`,"object":` + o.JSON())
+				wr.WriteString(`,"object":` + opts.o.JSON())
 			case outputPoints:
-				wr.WriteString(`,"point":` + o.CalculatedPoint().ExternalJSON())
+				wr.WriteString(`,"point":` + opts.o.CalculatedPoint().ExternalJSON())
 			case outputHashes:
-				p, err := o.Geohash(int(sw.precision))
+				p, err := opts.o.Geohash(int(sw.precision))
 				if err != nil {
 					p = ""
 				}
 				wr.WriteString(`,"hash":"` + p + `"`)
 			case outputBounds:
-				wr.WriteString(`,"bounds":` + o.CalculatedBBox().ExternalJSON())
+				wr.WriteString(`,"bounds":` + opts.o.CalculatedBBox().ExternalJSON())
 			}
+
 			wr.WriteString(jsfields)
+
+			if opts.distance > 0 {
+				wr.WriteString(`,"distance":` + strconv.FormatFloat(opts.distance, 'f', 2, 64))
+			}
+
 			wr.WriteString(`}`)
 		}
 		sw.wr.Write(wr.Bytes())
 	case server.RESP:
 		vals := make([]resp.Value, 1, 3)
-		vals[0] = resp.StringValue(id)
+		vals[0] = resp.StringValue(opts.id)
 		if sw.output == outputIDs {
 			sw.values = append(sw.values, vals[0])
 		} else {
 			switch sw.output {
 			case outputObjects:
-				vals = append(vals, resp.StringValue(o.String()))
+				vals = append(vals, resp.StringValue(opts.o.String()))
 			case outputPoints:
-				point := o.CalculatedPoint()
+				point := opts.o.CalculatedPoint()
 				if point.Z != 0 {
 					vals = append(vals, resp.ArrayValue([]resp.Value{
 						resp.FloatValue(point.Y),
@@ -352,13 +367,13 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 					}))
 				}
 			case outputHashes:
-				p, err := o.Geohash(int(sw.precision))
+				p, err := opts.o.Geohash(int(sw.precision))
 				if err != nil {
 					p = ""
 				}
 				vals = append(vals, resp.StringValue(p))
 			case outputBounds:
-				bbox := o.CalculatedBBox()
+				bbox := opts.o.CalculatedBBox()
 				vals = append(vals, resp.ArrayValue([]resp.Value{
 					resp.ArrayValue([]resp.Value{
 						resp.FloatValue(bbox.Min.Y),
@@ -371,7 +386,7 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 				}))
 			}
 
-			fvs := orderFields(sw.fmap, fields)
+			fvs := orderFields(sw.fmap, opts.fields)
 			if len(fvs) > 0 {
 				fvals := make([]resp.Value, 0, len(fvs)*2)
 				for i, fv := range fvs {
@@ -379,6 +394,10 @@ func (sw *scanWriter) writeObject(id string, o geojson.Object, fields []float64,
 					i++
 				}
 				vals = append(vals, resp.ArrayValue(fvals))
+			}
+
+			if opts.distance > 0 {
+				vals = append(vals, resp.FloatValue(opts.distance))
 			}
 
 			sw.values = append(sw.values, resp.ArrayValue(vals))

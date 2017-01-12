@@ -207,7 +207,7 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "geojson",
-                "type": "geojson"    
+                "type": "geojson"
               }
             ]
           },
@@ -216,11 +216,11 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "lat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "lon",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "z",
@@ -234,19 +234,19 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "minlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "minlon",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlon",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -255,7 +255,7 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "geohash",
-                "type": "geohash"    
+                "type": "geohash"
               }
             ]
           },
@@ -264,7 +264,7 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "value",
-                "type": "string"    
+                "type": "string"
               }
             ]
           }
@@ -645,6 +645,12 @@ var commandsJSON = `{
         "type": "pattern",
         "optional": true
       },
+			{
+				"command": "DISTANCE",
+				"name": [],
+				"type": [],
+				"optional": true
+			},
       {
         "command": "WHERE",
         "name": ["field","min","max"],
@@ -731,15 +737,15 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "key",
-                "type": "string"    
+                "type": "string"
               },
               {
                 "name": "pattern",
-                "type": "pattern"    
+                "type": "pattern"
               },
               {
                 "name": "meters",
-                "type": "double"    
+                "type": "double"
               }
             ]
           }
@@ -863,19 +869,19 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "minlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "minlon",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlon",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -884,7 +890,7 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "geojson",
-                "type": "geojson"    
+                "type": "geojson"
               }
             ]
           },
@@ -893,15 +899,15 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "x",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "y",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "z",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -910,7 +916,7 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "quadkey",
-                "type": "string"    
+                "type": "string"
               }
             ]
           },
@@ -1043,19 +1049,19 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "minlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "minlon",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlat",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "maxlon",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -1064,7 +1070,7 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "geojson",
-                "type": "geojson"    
+                "type": "geojson"
               }
             ]
           },
@@ -1073,15 +1079,15 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "x",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "y",
-                "type": "double"    
+                "type": "double"
               },
               {
                 "name": "z",
-                "type": "double"    
+                "type": "double"
               }
             ]
           },
@@ -1090,7 +1096,7 @@ var commandsJSON = `{
             "arguments":[
               {
                 "name": "quadkey",
-                "type": "string"    
+                "type": "string"
               }
             ]
           },
@@ -1114,7 +1120,7 @@ var commandsJSON = `{
     "arguments":[
       {
         "name": "parameter",
-        "type": "string"    
+        "type": "string"
       }
     ],
     "group": "server"
@@ -1124,7 +1130,7 @@ var commandsJSON = `{
     "arguments":[
       {
         "name": "parameter",
-        "type": "string"    
+        "type": "string"
       },
       {
         "name": "value",

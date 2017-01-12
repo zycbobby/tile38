@@ -163,6 +163,7 @@ type searchScanBaseTokens struct {
 	precision uint64
 	lineout   string
 	fence     bool
+	distance  bool
 	detect    map[string]bool
 	accept    map[string]bool
 	glob      string
@@ -303,6 +304,14 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 				if len(t.accept) == 0 {
 					t.accept = nil
 				}
+				continue
+			} else if (wtok[0] == 'D' || wtok[0] == 'd') && strings.ToLower(wtok) == "distance" {
+				vs = nvs
+				if t.distance {
+					err = errDuplicateArgument(strings.ToUpper(wtok))
+					return
+				}
+				t.distance = true
 				continue
 			} else if (wtok[0] == 'D' || wtok[0] == 'd') && strings.ToLower(wtok) == "detect" {
 				vs = nvs

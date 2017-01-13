@@ -651,7 +651,7 @@
         "optional": true
       },
       {
-        "command": "COMMAND",
+        "command": "COMMANDS",
         "name": ["which"],
         "type": ["string"],
         "optional": true
@@ -831,7 +831,7 @@
         "optional": true
       },
       {
-        "command": "COMMAND",
+        "command": "COMMANDS",
         "name": ["which"],
         "type": ["string"],
         "optional": true
@@ -1136,7 +1136,7 @@
         "optional": true
       },
       {
-        "command": "COMMAND",
+        "command": "COMMANDS",
         "name": ["which"],
         "type": ["string"],
         "optional": true

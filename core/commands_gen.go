@@ -813,7 +813,7 @@ var commandsJSON = `{
         "optional": true
       },
       {
-        "command": "COMMAND",
+        "command": "COMMANDS",
         "name": ["which"],
         "type": ["string"],
         "optional": true
@@ -993,7 +993,7 @@ var commandsJSON = `{
         "optional": true
       },
       {
-        "command": "COMMAND",
+        "command": "COMMANDS",
         "name": ["which"],
         "type": ["string"],
         "optional": true
@@ -1298,7 +1298,7 @@ var commandsJSON = `{
         "optional": true
       },
       {
-        "command": "COMMAND",
+        "command": "COMMANDS",
         "name": ["which"],
         "type": ["string"],
         "optional": true

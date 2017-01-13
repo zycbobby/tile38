@@ -81,6 +81,7 @@ func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 		m["following"] = fmt.Sprintf("%s:%d", c.config.FollowHost, c.config.FollowPort)
 		m["caught_up"] = c.fcup
 	}
+	m["http_transport"] = c.http
 	m["pid"] = os.Getpid()
 	m["aof_size"] = c.aofsz
 	m["num_collections"] = c.cols.Len()

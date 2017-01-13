@@ -84,6 +84,7 @@ type Controller struct {
 	expires   map[string]map[string]time.Time
 	conns     map[*server.Conn]bool
 	started   time.Time
+	http      bool
 
 	epc *endpoint.EndpointManager
 
@@ -121,6 +122,7 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 		started:  time.Now(),
 		conns:    make(map[*server.Conn]bool),
 		epc:      endpoint.NewEndpointManager(),
+		http:     http,
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err

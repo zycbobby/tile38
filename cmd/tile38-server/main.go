@@ -109,7 +109,7 @@ func main() {
 		case "--dev", "-dev":
 			devMode = true
 			continue
-		case "--http-transport":
+		case "--http-transport", "-http-transport":
 			i++
 			if i < len(os.Args) {
 				switch strings.ToLower(os.Args[i]) {
@@ -120,6 +120,8 @@ func main() {
 				}
 				continue
 			}
+			fmt.Fprintf(os.Stderr, "http-transport must be 'yes' or 'no'\n")
+			os.Exit(1)
 		}
 		nargs = append(nargs, os.Args[i])
 	}
@@ -153,11 +155,6 @@ func main() {
 		gitsha = ""
 	}
 
-	httpTransportEnabled := "Enabled"
-	if !httpTransport {
-		httpTransportEnabled = "Disabled"
-	}
-
 	//  _____ _ _     ___ ___
 	// |_   _|_| |___|_  | . |
 	//   | | | | | -_|_  | . |
@@ -168,10 +165,10 @@ func main() {
   |       |       |
   |____   |   _   |   Tile38 %s%s %d bit (%s/%s)
   |       |       |   %sPort: %d, PID: %d
-  |____   |   _   |   HTTP & WebSocket transports: %s
+  |____   |   _   | 
   |       |       |
   |_______|_______|   tile38.com
-`+"\n", core.Version, gitsha, strconv.IntSize, runtime.GOARCH, runtime.GOOS, hostd, port, os.Getpid(), httpTransportEnabled)
+`+"\n", core.Version, gitsha, strconv.IntSize, runtime.GOARCH, runtime.GOOS, hostd, port, os.Getpid())
 
 	if err := controller.ListenAndServe(host, port, dir, httpTransport); err != nil {
 		log.Fatal(err)

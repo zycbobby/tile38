@@ -298,9 +298,9 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 			}
 
 			return sw.writeObject(ScanWriterParams{
-				id: id,
-				o: o,
-				fields: fields,
+				id:       id,
+				o:        o,
+				fields:   fields,
 				distance: distance,
 			})
 		})
@@ -349,8 +349,8 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 		s.cursor = sw.col.Within(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
 			func(id string, o geojson.Object, fields []float64) bool {
 				return sw.writeObject(ScanWriterParams{
-					id: id,
-					o: o,
+					id:     id,
+					o:      o,
 					fields: fields,
 				})
 			},
@@ -359,8 +359,8 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 		s.cursor = sw.col.Intersects(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
 			func(id string, o geojson.Object, fields []float64) bool {
 				return sw.writeObject(ScanWriterParams{
-					id: id,
-					o: o,
+					id:     id,
+					o:      o,
 					fields: fields,
 				})
 			},
@@ -414,8 +414,8 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 				s.cursor = sw.col.SearchValues(s.cursor, s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
 						return sw.writeObject(ScanWriterParams{
-							id: id,
-							o: o,
+							id:     id,
+							o:      o,
 							fields: fields,
 						})
 					},
@@ -428,8 +428,8 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 					s.cursor, g.Limits[0], g.Limits[1], s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
 						return sw.writeObject(ScanWriterParams{
-							id: id,
-							o: o,
+							id:     id,
+							o:      o,
 							fields: fields,
 						})
 					},

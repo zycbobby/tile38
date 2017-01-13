@@ -1,6 +1,8 @@
 package collection
 
 import (
+	"math"
+
 	"github.com/tidwall/btree"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/index"
@@ -384,6 +386,12 @@ func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, min
 	var bbox geojson.BBox
 	if obj != nil {
 		bbox = obj.CalculatedBBox()
+		if minZ == math.Inf(-1) && maxZ == math.Inf(+1) {
+			if bbox.Min.Z == 0 && bbox.Max.Z == 0 {
+				bbox.Min.Z = minZ
+				bbox.Max.Z = maxZ
+			}
+		}
 	} else {
 		bbox = geojson.BBox{Min: geojson.Position{X: minLon, Y: minLat, Z: minZ}, Max: geojson.Position{X: maxLon, Y: maxLat, Z: maxZ}}
 	}
@@ -432,6 +440,12 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 	var bbox geojson.BBox
 	if obj != nil {
 		bbox = obj.CalculatedBBox()
+		if minZ == math.Inf(-1) && maxZ == math.Inf(+1) {
+			if bbox.Min.Z == 0 && bbox.Max.Z == 0 {
+				bbox.Min.Z = minZ
+				bbox.Max.Z = maxZ
+			}
+		}
 	} else {
 		bbox = geojson.BBox{Min: geojson.Position{X: minLon, Y: minLat, Z: minZ}, Max: geojson.Position{X: maxLon, Y: maxLat, Z: maxZ}}
 	}

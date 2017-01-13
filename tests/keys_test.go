@@ -29,6 +29,7 @@ func subTestKeys(t *testing.T, mc *mockServer) {
 	runStep(t, mc, "TTL", keys_TTL_test)
 	runStep(t, mc, "SET EX", keys_SET_EX_test)
 	runStep(t, mc, "PDEL", keys_PDEL_test)
+	runStep(t, mc, "FIELDS", keys_FIELDS_test)
 }
 
 func keys_BOUNDS_test(mc *mockServer) error {
@@ -323,6 +324,21 @@ func keys_SET_EX_test(mc *mockServer) (err error) {
 	}
 	mc.conn.Do("FLUSHDB")
 	return nil
+}
+
+func keys_FIELDS_test(mc *mockServer) error {
+	return mc.DoBatch([][]interface{}{
+		{"SET", "mykey", "myid1a", "FIELD", "a", 1, "POINT", 33, -115}, {"OK"},
+		{"GET", "mykey", "myid1a", "WITHFIELDS"}, {`[{"type":"Point","coordinates":[-115,33]} [a 1]]`},
+		{"SET", "mykey", "myid1a", "FIELD", "a", "a", "POINT", 33, -115}, {"ERR invalid argument 'a'"},
+		{"GET", "mykey", "myid1a", "WITHFIELDS"}, {`[{"type":"Point","coordinates":[-115,33]} [a 1]]`},
+		{"SET", "mykey", "myid1a", "FIELD", "a", 1, "FIELD", "b", 2, "POINT", 33, -115}, {"OK"},
+		{"GET", "mykey", "myid1a", "WITHFIELDS"}, {`[{"type":"Point","coordinates":[-115,33]} [a 1 b 2]]`},
+		{"SET", "mykey", "myid1a", "FIELD", "b", 2, "POINT", 33, -115}, {"OK"},
+		{"GET", "mykey", "myid1a", "WITHFIELDS"}, {`[{"type":"Point","coordinates":[-115,33]} [a 1 b 2]]`},
+		{"SET", "mykey", "myid1a", "FIELD", "b", 2, "FIELD", "a", "1", "FIELD", "c", 3, "POINT", 33, -115}, {"OK"},
+		{"GET", "mykey", "myid1a", "WITHFIELDS"}, {`[{"type":"Point","coordinates":[-115,33]} [a 1 b 2 c 3]]`},
+	})
 }
 
 func keys_PDEL_test(mc *mockServer) error {

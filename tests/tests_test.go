@@ -57,7 +57,10 @@ func runStep(t *testing.T, mc *mockServer, name string, step func(mc *mockServer
 			mc.ResetConn()
 			defer mc.ResetConn()
 			// clear the database so the test is consistent
-			if err := mc.DoBatch([][]interface{}{{"FLUSHDB"}, {"OK"}}); err != nil {
+			if err := mc.DoBatch([][]interface{}{
+				{"OUTPUT", "resp"}, {"OK"},
+				{"FLUSHDB"}, {"OK"},
+			}); err != nil {
 				return err
 			}
 			if err := step(mc); err != nil {

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="1.7.0"
+VERSION="1.7.5"
 PROTECTED_MODE="no"
 
 # Hardcode some values to the core package

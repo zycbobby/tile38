@@ -2,6 +2,21 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.7.5] - 2017-01-13
+### Added
+- Performance bump for all SET commands, ~10% faster
+- Lower memory footprint for large datasets
+- #112: Added distance to NEARBY command (@m1ome, @auselen)
+- #123: Redis endpoint for webhooks (@m1ome)
+- #128: Allow disabling HTTP & WebSocket transport (@m1ome)
+
+### Fixed
+- #116: Missing response in TTL json command (@phulst)
+- #117: Error in command documentation (@juanpabloaj)
+- #118: Unexpected EOF bug with websockets (@m1ome)
+- #122: Disque typo timeout handling (@m1ome)
+- #127: 3d object searches with 2d geojson area (@damariei)
+
 ## [1.7.0] - 2016-12-29
 ### Added
 - #104: PDEL command - Selete objects that match a pattern (@GameFreedom)

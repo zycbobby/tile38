@@ -97,6 +97,7 @@ type Controller struct {
 
 	stopBackgroundExpiring bool
 	stopWatchingMemory     bool
+	stopWatchingAutoGC     bool
 	outOfMemory            bool
 }
 
@@ -178,11 +179,13 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 	}()
 	go c.processLives()
 	go c.watchMemory()
+	go c.watchGC()
 	go c.backgroundExpiring()
 	defer func() {
 		c.mu.Lock()
 		c.stopBackgroundExpiring = true
 		c.stopWatchingMemory = true
+		c.stopWatchingAutoGC = true
 		c.mu.Unlock()
 	}()
 	handler := func(conn *server.Conn, msg *server.Message, rd *server.AnyReaderWriter, w io.Writer, websocket bool) error {
@@ -224,6 +227,30 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 		c.mu.Unlock()
 	}
 	return server.ListenAndServe(host, port, protected, handler, opened, closed, ln, http)
+}
+
+func (c *Controller) watchGC() {
+	autoGC := c.config.AutoGC
+
+	if autoGC == 0 {
+		return
+	}
+
+	t := time.NewTicker(time.Second * time.Duration(autoGC))
+	defer t.Stop()
+
+	for range t.C {
+		func() {
+			c.mu.RLock()
+			if c.stopWatchingAutoGC {
+				c.mu.RUnlock()
+				return
+			}
+
+			runtime.GC()
+			debug.FreeOSMemory()
+		}()
+	}
 }
 
 func (c *Controller) watchMemory() {

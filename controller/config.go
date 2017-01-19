@@ -14,7 +14,15 @@ import (
 	"github.com/tidwall/tile38/controller/server"
 )
 
-var validProperties = []string{"requirepass", "leaderauth", "protected-mode", "maxmemory"}
+const (
+	RequirePass   = "requirepass"
+	LeaderAuth    = "leaderauth"
+	ProtectedMode = "protected-mode"
+	MaxMemory     = "maxmemory"
+	AutoGC        = "autogc"
+)
+
+var validProperties = []string{RequirePass, LeaderAuth, ProtectedMode, MaxMemory, AutoGC}
 
 // Config is a tile38 config
 type Config struct {
@@ -34,6 +42,8 @@ type Config struct {
 	ProtectedMode  string `json:"-"`
 	MaxMemoryP     string `json:"maxmemory,omitempty"`
 	MaxMemory      int    `json:"-"`
+	AutoGCP        string `json:"autogc,omitempty"`
+	AutoGC         uint64 `json:"-"`
 }
 
 func (c *Controller) loadConfig() error {
@@ -49,16 +59,19 @@ func (c *Controller) loadConfig() error {
 		return err
 	}
 	// load properties
-	if err := c.setConfigProperty("requirepass", c.config.RequirePassP, true); err != nil {
+	if err := c.setConfigProperty(RequirePass, c.config.RequirePassP, true); err != nil {
 		return err
 	}
-	if err := c.setConfigProperty("leaderauth", c.config.LeaderAuthP, true); err != nil {
+	if err := c.setConfigProperty(LeaderAuth, c.config.LeaderAuthP, true); err != nil {
 		return err
 	}
-	if err := c.setConfigProperty("protected-mode", c.config.ProtectedModeP, true); err != nil {
+	if err := c.setConfigProperty(ProtectedMode, c.config.ProtectedModeP, true); err != nil {
 		return err
 	}
-	if err := c.setConfigProperty("maxmemory", c.config.MaxMemoryP, true); err != nil {
+	if err := c.setConfigProperty(MaxMemory, c.config.MaxMemoryP, true); err != nil {
+		return err
+	}
+	if err := c.setConfigProperty(AutoGC, c.config.AutoGCP, true); err != nil {
 		return err
 	}
 	return nil
@@ -115,17 +128,27 @@ func (c *Controller) setConfigProperty(name, value string, fromLoad bool) error 
 	switch name {
 	default:
 		return fmt.Errorf("Unsupported CONFIG parameter: %s", name)
-	case "requirepass":
+	case RequirePass:
 		c.config.RequirePass = value
-	case "leaderauth":
+	case LeaderAuth:
 		c.config.LeaderAuth = value
-	case "maxmemory":
+	case AutoGC:
+		if value == "" {
+			c.config.AutoGC = 0
+		} else {
+			gc, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			c.config.AutoGC = gc
+		}
+	case MaxMemory:
 		sz, ok := parseMemSize(value)
 		if !ok {
 			return fmt.Errorf("Invalid argument '%s' for CONFIG SET '%s'", value, name)
 		}
 		c.config.MaxMemory = sz
-	case "protected-mode":
+	case ProtectedMode:
 		switch strings.ToLower(value) {
 		case "":
 			if fromLoad {
@@ -159,13 +182,15 @@ func (c *Controller) getConfigProperty(name string) string {
 	switch name {
 	default:
 		return ""
-	case "requirepass":
+	case AutoGC:
+		return strconv.FormatUint(c.config.AutoGC, 10)
+	case RequirePass:
 		return c.config.RequirePass
-	case "leaderauth":
+	case LeaderAuth:
 		return c.config.LeaderAuth
-	case "protected-mode":
+	case ProtectedMode:
 		return c.config.ProtectedMode
-	case "maxmemory":
+	case MaxMemory:
 		return formatMemSize(c.config.MaxMemory)
 	}
 }
@@ -190,6 +215,7 @@ func (c *Controller) writeConfig(writeProperties bool) error {
 		c.config.LeaderAuthP = c.config.LeaderAuth
 		c.config.ProtectedModeP = c.config.ProtectedMode
 		c.config.MaxMemoryP = formatMemSize(c.config.MaxMemory)
+		c.config.AutoGCP = strconv.FormatUint(c.config.AutoGC, 10)
 	}
 	var data []byte
 	data, err = json.MarshalIndent(c.config, "", "\t")
@@ -242,7 +268,7 @@ func (c *Controller) cmdConfigSet(msg *server.Message) (res string, err error) {
 	}
 	var value string
 	if vs, value, ok = tokenval(vs); !ok {
-		if strings.ToLower(name) != "requirepass" {
+		if strings.ToLower(name) != RequirePass {
 			return "", errInvalidNumberOfArguments
 		}
 	}

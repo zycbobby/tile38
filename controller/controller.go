@@ -230,35 +230,32 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 }
 
 func (c *Controller) watchGC() {
-	var elapsed uint64
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 
+	s := time.Now()
 	for range t.C {
-		elapsed++
 		c.mu.RLock()
+
+		if c.stopWatchingAutoGC {
+			c.mu.RUnlock()
+			return
+		}
+
 		autoGC := c.config.AutoGC
 		c.mu.RUnlock()
 
-		func() {
-			if autoGC == 0 {
-				return
-			}
+		if autoGC == 0 {
+			continue
+		}
 
-			if c.stopWatchingAutoGC {
-				return
-			}
+		if time.Now().Sub(s) < time.Second*time.Duration(autoGC) {
+			continue
+		}
 
-			if elapsed < autoGC {
-				return
-			}
-
-			c.mu.RLock()
-			runtime.GC()
-			debug.FreeOSMemory()
-			c.mu.RUnlock()
-			elapsed = 0
-		}()
+		runtime.GC()
+		debug.FreeOSMemory()
+		s = time.Now()
 	}
 }
 

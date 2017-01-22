@@ -97,6 +97,7 @@ type Controller struct {
 
 	stopBackgroundExpiring bool
 	stopWatchingMemory     bool
+	stopWatchingAutoGC     bool
 	outOfMemory            bool
 }
 
@@ -178,11 +179,13 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 	}()
 	go c.processLives()
 	go c.watchMemory()
+	go c.watchGC()
 	go c.backgroundExpiring()
 	defer func() {
 		c.mu.Lock()
 		c.stopBackgroundExpiring = true
 		c.stopWatchingMemory = true
+		c.stopWatchingAutoGC = true
 		c.mu.Unlock()
 	}()
 	handler := func(conn *server.Conn, msg *server.Message, rd *server.AnyReaderWriter, w io.Writer, websocket bool) error {
@@ -224,6 +227,47 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 		c.mu.Unlock()
 	}
 	return server.ListenAndServe(host, port, protected, handler, opened, closed, ln, http)
+}
+
+func (c *Controller) watchGC() {
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+
+	s := time.Now()
+	for range t.C {
+		c.mu.RLock()
+
+		if c.stopWatchingAutoGC {
+			c.mu.RUnlock()
+			return
+		}
+
+		autoGC := c.config.AutoGC
+		c.mu.RUnlock()
+
+		if autoGC == 0 {
+			continue
+		}
+
+		if time.Now().Sub(s) < time.Second*time.Duration(autoGC) {
+			continue
+		}
+
+		var mem1, mem2 runtime.MemStats
+		runtime.ReadMemStats(&mem1)
+		log.Debugf("autogc(before): "+
+			"alloc: %v, heap_alloc: %v, heap_released: %v",
+			mem1.Alloc, mem1.HeapAlloc, mem1.HeapReleased)
+
+		runtime.GC()
+		debug.FreeOSMemory()
+
+		runtime.ReadMemStats(&mem2)
+		log.Debugf("autogc(after): "+
+			"alloc: %v, heap_alloc: %v, heap_released: %v",
+			mem2.Alloc, mem2.HeapAlloc, mem2.HeapReleased)
+		s = time.Now()
+	}
 }
 
 func (c *Controller) watchMemory() {

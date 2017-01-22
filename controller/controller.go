@@ -253,8 +253,19 @@ func (c *Controller) watchGC() {
 			continue
 		}
 
+		var mem1, mem2 runtime.MemStats
+		runtime.ReadMemStats(&mem1)
+		log.Debugf("autogc(before): "+
+			"alloc: %v, heap_alloc: %v, heap_released: %v",
+			mem1.Alloc, mem1.HeapAlloc, mem1.HeapReleased)
+
 		runtime.GC()
 		debug.FreeOSMemory()
+
+		runtime.ReadMemStats(&mem2)
+		log.Debugf("autogc(after): "+
+			"alloc: %v, heap_alloc: %v, heap_released: %v",
+			mem2.Alloc, mem2.HeapAlloc, mem2.HeapReleased)
 		s = time.Now()
 	}
 }

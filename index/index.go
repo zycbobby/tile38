@@ -123,6 +123,20 @@ func (ix *Index) getRTreeItem(item rtree.Item) Item {
 	return nil
 }
 
+func (ix *Index) NearestNeighbors(k int, lat, lon float64, iterator func(item Item) bool) {
+	x, y, _ := normPoint(lat, lon)
+	items := ix.r.NearestNeighbors(k, x, y, 0)
+	for _, item := range items {
+		iitm := ix.getRTreeItem(item)
+		if item == nil {
+			continue
+		}
+		if !iterator(iitm) {
+			break
+		}
+	}
+}
+
 // Search returns all items that intersect the bounding box.
 func (ix *Index) Search(cursor uint64, swLat, swLon, neLat, neLon, minZ, maxZ float64, iterator func(item Item) bool) (ncursor uint64) {
 	var idx uint64

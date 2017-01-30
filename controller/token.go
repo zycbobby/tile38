@@ -169,7 +169,9 @@ type searchScanBaseTokens struct {
 	glob      string
 	wheres    []whereT
 	nofields  bool
+	ulimit    bool
 	limit     uint64
+	usparse   bool
 	sparse    uint8
 	desc      bool
 }
@@ -465,12 +467,14 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 		}
 	}
 	if slimit != "" {
+		t.ulimit = true
 		if t.limit, err = strconv.ParseUint(slimit, 10, 64); err != nil || t.limit == 0 {
 			err = errInvalidArgument(slimit)
 			return
 		}
 	}
 	if ssparse != "" {
+		t.usparse = true
 		var sparse uint64
 		if sparse, err = strconv.ParseUint(ssparse, 10, 8); err != nil || sparse == 0 || sparse > 8 {
 			err = errInvalidArgument(ssparse)

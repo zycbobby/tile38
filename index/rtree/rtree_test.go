@@ -1,6 +1,7 @@
 package rtree
 
 import (
+	"fmt"
 	"math/rand"
 	"runtime"
 	"testing"
@@ -87,6 +88,25 @@ func TestBounds(t *testing.T) {
 		t.Fatalf("expected 10,10,0 30,30,0, got %v,%v %v,%v\n", minX, minY, minZ, maxX, maxY, maxZ)
 	}
 }
+func TestKNN(t *testing.T) {
+	x, y, z := 20., 20., 0.
+	tr := New()
+	tr.Insert(wpp(5, 5, 0))
+	tr.Insert(wpp(19, 19, 0))
+	tr.Insert(wpp(12, 19, 0))
+	tr.Insert(wpp(-5, 5, 0))
+	tr.Insert(wpp(33, 21, 0))
+	items := tr.NearestNeighbors(10, x, y, z)
+	var res string
+	for i, item := range items {
+		ix, iy, _, _, _, _ := item.Rect()
+		res += fmt.Sprintf("%d:%v,%v\n", i, ix, iy)
+	}
+	if res != "0:19,19\n1:12,19\n2:33,21\n3:5,5\n4:-5,5\n" {
+		t.Fatal("invalid response")
+	}
+}
+
 func BenchmarkInsert(b *testing.B) {
 	rand.Seed(0)
 	tr := New()

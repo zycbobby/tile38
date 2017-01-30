@@ -536,3 +536,17 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 		return true
 	})
 }
+
+func (c *Collection) NearestNeighbors(k int, lat, lon float64, iterator func(id string, obj geojson.Object, fields []float64) bool) {
+	c.index.NearestNeighbors(k, lat, lon, func(item index.Item) bool {
+		var iitm *itemT
+		iitm, ok := item.(*itemT)
+		if !ok {
+			return true // just ignore
+		}
+		if !iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id)) {
+			return false
+		}
+		return true
+	})
+}

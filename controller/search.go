@@ -22,6 +22,7 @@ type liveFenceSwitches struct {
 	maxLat, maxLon   float64
 	cmd              string
 	roam             roamSwitches
+	knn              bool
 	groups           map[string]string
 }
 
@@ -85,10 +86,22 @@ func (c *Controller) cmdSearchArgs(cmd string, vs []resp.Value, types []string) 
 			err = errInvalidNumberOfArguments
 			return
 		}
+
+		umeters := true
 		if vs, smeters, ok = tokenval(vs); !ok || smeters == "" {
-			err = errInvalidNumberOfArguments
-			return
+			umeters = false
+			if cmd == "nearby" {
+				// possible that this is KNN search
+				s.knn = s.searchScanBaseTokens.ulimit && // must be true
+					!s.searchScanBaseTokens.usparse && // must be false
+					s.searchScanBaseTokens.cursor == 0 // must be zero
+			}
+			if !s.knn {
+				err = errInvalidArgument(slat)
+				return
+			}
 		}
+
 		if s.lat, err = strconv.ParseFloat(slat, 64); err != nil {
 			err = errInvalidArgument(slat)
 			return
@@ -97,9 +110,12 @@ func (c *Controller) cmdSearchArgs(cmd string, vs []resp.Value, types []string) 
 			err = errInvalidArgument(slon)
 			return
 		}
-		if s.meters, err = strconv.ParseFloat(smeters, 64); err != nil {
-			err = errInvalidArgument(smeters)
-			return
+
+		if umeters {
+			if s.meters, err = strconv.ParseFloat(smeters, 64); err != nil {
+				err = errInvalidArgument(smeters)
+				return
+			}
 		}
 	case "object":
 		var obj string
@@ -290,7 +306,7 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	}
 	sw.writeHead()
 	if sw.col != nil {
-		s.cursor = sw.col.Nearby(s.cursor, s.sparse, s.lat, s.lon, s.meters, minZ, maxZ, func(id string, o geojson.Object, fields []float64) bool {
+		iter := func(id string, o geojson.Object, fields []float64) bool {
 			// Calculate distance if we need to
 			distance := 0.0
 			if s.distance {
@@ -303,7 +319,12 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 				fields:   fields,
 				distance: distance,
 			})
-		})
+		}
+		if s.knn {
+			sw.col.NearestNeighbors(int(s.limit), s.lat, s.lon, iter)
+		} else {
+			s.cursor = sw.col.Nearby(s.cursor, s.sparse, s.lat, s.lon, s.meters, minZ, maxZ, iter)
+		}
 	}
 	sw.writeFoot(s.cursor)
 	if msg.OutputType == server.JSON {

@@ -124,7 +124,7 @@ func (c *Controller) loadAOF() error {
 			}
 			nn += 1 + len(ns) + int(n) + 2
 		}
-		if _, _, err := c.command(&msg, nil); err != nil {
+		if _, _, err := c.command(&msg, nil, nil); err != nil {
 			if commandErrIsFatal(err) {
 				return err
 			}

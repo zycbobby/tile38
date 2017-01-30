@@ -57,6 +57,14 @@ func (col *collectionT) Less(item btree.Item, ctx interface{}) bool {
 	return col.Key < item.(*collectionT).Key
 }
 
+type clientConn struct {
+	id     uint64
+	name   string
+	opened time.Time
+	last   time.Time
+	conn   *server.Conn
+}
+
 // Controller is a tile38 controller
 type Controller struct {
 	mu        sync.RWMutex
@@ -82,7 +90,7 @@ type Controller struct {
 	hookcols  map[string]map[string]*Hook // col key
 	aofconnM  map[net.Conn]bool
 	expires   map[string]map[string]time.Time
-	conns     map[*server.Conn]bool
+	conns     map[*server.Conn]*clientConn
 	started   time.Time
 	http      bool
 
@@ -121,7 +129,7 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 		aofconnM: make(map[net.Conn]bool),
 		expires:  make(map[string]map[string]time.Time),
 		started:  time.Now(),
-		conns:    make(map[*server.Conn]bool),
+		conns:    make(map[*server.Conn]*clientConn),
 		epc:      endpoint.NewEndpointManager(),
 		http:     http,
 	}
@@ -190,6 +198,9 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 	}()
 	handler := func(conn *server.Conn, msg *server.Message, rd *server.AnyReaderWriter, w io.Writer, websocket bool) error {
 		c.mu.Lock()
+		if cc, ok := c.conns[conn]; ok {
+			cc.last = time.Now()
+		}
 		c.statsTotalCommands++
 		c.mu.Unlock()
 		err := c.handleInputCommand(conn, msg, w)
@@ -215,9 +226,15 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 		c.mu.RUnlock()
 		return is
 	}
+	var clientId uint64
 	opened := func(conn *server.Conn) {
 		c.mu.Lock()
-		c.conns[conn] = true
+		clientId++
+		c.conns[conn] = &clientConn{
+			id:     clientId,
+			opened: time.Now(),
+			conn:   conn,
+		}
 		c.statsTotalConns++
 		c.mu.Unlock()
 	}
@@ -479,9 +496,12 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 	case "aofshrink":
 		c.mu.RLock()
 		defer c.mu.RUnlock()
+	case "client":
+		c.mu.Lock()
+		defer c.mu.Unlock()
 	}
 
-	res, d, err := c.command(msg, w)
+	res, d, err := c.command(msg, w, conn)
 	if err != nil {
 		if err.Error() == "going live" {
 			return err
@@ -522,7 +542,11 @@ func (c *Controller) reset() {
 	c.cols = btree.New(16, 0)
 }
 
-func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d commandDetailsT, err error) {
+func (c *Controller) command(
+	msg *server.Message, w io.Writer, conn *server.Conn,
+) (
+	res string, d commandDetailsT, err error,
+) {
 	switch msg.Command {
 	default:
 		err = fmt.Errorf("unknown command '%s'", msg.Values[0])
@@ -624,8 +648,10 @@ func (c *Controller) command(msg *server.Message, w io.Writer) (res string, d co
 			msg.Values[1] = resp.StringValue(command)
 			msg.Values = msg.Values[1:]
 			msg.Command = strings.ToLower(command)
-			return c.command(msg, w)
+			return c.command(msg, w, conn)
 		}
+	case "client":
+		res, err = c.cmdClient(msg, conn)
 	}
 	return
 }

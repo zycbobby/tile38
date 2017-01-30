@@ -84,7 +84,7 @@ func (c *Controller) cmdMassInsert(msg *server.Message) (res string, err error) 
 		nmsg.Values = values
 		nmsg.Command = strings.ToLower(values[0].String())
 		var d commandDetailsT
-		_, d, err = c.command(nmsg, nil)
+		_, d, err = c.command(nmsg, nil, nil)
 		if err != nil {
 			return err
 		}

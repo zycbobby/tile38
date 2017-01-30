@@ -126,7 +126,7 @@ func (c *Controller) followHandleCommand(values []resp.Value, followc uint64, w 
 		Command: strings.ToLower(values[0].String()),
 		Values:  values,
 	}
-	_, d, err := c.command(msg, nil)
+	_, d, err := c.command(msg, nil, nil)
 	if err != nil {
 		if commandErrIsFatal(err) {
 			return c.aofsz, err

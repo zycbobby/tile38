@@ -150,12 +150,12 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas
 	sw.fullFields = true
 	sw.msg.OutputType = server.JSON
 	sw.writeObject(ScanWriterParams{
-		id:details.id,
-		o: details.obj,
+		id:     details.id,
+		o:      details.obj,
 		fields: details.fields,
 		noLock: true,
 	})
-	
+
 	if sw.wr.Len() == 0 {
 		sw.mu.Unlock()
 		return nil
@@ -194,10 +194,13 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas
 
 	msgs := make([][]byte, 0, 4)
 	if fence.detect == nil || fence.detect[detect] {
-		if len(res) > 0 && res[0] == '{' {
-			res = makemsg(details.command, group, detect, hookName, metas, details.key, details.timestamp, res[1:])
+		if fence.detect == nil || fence.detect[detect] {
+			if len(res) > 0 && res[0] == '{' {
+				msgs = append(msgs, makemsg(details.command, group, detect, hookName, metas, details.key, details.timestamp, res[1:]))
+			} else {
+				msgs = append(msgs, res)
+			}
 		}
-		msgs = append(msgs, res)
 	}
 	switch detect {
 	case "enter":

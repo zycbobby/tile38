@@ -227,8 +227,17 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 		return is
 	}
 	var clientId uint64
+
 	opened := func(conn *server.Conn) {
 		c.mu.Lock()
+		if c.config.KeepAlive > 0 {
+			err := conn.SetKeepAlive(
+				time.Duration(c.config.KeepAlive) * time.Second)
+			if err != nil {
+				log.Warnf("could not set keepalive for connection: %v",
+					conn.RemoteAddr().String())
+			}
+		}
 		clientId++
 		c.conns[conn] = &clientConn{
 			id:     clientId,

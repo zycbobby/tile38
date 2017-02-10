@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var errExpired = errors.New("expired")
+
 // EndpointProtocol is the type of protocol that the endpoint represents.
 type EndpointProtocol string
 
@@ -36,9 +38,9 @@ type Endpoint struct {
 		}
 	}
 	Redis struct {
-		Host		string
-		Port		int
-		Channel	string
+		Host    string
+		Port    int
+		Channel string
 	}
 }
 
@@ -82,30 +84,42 @@ func (epc *EndpointManager) Validate(url string) error {
 }
 
 func (epc *EndpointManager) Send(endpoint, val string) error {
-	epc.mu.Lock()
-	conn, ok := epc.conns[endpoint]
-	if !ok || conn.Expired() {
-		ep, err := parseEndpoint(endpoint)
+	for {
+		epc.mu.Lock()
+		conn, ok := epc.conns[endpoint]
+		if !ok || conn.Expired() {
+			ep, err := parseEndpoint(endpoint)
+			if err != nil {
+				epc.mu.Unlock()
+				return err
+			}
+			switch ep.Protocol {
+			default:
+				return errors.New("invalid protocol")
+			case HTTP:
+				conn = newHTTPEndpointConn(ep)
+			case Disque:
+				conn = newDisqueEndpointConn(ep)
+			case GRPC:
+				conn = newGRPCEndpointConn(ep)
+			case Redis:
+				conn = newRedisEndpointConn(ep)
+			}
+			epc.conns[endpoint] = conn
+		}
+		epc.mu.Unlock()
+		err := conn.Send(val)
 		if err != nil {
-			epc.mu.Unlock()
+			if err == errExpired {
+				// it's possible that the connection has expired in-between
+				// the last conn.Expired() check and now. If so, we should
+				// just try the send again.
+				continue
+			}
 			return err
 		}
-		switch ep.Protocol {
-		default:
-			return errors.New("invalid protocol")
-		case HTTP:
-			conn = newHTTPEndpointConn(ep)
-		case Disque:
-			conn = newDisqueEndpointConn(ep)
-		case GRPC:
-			conn = newGRPCEndpointConn(ep)
-		case Redis:
-			conn = newRedisEndpointConn(ep)
-		}
-		epc.conns[endpoint] = conn
+		return nil
 	}
-	epc.mu.Unlock()
-	return conn.Send(val)
 }
 
 func parseEndpoint(s string) (Endpoint, error) {

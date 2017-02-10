@@ -19,15 +19,12 @@ const (
 type HTTPEndpointConn struct {
 	mu     sync.Mutex
 	ep     Endpoint
-	ex     bool
-	t      time.Time
 	client *http.Client
 }
 
 func newHTTPEndpointConn(ep Endpoint) *HTTPEndpointConn {
 	return &HTTPEndpointConn{
 		ep: ep,
-		t:  time.Now(),
 	}
 }
 
@@ -38,10 +35,7 @@ func (conn *HTTPEndpointConn) Expired() bool {
 func (conn *HTTPEndpointConn) Send(msg string) error {
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
-	if conn.ex {
-		return errExpired
-	}
-	conn.t = time.Now()
+
 	if conn.client == nil {
 		conn.client = &http.Client{
 			Transport: &http.Transport{

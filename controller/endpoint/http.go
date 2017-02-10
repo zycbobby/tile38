@@ -33,15 +33,7 @@ func newHTTPEndpointConn(ep Endpoint) *HTTPEndpointConn {
 }
 
 func (conn *HTTPEndpointConn) Expired() bool {
-	conn.mu.Lock()
-	defer conn.mu.Unlock()
-	if !conn.ex {
-		if time.Now().Sub(conn.t) > httpExpiresAfter {
-			conn.ex = true
-			conn.client = nil
-		}
-	}
-	return conn.ex
+	return false
 }
 
 func (conn *HTTPEndpointConn) Send(msg string) error {
@@ -55,6 +47,7 @@ func (conn *HTTPEndpointConn) Send(msg string) error {
 		conn.client = &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: httpMaxIdleConnections,
+				IdleConnTimeout:     httpExpiresAfter,
 			},
 			Timeout: httpRequestTimeout,
 		}

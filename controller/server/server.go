@@ -45,6 +45,16 @@ type Conn struct {
 	Authenticated bool
 }
 
+func (conn Conn) SetKeepAlive(period time.Duration) error {
+	if tcp, ok := conn.Conn.(*net.TCPConn); ok {
+		if err := tcp.SetKeepAlive(true); err != nil {
+			return err
+		}
+		return tcp.SetKeepAlivePeriod(period)
+	}
+	return nil
+}
+
 var errCloseHTTP = errors.New("close http")
 
 // ListenAndServe starts a tile38 server at the specified address.

@@ -56,7 +56,7 @@ func (conn *RedisEndpointConn) Send(msg string) error {
 	defer conn.mu.Unlock()
 
 	if conn.ex {
-		return errors.New("expired")
+		return errExpired
 	}
 
 	conn.t = time.Now()

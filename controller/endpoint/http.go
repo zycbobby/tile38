@@ -2,7 +2,6 @@ package endpoint
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -40,7 +39,7 @@ func (conn *HTTPEndpointConn) Send(msg string) error {
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
 	if conn.ex {
-		return errors.New("expired")
+		return errExpired
 	}
 	conn.t = time.Now()
 	if conn.client == nil {

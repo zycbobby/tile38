@@ -20,9 +20,10 @@ const (
 	ProtectedMode = "protected-mode"
 	MaxMemory     = "maxmemory"
 	AutoGC        = "autogc"
+	KeepAlive     = "keepalive"
 )
 
-var validProperties = []string{RequirePass, LeaderAuth, ProtectedMode, MaxMemory, AutoGC}
+var validProperties = []string{RequirePass, LeaderAuth, ProtectedMode, MaxMemory, AutoGC, KeepAlive}
 
 // Config is a tile38 config
 type Config struct {
@@ -44,6 +45,8 @@ type Config struct {
 	MaxMemory      int    `json:"-"`
 	AutoGCP        string `json:"autogc,omitempty"`
 	AutoGC         uint64 `json:"-"`
+	KeepAliveP     string `json:"keepalive,omitempty"`
+	KeepAlive      int    `json:"-"`
 }
 
 func (c *Controller) loadConfig() error {
@@ -72,6 +75,9 @@ func (c *Controller) loadConfig() error {
 		return err
 	}
 	if err := c.setConfigProperty(AutoGC, c.config.AutoGCP, true); err != nil {
+		return err
+	}
+	if err := c.setConfigProperty(KeepAlive, c.config.KeepAliveP, true); err != nil {
 		return err
 	}
 	return nil
@@ -161,7 +167,19 @@ func (c *Controller) setConfigProperty(name, value string, fromLoad bool) error 
 		default:
 			invalid = true
 		}
+	case KeepAlive:
+		if value == "" {
+			c.config.KeepAlive = 300
+		} else {
+			keepalive, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				invalid = true
+			} else {
+				c.config.KeepAlive = int(keepalive)
+			}
+		}
 	}
+
 	if invalid {
 		return fmt.Errorf("Invalid argument '%s' for CONFIG SET '%s'", value, name)
 	}
@@ -192,6 +210,8 @@ func (c *Controller) getConfigProperty(name string) string {
 		return c.config.ProtectedMode
 	case MaxMemory:
 		return formatMemSize(c.config.MaxMemory)
+	case KeepAlive:
+		return strconv.FormatUint(uint64(c.config.KeepAlive), 10)
 	}
 }
 
@@ -216,6 +236,7 @@ func (c *Controller) writeConfig(writeProperties bool) error {
 		c.config.ProtectedModeP = c.config.ProtectedMode
 		c.config.MaxMemoryP = formatMemSize(c.config.MaxMemory)
 		c.config.AutoGCP = strconv.FormatUint(c.config.AutoGC, 10)
+		c.config.KeepAliveP = strconv.FormatUint(uint64(c.config.KeepAlive), 10)
 	}
 	var data []byte
 	data, err = json.MarshalIndent(c.config, "", "\t")

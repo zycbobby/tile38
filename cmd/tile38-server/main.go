@@ -166,8 +166,8 @@ func main() {
   |____   |   _   |   Tile38 %s%s %d bit (%s/%s)
   |       |       |   %sPort: %d, PID: %d
   |____   |   _   | 
-  |       |       |
-  |_______|_______|   tile38.com
+  |       |       |   tile38.com
+  |_______|_______| 
 `+"\n", core.Version, gitsha, strconv.IntSize, runtime.GOARCH, runtime.GOOS, hostd, port, os.Getpid())
 
 	if err := controller.ListenAndServe(host, port, dir, httpTransport); err != nil {

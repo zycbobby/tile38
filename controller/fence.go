@@ -192,14 +192,12 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas
 		}
 	}
 
-	msgs := make([][]byte, 0, 4)
+	var msgs [][]byte
 	if fence.detect == nil || fence.detect[detect] {
-		if fence.detect == nil || fence.detect[detect] {
-			if len(res) > 0 && res[0] == '{' {
-				msgs = append(msgs, makemsg(details.command, group, detect, hookName, metas, details.key, details.timestamp, res[1:]))
-			} else {
-				msgs = append(msgs, res)
-			}
+		if len(res) > 0 && res[0] == '{' {
+			msgs = append(msgs, makemsg(details.command, group, detect, hookName, metas, details.key, details.timestamp, res[1:]))
+		} else {
+			msgs = append(msgs, res)
 		}
 	}
 	switch detect {

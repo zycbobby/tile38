@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.8.0] - 2017-02-21
+### Added
+- #145: TCP Keepalives option (@UriHendler)
+- #136: K nearest neighbors for NEARBY command (@m1ome, @tomquas, @joernroeder)
+- #139: Added CLIENT command (@UriHendler)
+- #133: AutoGC config option (@m1ome, @amorskoy)
+
+### Fixed
+- #147: Leaking http hook connections (@mkabischev)
+- #143: Duplicate data in hook data (@mkabischev)
+
 ## [1.7.5] - 2017-01-13
 ### Added
 - Performance bump for all SET commands, ~10% faster

@@ -155,14 +155,19 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas
 		break
 	}
 	sw.mu.Lock()
+	var distance float64
+	if fence.distance {
+		distance = details.obj.CalculatedPoint().DistanceTo(geojson.Position{X: fence.lon, Y: fence.lat, Z: 0})
+	}
 	sw.fmap = details.fmap
 	sw.fullFields = true
 	sw.msg.OutputType = server.JSON
 	sw.writeObject(ScanWriterParams{
-		id:     details.id,
-		o:      details.obj,
-		fields: details.fields,
-		noLock: true,
+		id:       details.id,
+		o:        details.obj,
+		fields:   details.fields,
+		noLock:   true,
+		distance: distance,
 	})
 
 	if sw.wr.Len() == 0 {

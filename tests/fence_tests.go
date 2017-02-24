@@ -16,7 +16,8 @@ import (
 )
 
 func subTestFence(t *testing.T, mc *mockServer) {
-	runStep(t, mc, "basic", json_FENCE_basic_test)
+	runStep(t, mc, "basic", fence_basic_test)
+	runStep(t, mc, "detect inside,outside", fence_detect_inside_test)
 }
 
 type fenceReader struct {
@@ -68,7 +69,7 @@ func (fr *fenceReader) receiveExpect(valex ...string) error {
 	return nil
 }
 
-func json_FENCE_basic_test(mc *mockServer) error {
+func fence_basic_test(mc *mockServer) error {
 	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", mc.port))
 	if err != nil {
 		return err
@@ -148,6 +149,69 @@ func json_FENCE_basic_test(mc *mockServer) error {
 		"id", "myid1",
 		"object.type", "Point",
 		"object.coordinates", "[-115,34]"); err != nil {
+		return err
+	}
+	return nil
+}
+func fence_detect_inside_test(mc *mockServer) error {
+	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", mc.port))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	_, err = fmt.Fprintf(conn, "WITHIN users FENCE DETECT inside,outside POINTS BOUNDS 33.618824 -84.457973 33.654359 -84.399859\r\n")
+	if err != nil {
+		return err
+	}
+
+	buf := make([]byte, 4096)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return err
+	}
+	res := string(buf[:n])
+	if res != "+OK\r\n" {
+		return fmt.Errorf("expected OK, got '%v'", res)
+	}
+	rd := &fenceReader{conn, bufio.NewReader(conn)}
+
+	// send a point
+	c, err := redis.Dial("tcp", fmt.Sprintf(":%d", mc.port))
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	res, err = redis.String(c.Do("SET", "users", "200", "POINT", "33.642301", "-84.43118"))
+	if err != nil {
+		return err
+	}
+	if res != "OK" {
+		return fmt.Errorf("expected OK, got '%v'", res)
+	}
+
+	if err := rd.receiveExpect("command", "set",
+		"detect", "inside",
+		"key", "users",
+		"id", "200",
+		"point", `{"lat":33.642301,"lon":-84.43118}`); err != nil {
+		return err
+	}
+
+	res, err = redis.String(c.Do("SET", "users", "200", "POINT", "34.642301", "-84.43118"))
+	if err != nil {
+		return err
+	}
+	if res != "OK" {
+		return fmt.Errorf("expected OK, got '%v'", res)
+	}
+
+	// receive the message
+	if err := rd.receiveExpect("command", "set",
+		"detect", "outside",
+		"key", "users",
+		"id", "200",
+		"point", `{"lat":34.642301,"lon":-84.43118}`); err != nil {
 		return err
 	}
 	return nil

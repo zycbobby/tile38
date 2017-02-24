@@ -82,7 +82,6 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas
 	if details.command == "del" {
 		return [][]byte{[]byte(`{"command":"del"` + hookJSONString(hookName, metas) + `,"id":` + jsonString(details.id) + `,"time":` + jsonTimeFormat(details.timestamp) + `}`)}
 	}
-
 	var roamkeys, roamids []string
 	var roammeters []float64
 	var detect string = "outside"
@@ -141,10 +140,20 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas
 	if details.fmap == nil {
 		return nil
 	}
-	if fence.detect != nil && !fence.detect[detect] {
-		return nil
+	for {
+		if fence.detect != nil && !fence.detect[detect] {
+			if detect == "enter" {
+				detect = "inside"
+				continue
+			}
+			if detect == "exit" {
+				detect = "outside"
+				continue
+			}
+			return nil
+		}
+		break
 	}
-
 	sw.mu.Lock()
 	sw.fmap = details.fmap
 	sw.fullFields = true

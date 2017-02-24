@@ -8,9 +8,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 
 	"golang.org/x/net/context"
 
@@ -30,6 +33,7 @@ var (
 	veryVerbose bool
 	devMode     bool
 	quiet       bool
+	pidfile     string
 )
 
 // TODO: Set to false in 2.*
@@ -128,6 +132,7 @@ func main() {
 	os.Args = nargs
 
 	flag.IntVar(&port, "p", 9851, "The listening port.")
+	flag.StringVar(&pidfile, "pidfile", "", "A file that contains the pid")
 	flag.StringVar(&host, "h", "", "The listening host.")
 	flag.StringVar(&dir, "d", "data", "The data directory.")
 	flag.BoolVar(&verbose, "v", false, "Enable verbose logging.")
@@ -154,12 +159,57 @@ func main() {
 	if gitsha == " (0000000)" {
 		gitsha = ""
 	}
+	var pidferr error
+
+	var cleanedup bool
+	var cleanupMu sync.Mutex
+	cleanup := func() {
+		cleanupMu.Lock()
+		defer cleanupMu.Unlock()
+		if cleanedup {
+			return
+		}
+		// cleanup code
+		if pidfile != "" {
+			os.Remove(pidfile)
+		}
+		cleanedup = true
+	}
+	defer cleanup()
+
+	if pidfile != "" {
+		pidferr := ioutil.WriteFile(pidfile, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0666)
+		if pidferr == nil {
+		}
+	}
+
+	c := make(chan os.Signal, 1)
+
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		s := <-c
+		log.Warnf("signal: %v", s)
+		if pidfile != "" {
+			cleanup()
+		}
+		switch {
+		default:
+			os.Exit(-1)
+		case s == syscall.SIGHUP:
+			os.Exit(1)
+		case s == syscall.SIGINT:
+			os.Exit(2)
+		case s == syscall.SIGQUIT:
+			os.Exit(3)
+		case s == syscall.SIGTERM:
+			os.Exit(0xf)
+		}
+	}()
 
 	//  _____ _ _     ___ ___
 	// |_   _|_| |___|_  | . |
 	//   | | | | | -_|_  | . |
 	//   |_| |_|_|___|___|___|
-
 	fmt.Fprintf(logw, `
    _______ _______
   |       |       |
@@ -169,7 +219,9 @@ func main() {
   |       |       |   tile38.com
   |_______|_______| 
 `+"\n", core.Version, gitsha, strconv.IntSize, runtime.GOARCH, runtime.GOOS, hostd, port, os.Getpid())
-
+	if pidferr != nil {
+		log.Warnf("pidfile: %v", pidferr)
+	}
 	if err := controller.ListenAndServe(host, port, dir, httpTransport); err != nil {
 		log.Fatal(err)
 	}

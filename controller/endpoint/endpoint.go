@@ -53,6 +53,8 @@ type Endpoint struct {
 		Host      string
 		Port      int
 		QueueName string
+		Qos       byte
+		Retained  bool
 	}
 }
 
@@ -325,6 +327,40 @@ func parseEndpoint(s string) (Endpoint, error) {
 			endpoint.MQTT.QueueName, err = url.QueryUnescape(sp[1])
 			if err != nil {
 				return endpoint, errors.New("invalid MQTT topic name")
+			}
+		}
+
+		// Parsing additional params
+		if len(sqp) > 1 {
+			m, err := url.ParseQuery(sqp[1])
+			if err != nil {
+				return endpoint, errors.New("invalid MQTT url")
+			}
+			for key, val := range m {
+				if len(val) == 0 {
+					continue
+				}
+				switch key {
+				case "qos":
+					n, err := strconv.ParseUint(val[0], 10, 8)
+					if err != nil {
+						return endpoint, errors.New("invalid MQTT qos value")
+					}
+					endpoint.MQTT.Qos = byte(n)
+				case "retained":
+					n, err := strconv.ParseUint(val[0], 10, 8)
+					if err != nil {
+						return endpoint, errors.New("invalid MQTT retained value")
+					}
+
+					if n != 1 && n != 0 {
+						return endpoint, errors.New("invalid MQTT retained, should be [0, 1]")
+					}
+
+					if n == 1 {
+						endpoint.MQTT.Retained = true
+					}
+				}
 			}
 		}
 

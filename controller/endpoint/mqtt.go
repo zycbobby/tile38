@@ -63,7 +63,7 @@ func (conn *MQTTEndpointConn) Send(msg string) error {
 		conn.conn = c
 	}
 
-	t := conn.conn.Publish(conn.ep.MQTT.QueueName, 0, false, msg)
+	t := conn.conn.Publish(conn.ep.MQTT.QueueName, conn.ep.MQTT.Qos, conn.ep.MQTT.Retained, msg)
 	t.Wait()
 
 	if t.Error() != nil {

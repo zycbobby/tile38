@@ -125,16 +125,19 @@ To set a field when an object already exists:
 Tile38 has support to search for objects and points that are within or intersects other objects. All object types can be searched including Polygons, MultiPolygons, GeometryCollections, etc.
 
 <img src="/doc/search-within.png" width="200" height="200" border="0" alt="Search Within" align="left">
+
 #### Within 
 WITHIN searches a collection for objects that are fully contained inside a specified bounding area.
 <BR CLEAR="ALL">
 
 <img src="/doc/search-intersects.png" width="200" height="200" border="0" alt="Search Intersects" align="left">
+
 #### Intersects
 INTERSECTS searches a collection for objects that intersect a specified bounding area.
 <BR CLEAR="ALL">
 
 <img src="/doc/search-nearby.png" width="200" height="200" border="0" alt="Search Nearby" align="left">
+
 #### Nearby
 NEARBY searches a collection for objects that intersect a specified radius.
 <BR CLEAR="ALL">

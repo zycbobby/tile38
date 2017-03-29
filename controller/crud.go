@@ -165,6 +165,7 @@ func (c *Controller) cmdGet(msg *server.Message) (string, error) {
 		return "", errKeyNotFound
 	}
 	o, fields, ok := col.Get(id)
+	ok = ok && !c.hasExpired(key, id)
 	if !ok {
 		if msg.OutputType == server.RESP {
 			return "$-1\r\n", nil
@@ -372,6 +373,7 @@ func (c *Controller) cmdPdel(msg *server.Message) (res string, d commandDetailsT
 		return true
 	}
 
+	var expired int
 	col := c.getCol(d.key)
 	if col != nil {
 		g := glob.Parse(d.pattern, false)
@@ -412,7 +414,11 @@ func (c *Controller) cmdPdel(msg *server.Message) (res string, d commandDetailsT
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
 	case server.RESP:
-		res = ":" + strconv.FormatInt(int64(len(d.children)), 10) + "\r\n"
+		total := len(d.children) - expired
+		if total < 0 {
+			total = 0
+		}
+		res = ":" + strconv.FormatInt(int64(total), 10) + "\r\n"
 	}
 	return
 }
@@ -884,13 +890,19 @@ func (c *Controller) cmdExpire(msg *server.Message) (res string, d commandDetail
 	col := c.getCol(key)
 	if col != nil {
 		_, _, ok = col.Get(id)
-		if ok {
-			c.expireAt(key, id, time.Now().Add(time.Duration(float64(time.Second)*value)))
-		}
+		ok = ok && !c.hasExpired(key, id)
+	}
+	if ok {
+		c.expireAt(key, id, time.Now().Add(time.Duration(float64(time.Second)*value)))
+		d.updated = true
 	}
 	switch msg.OutputType {
 	case server.JSON:
-		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+		if ok {
+			res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
+		} else {
+			return "", d, errIDNotFound
+		}
 	case server.RESP:
 		if ok {
 			res = ":1\r\n"
@@ -918,20 +930,30 @@ func (c *Controller) cmdPersist(msg *server.Message) (res string, d commandDetai
 		err = errInvalidNumberOfArguments
 		return
 	}
-	var bit int
+	var cleared bool
 	ok = false
 	col := c.getCol(key)
 	if col != nil {
 		_, _, ok = col.Get(id)
+		ok = ok && !c.hasExpired(key, id)
 		if ok {
-			bit = c.clearIDExpires(key, id)
+			cleared = c.clearIDExpires(key, id)
 		}
 	}
+	if !ok {
+		if msg.OutputType == server.RESP {
+			return ":0\r\n", d, nil
+		}
+		return "", d, errIDNotFound
+	}
+	d.command = "persist"
+	d.updated = cleared
+	d.timestamp = time.Now()
 	switch msg.OutputType {
 	case server.JSON:
 		res = `{"ok":true,"elapsed":"` + time.Now().Sub(start).String() + "\"}"
 	case server.RESP:
-		if ok && bit == 1 {
+		if cleared {
 			res = ":1\r\n"
 		} else {
 			res = ":0\r\n"
@@ -963,13 +985,18 @@ func (c *Controller) cmdTTL(msg *server.Message) (res string, err error) {
 	col := c.getCol(key)
 	if col != nil {
 		_, _, ok = col.Get(id)
+		ok = ok && !c.hasExpired(key, id)
 		if ok {
 			var at time.Time
 			at, ok2 = c.getExpires(key, id)
 			if ok2 {
-				v = float64(at.Sub(time.Now())) / float64(time.Second)
-				if v < 0 {
-					v = 0
+				if time.Now().After(at) {
+					ok2 = false
+				} else {
+					v = float64(at.Sub(time.Now())) / float64(time.Second)
+					if v < 0 {
+						v = 0
+					}
 				}
 			}
 		}

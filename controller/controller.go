@@ -90,6 +90,7 @@ type Controller struct {
 	hookcols  map[string]map[string]*Hook // col key
 	aofconnM  map[net.Conn]bool
 	expires   map[string]map[string]time.Time
+	exlist    []exitem
 	conns     map[*server.Conn]*clientConn
 	started   time.Time
 	http      bool
@@ -176,6 +177,7 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 		return err
 	}
 	c.mu.Lock()
+	c.fillExpiresList()
 	if c.config.FollowHost != "" {
 		go c.follow(c.config.FollowHost, c.config.FollowPort, c.followc)
 	}

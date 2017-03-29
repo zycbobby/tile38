@@ -1,13 +1,12 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -264,63 +263,35 @@ func psaux(pid int) PSAUX {
 }
 func keys_SET_EX_test(mc *mockServer) (err error) {
 	rand.Seed(time.Now().UnixNano())
-	mc.conn.Do("GC")
-	mc.conn.Do("OUTPUT", "json")
-	var json string
-	json, err = redis.String(mc.conn.Do("SERVER"))
-	if err != nil {
-		return
-	}
-	heap := gjson.Get(json, "stats.heap_size").Int()
-	//released := gjson.Get(json, "stats.heap_released").Int()
-	//fmt.Printf("%v %v %v\n", heap, released, psaux(int(gjson.Get(json, "stats.pid").Int())).VSZ)
-	mc.conn.Do("OUTPUT", "resp")
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 20000; i++ {
-			val := fmt.Sprintf("val:%d", i)
-			//			fmt.Printf("id: %s\n", val)
-			var resp string
-			var lat, lon float64
-			lat = rand.Float64()*180 - 90
-			lon = rand.Float64()*360 - 180
-			resp, err = redis.String(mc.conn.Do("SET", "mykey", val, "EX", 1+rand.Float64(), "POINT", lat, lon))
-			if err != nil {
-				return
-			}
-			if resp != "OK" {
-				err = fmt.Errorf("expected 'OK', got '%s'", resp)
-				return
-			}
-		}
-	}()
-	wg.Wait()
-	time.Sleep(time.Second * 3)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		mc.conn.Do("GC")
-		mc.conn.Do("OUTPUT", "json")
-		var json string
-		json, err = redis.String(mc.conn.Do("SERVER"))
+	// add a bunch of points
+	for i := 0; i < 20000; i++ {
+		val := fmt.Sprintf("val:%d", i)
+		var resp string
+		var lat, lon float64
+		lat = rand.Float64()*180 - 90
+		lon = rand.Float64()*360 - 180
+		resp, err = redis.String(mc.conn.Do("SET",
+			fmt.Sprintf("mykey%d", i%3), val,
+			"EX", 1+rand.Float64(),
+			"POINT", lat, lon))
 		if err != nil {
 			return
 		}
-		mc.conn.Do("OUTPUT", "resp")
-		heap2 := gjson.Get(json, "stats.heap_size").Int()
-		//released := gjson.Get(json, "stats.heap_released").Int()
-		//fmt.Printf("%v %v %v\n", heap2, released, psaux(int(gjson.Get(json, "stats.pid").Int())).VSZ)
-		if math.Abs(float64(heap)-float64(heap2)) > 100000 {
-			err = fmt.Errorf("garbage not collecting, possible leak")
+		if resp != "OK" {
+			err = fmt.Errorf("expected 'OK', got '%s'", resp)
 			return
 		}
-	}()
-	wg.Wait()
-	if err != nil {
-		return
+		time.Sleep(time.Nanosecond)
+	}
+	time.Sleep(time.Second * 3)
+	mc.conn.Do("OUTPUT", "json")
+	json, _ := redis.String(mc.conn.Do("SERVER"))
+	if !gjson.Get(json, "ok").Bool() {
+		return errors.New("not ok")
+	}
+	if gjson.Get(json, "stats.num_objects").Int() > 0 {
+		return errors.New("items left in database")
 	}
 	mc.conn.Do("FLUSHDB")
 	return nil

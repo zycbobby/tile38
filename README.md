@@ -35,8 +35,9 @@ Tile38 is an open source (MIT licensed), in-memory geolocation data store, spati
 - All coordinates are in [WGS 84 Web Mercator / EPSG:3857](#coordinate-system)
 
 ## Components
-- `tile38-server ` - The server
-- `tile38-cli    ` - Command line interface tool
+- `tile38-server    ` - The server
+- `tile38-cli       ` - Command line interface tool
+- `tile38-benchmark ` - Server benchmark tool
 
 ## Getting Started
 

@@ -85,9 +85,11 @@ package(){
 	if [ "$2" == "windows" ]; then
 		mv tile38-server packages/$bdir/tile38-server.exe
 		mv tile38-cli packages/$bdir/tile38-cli.exe
+		mv tile38-benchmark packages/$bdir/tile38-benchmark.exe
 	else
 		mv tile38-server packages/$bdir
 		mv tile38-cli packages/$bdir
+		mv tile38-benchmark packages/$bdir
 	fi
 	cp README.md packages/$bdir
 	cp CHANGELOG.md packages/$bdir
@@ -152,6 +154,7 @@ fi
 # build and store objects into original directory.
 go build -ldflags "$LDFLAGS" -o "$OD/tile38-server" cmd/tile38-server/*.go
 go build -ldflags "$LDFLAGS" -o "$OD/tile38-cli" cmd/tile38-cli/*.go
+go build -ldflags "$LDFLAGS" -o "$OD/tile38-benchmark" cmd/tile38-benchmark/*.go
 
 # test if requested
 if [ "$1" == "test" ]; then

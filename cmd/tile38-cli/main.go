@@ -154,16 +154,29 @@ func main() {
 	}
 
 	addr := fmt.Sprintf("%s:%d", hostname, port)
-	conn, err := client.Dial(addr)
-	if err != nil {
-		if _, ok := err.(net.Error); ok {
-			fmt.Fprintln(os.Stderr, refusedErrorString(addr))
-		} else {
-			fmt.Fprintln(os.Stderr, err.Error())
+	var conn *client.Conn
+	connDial := func() {
+		var err error
+		conn, err = client.Dial(addr)
+		if err != nil {
+			if _, ok := err.(net.Error); ok {
+				fmt.Fprintln(os.Stderr, refusedErrorString(addr))
+			} else {
+				fmt.Fprintln(os.Stderr, err.Error())
+				os.Exit(1)
+			}
 		}
-		return
+		if conn != nil {
+			if output == "resp" {
+				_, err := conn.Do("output resp")
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err.Error())
+					os.Exit(1)
+				}
+			}
+		}
 	}
-	defer conn.Close()
+	connDial()
 	livemode := false
 	aof := false
 	defer func() {
@@ -252,13 +265,6 @@ func main() {
 			f.Close()
 		}
 	}()
-	if output == "resp" {
-		_, err := conn.Do("output resp")
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			return
-		}
-	}
 	for {
 		var command string
 		var err error
@@ -266,7 +272,11 @@ func main() {
 			if raw || noprompt {
 				command, err = line.Prompt("")
 			} else {
-				command, err = line.Prompt(addr + "> ")
+				if conn == nil {
+					command, err = line.Prompt("not connected> ")
+				} else {
+					command, err = line.Prompt(addr + "> ")
+				}
 			}
 
 		} else {
@@ -276,14 +286,16 @@ func main() {
 			nohist := strings.HasPrefix(command, " ")
 			command = strings.TrimSpace(command)
 			if command == "" {
-				_, err := conn.Do("pInG")
-				if err != nil {
-					if err != io.EOF {
-						fmt.Fprintln(os.Stderr, err.Error())
-					} else {
-						fmt.Fprintln(os.Stderr, refusedErrorString(addr))
+				if conn != nil {
+					_, err := conn.Do("pInG")
+					if err != nil {
+						if err != io.EOF {
+							fmt.Fprintln(os.Stderr, err.Error())
+							return
+						} else {
+							fmt.Fprintln(os.Stderr, refusedErrorString(addr))
+						}
 					}
-					return
 				}
 			} else {
 				if !nohist {
@@ -303,12 +315,20 @@ func main() {
 					continue
 				}
 				aof = (command[0] == 'a' || command[0] == 'A') && strings.HasPrefix(strings.ToLower(command), "aof ")
+			tryAgain:
+				if conn == nil {
+					connDial()
+					if conn == nil {
+						continue
+					}
+				}
 				msg, err := conn.Do(command)
 				if err != nil {
 					if err != io.EOF {
 						fmt.Fprintln(os.Stderr, err.Error())
 					} else {
-						fmt.Fprintln(os.Stderr, refusedErrorString(addr))
+						conn = nil
+						goto tryAgain
 					}
 					return
 				}

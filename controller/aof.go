@@ -190,15 +190,17 @@ func (c *Controller) writeAOF(value resp.Value, d *commandDetailsT) error {
 		}
 		c.shrinklog = append(c.shrinklog, values)
 	}
-	data, err := value.MarshalRESP()
-	if err != nil {
-		return err
+	if c.persist {
+		data, err := value.MarshalRESP()
+		if err != nil {
+			return err
+		}
+		n, err := c.f.Write(data)
+		if err != nil {
+			return err
+		}
+		c.aofsz += n
 	}
-	n, err := c.f.Write(data)
-	if err != nil {
-		return err
-	}
-	c.aofsz += n
 
 	// notify aof live connections that we have new data
 	c.fcond.L.Lock()

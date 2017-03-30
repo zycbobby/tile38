@@ -94,6 +94,7 @@ type Controller struct {
 	conns     map[*server.Conn]*clientConn
 	started   time.Time
 	http      bool
+	persist   bool
 
 	epc *endpoint.EndpointManager
 
@@ -133,48 +134,51 @@ func ListenAndServeEx(host string, port int, dir string, ln *net.Listener, http 
 		conns:    make(map[*server.Conn]*clientConn),
 		epc:      endpoint.NewEndpointManager(),
 		http:     http,
+		persist:  core.AppendOnly != "no",
 	}
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-	if err := c.loadConfig(); err != nil {
-		return err
-	}
-	// load the queue before the aof
-	qdb, err := buntdb.Open(path.Join(dir, "queue.db"))
-	if err != nil {
-		return err
-	}
-	var qidx uint64
-	if err := qdb.View(func(tx *buntdb.Tx) error {
-		val, err := tx.Get("hook:idx")
-		if err != nil {
-			if err == buntdb.ErrNotFound {
-				return nil
-			}
+	if c.persist {
+		if err := os.MkdirAll(dir, 0700); err != nil {
 			return err
 		}
-		qidx = stringToUint64(val)
-		return nil
-	}); err != nil {
-		return err
-	}
-	err = qdb.CreateIndex("hooks", hookLogPrefix+"*", buntdb.IndexJSONCaseSensitive("hook"))
-	if err != nil {
-		return err
-	}
-	c.qdb = qdb
-	c.qidx = qidx
-	if err := c.migrateAOF(); err != nil {
-		return err
-	}
-	f, err := os.OpenFile(path.Join(dir, "appendonly.aof"), os.O_CREATE|os.O_RDWR, 0600)
-	if err != nil {
-		return err
-	}
-	c.f = f
-	if err := c.loadAOF(); err != nil {
-		return err
+		if err := c.loadConfig(); err != nil {
+			return err
+		}
+		// load the queue before the aof
+		qdb, err := buntdb.Open(path.Join(dir, "queue.db"))
+		if err != nil {
+			return err
+		}
+		var qidx uint64
+		if err := qdb.View(func(tx *buntdb.Tx) error {
+			val, err := tx.Get("hook:idx")
+			if err != nil {
+				if err == buntdb.ErrNotFound {
+					return nil
+				}
+				return err
+			}
+			qidx = stringToUint64(val)
+			return nil
+		}); err != nil {
+			return err
+		}
+		err = qdb.CreateIndex("hooks", hookLogPrefix+"*", buntdb.IndexJSONCaseSensitive("hook"))
+		if err != nil {
+			return err
+		}
+		c.qdb = qdb
+		c.qidx = qidx
+		if err := c.migrateAOF(); err != nil {
+			return err
+		}
+		f, err := os.OpenFile(path.Join(dir, "appendonly.aof"), os.O_CREATE|os.O_RDWR, 0600)
+		if err != nil {
+			return err
+		}
+		c.f = f
+		if err := c.loadAOF(); err != nil {
+			return err
+		}
 	}
 	c.mu.Lock()
 	c.fillExpiresList()

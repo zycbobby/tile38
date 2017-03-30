@@ -8,3 +8,6 @@ var ShowDebugMessages = false
 
 // ProtectedMode forces Tile38 to default in protected mode.
 var ProtectedMode = "yes"
+
+// AppendOnly allows for disabling the appendonly file.
+var AppendOnly = "yes"

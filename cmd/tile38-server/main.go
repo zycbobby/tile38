@@ -110,6 +110,19 @@ func main() {
 			}
 			fmt.Fprintf(os.Stderr, "protected-mode must be 'yes' or 'no'\n")
 			os.Exit(1)
+		case "--appendonly":
+			i++
+			if i < len(os.Args) {
+				switch strings.ToLower(os.Args[i]) {
+				case "no":
+					core.AppendOnly = "no"
+				case "yes":
+					core.AppendOnly = "yes"
+				}
+				continue
+			}
+			fmt.Fprintf(os.Stderr, "appendonly must be 'yes' or 'no'\n")
+			os.Exit(1)
 		case "--dev", "-dev":
 			devMode = true
 			continue

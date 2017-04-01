@@ -108,17 +108,15 @@ func TestKNN(t *testing.T) {
 }
 
 func BenchmarkInsert(b *testing.B) {
+	var rects []*Rect
+	for i := 0; i < b.N; i++ {
+		rects = append(rects, wp(randMinMax()))
+	}
 	rand.Seed(0)
+	b.ReportAllocs()
+	b.ResetTimer()
 	tr := New()
 	for i := 0; i < b.N; i++ {
-		min, max := randMinMax()
-		tr.Insert(wp(min, max))
+		tr.Insert(rects[i])
 	}
-	// count := 0
-	// tr.Search([]float64{-116, 32, 20}, []float64{-114, 34, 800}, func(id int) bool {
-	// 	count++
-	// 	return true
-	// })
-	// println(count)
-	// //println(tr.Count())
 }

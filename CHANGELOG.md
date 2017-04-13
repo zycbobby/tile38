@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.9.0] - 2017-04-13
+### Added
+- #159: AMQP/RabbitMQ webhook support (@m1ome, @paavalan)
+- #152: Kafka webhook support (@m1ome)
+- #141: Add distances to Geofence notifications
+- #54: New benchmark tool (@literadix, @Lars-Meijer, @m1ome)
+- #20: Ability to specify pidfile via args (@olevole)
+
+### Fixed
+- #b1c76d: tile38-cli auto doesn't auto reconnect
+- #156: Use redis-style TTL implementation (@Lars-Meijer, @m1ome)
+- #150: Live "inside" fence event not triggering for new object (@phulst)
+
 ## [1.8.0] - 2017-02-21
 ### Added
 - #145: TCP Keepalives option (@UriHendler)

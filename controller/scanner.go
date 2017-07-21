@@ -55,11 +55,11 @@ type scanWriter struct {
 }
 
 type ScanWriterParams struct {
-	id string
-	o geojson.Object
-	fields []float64
+	id       string
+	o        geojson.Object
+	fields   []float64
 	distance float64
-	noLock bool
+	noLock   bool
 }
 
 func (c *Controller) newScanWriter(
@@ -386,16 +386,17 @@ func (sw *scanWriter) writeObject(opts ScanWriterParams) bool {
 				}))
 			}
 
-			fvs := orderFields(sw.fmap, opts.fields)
-			if len(fvs) > 0 {
-				fvals := make([]resp.Value, 0, len(fvs)*2)
-				for i, fv := range fvs {
-					fvals = append(fvals, resp.StringValue(fv.field), resp.StringValue(strconv.FormatFloat(fv.value, 'f', -1, 64)))
-					i++
+			if sw.hasFieldsOutput() {
+				fvs := orderFields(sw.fmap, opts.fields)
+				if len(fvs) > 0 {
+					fvals := make([]resp.Value, 0, len(fvs)*2)
+					for i, fv := range fvs {
+						fvals = append(fvals, resp.StringValue(fv.field), resp.StringValue(strconv.FormatFloat(fv.value, 'f', -1, 64)))
+						i++
+					}
+					vals = append(vals, resp.ArrayValue(fvals))
 				}
-				vals = append(vals, resp.ArrayValue(fvals))
 			}
-
 			if opts.distance > 0 {
 				vals = append(vals, resp.FloatValue(opts.distance))
 			}

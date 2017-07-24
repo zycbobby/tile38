@@ -154,7 +154,7 @@ func (sw *scanWriter) writeHead() {
 func (sw *scanWriter) writeFoot() {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
-	cursor := sw.numberItems + sw.cursor
+	cursor := sw.cursor + sw.numberItems
 	if !sw.hitLimit {
 		cursor = 0
 	}
@@ -275,9 +275,13 @@ func (sw *scanWriter) writeObject(opts ScanWriterParams) bool {
 		return true
 	}
 	sw.count++
+	if sw.count <= sw.cursor {
+		return true
+	}
 	if sw.output == outputCount {
 		return true
 	}
+
 	switch sw.msg.OutputType {
 	case server.JSON:
 		var wr bytes.Buffer

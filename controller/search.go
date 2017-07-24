@@ -93,8 +93,7 @@ func (c *Controller) cmdSearchArgs(cmd string, vs []resp.Value, types []string) 
 			if cmd == "nearby" {
 				// possible that this is KNN search
 				s.knn = s.searchScanBaseTokens.ulimit && // must be true
-					!s.searchScanBaseTokens.usparse && // must be false
-					s.searchScanBaseTokens.cursor == 0 // must be zero
+					!s.searchScanBaseTokens.usparse // must be false
 			}
 			if !s.knn {
 				err = errInvalidArgument(slat)

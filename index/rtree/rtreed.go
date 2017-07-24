@@ -2,9 +2,9 @@ package rtree
 
 import "math"
 
-type float float32
+type float float64
 
-const d3roundValues = true // only set to true when using 32-bit floats
+const d3roundValues = false // only set to true when using 32-bit floats
 
 func d3fmin(a, b float) float {
 	if a < b {

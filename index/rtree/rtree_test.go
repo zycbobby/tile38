@@ -96,7 +96,11 @@ func TestKNN(t *testing.T) {
 	tr.Insert(wpp(12, 19, 0))
 	tr.Insert(wpp(-5, 5, 0))
 	tr.Insert(wpp(33, 21, 0))
-	items := tr.NearestNeighbors(10, x, y, z)
+	var items []Item
+	tr.NearestNeighbors(x, y, z, func(item Item, dist float64) bool {
+		items = append(items, item)
+		return true
+	})
 	var res string
 	for i, item := range items {
 		ix, iy, _, _, _, _ := item.Rect()

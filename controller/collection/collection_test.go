@@ -32,7 +32,7 @@ func TestCollection(t *testing.T) {
 	}
 	count := 0
 	bbox := geojson.BBox{Min: geojson.Position{X: -180, Y: -90, Z: 0}, Max: geojson.Position{X: 180, Y: 90, Z: 0}}
-	c.geoSearch(0, bbox, func(id string, obj geojson.Object, field []float64) bool {
+	c.geoSearch(bbox, func(id string, obj geojson.Object, field []float64) bool {
 		count++
 		return true
 	})
@@ -84,7 +84,7 @@ func TestManyCollections(t *testing.T) {
 	col := colsM["13"]
 	//println(col.Count())
 	bbox := geojson.BBox{Min: geojson.Position{X: -180, Y: 30, Z: 0}, Max: geojson.Position{X: 34, Y: 100, Z: 0}}
-	col.geoSearch(0, bbox, func(id string, obj geojson.Object, fields []float64) bool {
+	col.geoSearch(bbox, func(id string, obj geojson.Object, fields []float64) bool {
 		//println(id)
 		return true
 	})

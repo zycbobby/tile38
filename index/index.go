@@ -96,7 +96,7 @@ func (ix *Index) Remove(item Item) {
 // Count counts all items in the index.
 func (ix *Index) Count() int {
 	count := 0
-	ix.Search(0, -90, -180, 90, 180, math.Inf(-1), math.Inf(+1), func(item Item) bool {
+	ix.Search(-90, -180, 90, 180, math.Inf(-1), math.Inf(+1), func(item Item) bool {
 		count++
 		return true
 	})
@@ -123,72 +123,62 @@ func (ix *Index) getRTreeItem(item rtree.Item) Item {
 	return nil
 }
 
-func (ix *Index) NearestNeighbors(k int, lat, lon float64, iterator func(item Item) bool) {
+func (ix *Index) NearestNeighbors(lat, lon float64, iterator func(item Item) bool) bool {
 	x, y, _ := normPoint(lat, lon)
-	items := ix.r.NearestNeighbors(k, x, y, 0)
-	for _, item := range items {
+	return ix.r.NearestNeighbors(x, y, 0, func(item rtree.Item, dist float64) bool {
 		iitm := ix.getRTreeItem(item)
 		if item == nil {
-			continue
+			return true
 		}
-		if !iterator(iitm) {
-			break
-		}
-	}
+		return iterator(iitm)
+	})
 }
 
 // Search returns all items that intersect the bounding box.
-func (ix *Index) Search(cursor uint64, swLat, swLon, neLat, neLon, minZ, maxZ float64, iterator func(item Item) bool) (ncursor uint64) {
-	var idx uint64
-	var active = true
+func (ix *Index) Search(swLat, swLon, neLat, neLon, minZ, maxZ float64, iterator func(item Item) bool) bool {
+	var keepon = true
 	var idm = make(map[Item]bool)
 	mins, maxs, _ := normRect(swLat, swLon, neLat, neLon)
 	// Points
 	if len(mins) == 1 {
 		// There is only one rectangle.
 		// It's possible that a r rect may span multiple entries. Check mulm map for spanning rects.
-		if active {
+		if keepon {
 			ix.r.Search(mins[0][0], mins[0][1], minZ, maxs[0][0], maxs[0][1], maxZ, func(item rtree.Item) bool {
-				if idx >= cursor {
-					iitm := ix.getRTreeItem(item)
-					if iitm != nil {
-						if ix.mulm[iitm] {
-							if !idm[iitm] {
-								idm[iitm] = true
-								active = iterator(iitm)
-							}
-						} else {
-							active = iterator(iitm)
+				iitm := ix.getRTreeItem(item)
+				if iitm != nil {
+					if ix.mulm[iitm] {
+						if !idm[iitm] {
+							idm[iitm] = true
+							keepon = iterator(iitm)
 						}
+					} else {
+						keepon = iterator(iitm)
 					}
 				}
-				idx++
-				return active
+				return keepon
 			})
 		}
 	} else {
 		// There are multiple rectangles. Duplicates might occur.
 		for i := range mins {
-			if active {
+			if keepon {
 				ix.r.Search(mins[i][0], mins[i][1], minZ, maxs[i][0], maxs[i][1], maxZ, func(item rtree.Item) bool {
-					if idx >= cursor {
-						iitm := ix.getRTreeItem(item)
-						if iitm != nil {
-							if ix.mulm[iitm] {
-								if !idm[iitm] {
-									idm[iitm] = true
-									active = iterator(iitm)
-								}
-							} else {
-								active = iterator(iitm)
+					iitm := ix.getRTreeItem(item)
+					if iitm != nil {
+						if ix.mulm[iitm] {
+							if !idm[iitm] {
+								idm[iitm] = true
+								keepon = iterator(iitm)
 							}
+						} else {
+							keepon = iterator(iitm)
 						}
 					}
-					idx++
-					return active
+					return keepon
 				})
 			}
 		}
 	}
-	return idx
+	return keepon
 }

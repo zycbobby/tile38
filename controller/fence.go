@@ -261,9 +261,9 @@ func fenceMatch(hookName string, sw *scanWriter, fence *liveFenceSwitches, metas
 							}
 							g := glob.Parse(pattern, false)
 							if g.Limits[0] == "" && g.Limits[1] == "" {
-								col.Scan(0, false, iterator)
+								col.Scan(false, iterator)
 							} else {
-								col.ScanRange(0, g.Limits[0], g.Limits[1], false, iterator)
+								col.ScanRange(g.Limits[0], g.Limits[1], false, iterator)
 							}
 						}
 					}()
@@ -332,7 +332,7 @@ func fenceMatchRoam(c *Controller, fence *liveFenceSwitches, tkey, tid string, o
 		return
 	}
 	p := obj.CalculatedPoint()
-	col.Nearby(0, 0, p.Y, p.X, fence.roam.meters, math.Inf(-1), math.Inf(+1),
+	col.Nearby(0, p.Y, p.X, fence.roam.meters, math.Inf(-1), math.Inf(+1),
 		func(id string, obj geojson.Object, fields []float64) bool {
 			var match bool
 			if id == tid {

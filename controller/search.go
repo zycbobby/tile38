@@ -296,7 +296,7 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 		return "", s
 	}
 	minZ, maxZ := zMinMaxFromWheres(s.wheres)
-	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.limit, s.wheres, s.nofields)
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.cursor, s.limit, s.wheres, s.nofields)
 	if err != nil {
 		return "", err
 	}
@@ -322,12 +322,12 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 			})
 		}
 		if s.knn {
-			sw.col.NearestNeighbors(int(s.limit), s.lat, s.lon, iter)
+			sw.col.NearestNeighbors(s.lat, s.lon, iter)
 		} else {
-			s.cursor = sw.col.Nearby(s.cursor, s.sparse, s.lat, s.lon, s.meters, minZ, maxZ, iter)
+			sw.col.Nearby(s.sparse, s.lat, s.lon, s.meters, minZ, maxZ, iter)
 		}
 	}
-	sw.writeFoot(s.cursor)
+	sw.writeFoot()
 	if msg.OutputType == server.JSON {
 		wr.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
 	}
@@ -355,7 +355,7 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 	if s.fence {
 		return "", s
 	}
-	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.limit, s.wheres, s.nofields)
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.cursor, s.limit, s.wheres, s.nofields)
 	if err != nil {
 		return "", err
 	}
@@ -368,7 +368,7 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 	sw.writeHead()
 	minZ, maxZ := zMinMaxFromWheres(s.wheres)
 	if cmd == "within" {
-		s.cursor = sw.col.Within(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
+		sw.col.Within(s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
 			func(id string, o geojson.Object, fields []float64) bool {
 				if c.hasExpired(s.key, id) {
 					return true
@@ -381,7 +381,7 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 			},
 		)
 	} else if cmd == "intersects" {
-		s.cursor = sw.col.Intersects(s.cursor, s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
+		sw.col.Intersects(s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
 			func(id string, o geojson.Object, fields []float64) bool {
 				if c.hasExpired(s.key, id) {
 					return true
@@ -394,7 +394,7 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 			},
 		)
 	}
-	sw.writeFoot(s.cursor)
+	sw.writeFoot()
 	if msg.OutputType == server.JSON {
 		wr.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
 	}
@@ -421,7 +421,7 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 	if err != nil {
 		return "", err
 	}
-	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, true, s.limit, s.wheres, s.nofields)
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, true, s.cursor, s.limit, s.wheres, s.nofields)
 	if err != nil {
 		return "", err
 	}
@@ -439,7 +439,7 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 		} else {
 			g := glob.Parse(sw.globPattern, s.desc)
 			if g.Limits[0] == "" && g.Limits[1] == "" {
-				s.cursor = sw.col.SearchValues(s.cursor, s.desc,
+				sw.col.SearchValues(s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
 						return sw.writeObject(ScanWriterParams{
 							id:     id,
@@ -452,8 +452,7 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 				// must disable globSingle for string value type matching because
 				// globSingle is only for ID matches, not values.
 				sw.globSingle = false
-				s.cursor = sw.col.SearchValuesRange(
-					s.cursor, g.Limits[0], g.Limits[1], s.desc,
+				sw.col.SearchValuesRange(g.Limits[0], g.Limits[1], s.desc,
 					func(id string, o geojson.Object, fields []float64) bool {
 						return sw.writeObject(ScanWriterParams{
 							id:     id,
@@ -465,7 +464,7 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 			}
 		}
 	}
-	sw.writeFoot(s.cursor)
+	sw.writeFoot()
 	if msg.OutputType == server.JSON {
 		wr.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
 	}

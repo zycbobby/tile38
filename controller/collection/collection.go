@@ -265,41 +265,33 @@ func (c *Collection) FieldArr() []string {
 	return arr
 }
 
-// Scan iterates though the collection ids. A cursor can be used for paging.
-func (c *Collection) Scan(cursor uint64, desc bool,
+// Scan iterates though the collection ids.
+func (c *Collection) Scan(desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
-) (ncursor uint64) {
-	var i uint64
-	var active = true
+) bool {
+	var keepon = true
 	iter := func(item btree.Item) bool {
-		if i >= cursor {
-			iitm := item.(*itemT)
-			active = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
-		}
-		i++
-		return active
+		iitm := item.(*itemT)
+		keepon = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
+		return keepon
 	}
 	if desc {
 		c.items.Descend(iter)
 	} else {
 		c.items.Ascend(iter)
 	}
-	return i
+	return keepon
 }
 
-// ScanGreaterOrEqual iterates though the collection starting with specified id. A cursor can be used for paging.
-func (c *Collection) ScanRange(cursor uint64, start, end string, desc bool,
+// ScanGreaterOrEqual iterates though the collection starting with specified id.
+func (c *Collection) ScanRange(start, end string, desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
-) (ncursor uint64) {
-	var i uint64
-	var active = true
+) bool {
+	var keepon = true
 	iter := func(item btree.Item) bool {
-		if i >= cursor {
-			iitm := item.(*itemT)
-			active = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
-		}
-		i++
-		return active
+		iitm := item.(*itemT)
+		keepon = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
+		return keepon
 	}
 
 	if desc {
@@ -307,77 +299,65 @@ func (c *Collection) ScanRange(cursor uint64, start, end string, desc bool,
 	} else {
 		c.items.AscendRange(&itemT{id: start}, &itemT{id: end}, iter)
 	}
-	return i
+	return keepon
 }
 
-// SearchValues iterates though the collection values. A cursor can be used for paging.
-func (c *Collection) SearchValues(cursor uint64, desc bool,
+// SearchValues iterates though the collection values.
+func (c *Collection) SearchValues(desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
-) (ncursor uint64) {
-	var i uint64
-	var active = true
+) bool {
+	var keepon = true
 	iter := func(item btree.Item) bool {
-		if i >= cursor {
-			iitm := item.(*itemT)
-			active = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
-		}
-		i++
-		return active
+		iitm := item.(*itemT)
+		keepon = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
+		return keepon
 	}
 	if desc {
 		c.values.Descend(iter)
 	} else {
 		c.values.Ascend(iter)
 	}
-	return i
+	return keepon
 }
 
-// SearchValuesRange iterates though the collection values. A cursor can be used for paging.
-func (c *Collection) SearchValuesRange(cursor uint64, start, end string, desc bool,
+// SearchValuesRange iterates though the collection values.
+func (c *Collection) SearchValuesRange(start, end string, desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
-) (ncursor uint64) {
-	var i uint64
-	var active = true
+) bool {
+	var keepon = true
 	iter := func(item btree.Item) bool {
-		if i >= cursor {
-			iitm := item.(*itemT)
-			active = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
-		}
-		i++
-		return active
+		iitm := item.(*itemT)
+		keepon = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
+		return keepon
 	}
 	if desc {
 		c.values.DescendRange(&itemT{object: geojson.String(start)}, &itemT{object: geojson.String(end)}, iter)
 	} else {
 		c.values.AscendRange(&itemT{object: geojson.String(start)}, &itemT{object: geojson.String(end)}, iter)
 	}
-	return i
+	return keepon
 }
 
-// ScanGreaterOrEqual iterates though the collection starting with specified id. A cursor can be used for paging.
-func (c *Collection) ScanGreaterOrEqual(id string, cursor uint64, desc bool,
+// ScanGreaterOrEqual iterates though the collection starting with specified id.
+func (c *Collection) ScanGreaterOrEqual(id string, desc bool,
 	iterator func(id string, obj geojson.Object, fields []float64) bool,
-) (ncursor uint64) {
-	var i uint64
-	var active = true
+) bool {
+	var keepon = true
 	iter := func(item btree.Item) bool {
-		if i >= cursor {
-			iitm := item.(*itemT)
-			active = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
-		}
-		i++
-		return active
+		iitm := item.(*itemT)
+		keepon = iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id))
+		return keepon
 	}
 	if desc {
 		c.items.DescendLessOrEqual(&itemT{id: id}, iter)
 	} else {
 		c.items.AscendGreaterOrEqual(&itemT{id: id}, iter)
 	}
-	return i
+	return keepon
 }
 
-func (c *Collection) geoSearch(cursor uint64, bbox geojson.BBox, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
-	return c.index.Search(cursor, bbox.Min.Y, bbox.Min.X, bbox.Max.Y, bbox.Max.X, bbox.Min.Z, bbox.Max.Z, func(item index.Item) bool {
+func (c *Collection) geoSearch(bbox geojson.BBox, iterator func(id string, obj geojson.Object, fields []float64) bool) bool {
+	return c.index.Search(bbox.Min.Y, bbox.Min.X, bbox.Max.Y, bbox.Max.X, bbox.Min.Z, bbox.Max.Z, func(item index.Item) bool {
 		var iitm *itemT
 		iitm, ok := item.(*itemT)
 		if !ok {
@@ -391,14 +371,15 @@ func (c *Collection) geoSearch(cursor uint64, bbox geojson.BBox, iterator func(i
 }
 
 // Nearby returns all object that are nearby a point.
-func (c *Collection) Nearby(cursor uint64, sparse uint8, lat, lon, meters, minZ, maxZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) Nearby(sparse uint8, lat, lon, meters, minZ, maxZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) bool {
+	var keepon = true
 	center := geojson.Position{X: lon, Y: lat, Z: 0}
 	bbox := geojson.BBoxesFromCenter(lat, lon, meters)
 	bboxes := bbox.Sparse(sparse)
 	if sparse > 0 {
 		for _, bbox := range bboxes {
 			bbox.Min.Z, bbox.Max.Z = minZ, maxZ
-			c.geoSearch(cursor, bbox, func(id string, obj geojson.Object, fields []float64) bool {
+			keepon = c.geoSearch(bbox, func(id string, obj geojson.Object, fields []float64) bool {
 				if obj.Nearby(center, meters) {
 					if iterator(id, obj, fields) {
 						return false
@@ -406,11 +387,14 @@ func (c *Collection) Nearby(cursor uint64, sparse uint8, lat, lon, meters, minZ,
 				}
 				return true
 			})
+			if !keepon {
+				break
+			}
 		}
-		return 0
+		return keepon
 	}
 	bbox.Min.Z, bbox.Max.Z = minZ, maxZ
-	return c.geoSearch(cursor, bbox, func(id string, obj geojson.Object, fields []float64) bool {
+	return c.geoSearch(bbox, func(id string, obj geojson.Object, fields []float64) bool {
 		if obj.Nearby(center, meters) {
 			return iterator(id, obj, fields)
 		}
@@ -419,7 +403,8 @@ func (c *Collection) Nearby(cursor uint64, sparse uint8, lat, lon, meters, minZ,
 }
 
 // Within returns all object that are fully contained within an object or bounding box. Set obj to nil in order to use the bounding box.
-func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon, minZ, maxZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) Within(sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon, minZ, maxZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) bool {
+	var keepon = true
 	var bbox geojson.BBox
 	if obj != nil {
 		bbox = obj.CalculatedBBox()
@@ -436,7 +421,7 @@ func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, min
 	if sparse > 0 {
 		for _, bbox := range bboxes {
 			if obj != nil {
-				c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+				keepon = c.geoSearch(bbox, func(id string, o geojson.Object, fields []float64) bool {
 					if o.Within(obj) {
 						if iterator(id, o, fields) {
 							return false
@@ -445,26 +430,31 @@ func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, min
 					return true
 				})
 			}
-			c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
-				if o.WithinBBox(bbox) {
-					if iterator(id, o, fields) {
-						return false
+			if keepon {
+				keepon = c.geoSearch(bbox, func(id string, o geojson.Object, fields []float64) bool {
+					if o.WithinBBox(bbox) {
+						if iterator(id, o, fields) {
+							return false
+						}
 					}
-				}
-				return true
-			})
+					return true
+				})
+			}
+			if !keepon {
+				break
+			}
 		}
-		return 0
+		return keepon
 	}
 	if obj != nil {
-		return c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+		return c.geoSearch(bbox, func(id string, o geojson.Object, fields []float64) bool {
 			if o.Within(obj) {
 				return iterator(id, o, fields)
 			}
 			return true
 		})
 	}
-	return c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+	return c.geoSearch(bbox, func(id string, o geojson.Object, fields []float64) bool {
 		if o.WithinBBox(bbox) {
 			return iterator(id, o, fields)
 		}
@@ -473,7 +463,8 @@ func (c *Collection) Within(cursor uint64, sparse uint8, obj geojson.Object, min
 }
 
 // Intersects returns all object that are intersect an object or bounding box. Set obj to nil in order to use the bounding box.
-func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon, minZ, maxZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) (ncursor uint64) {
+func (c *Collection) Intersects(sparse uint8, obj geojson.Object, minLat, minLon, maxLat, maxLon, minZ, maxZ float64, iterator func(id string, obj geojson.Object, fields []float64) bool) bool {
+	var keepon = true
 	var bbox geojson.BBox
 	if obj != nil {
 		bbox = obj.CalculatedBBox()
@@ -501,7 +492,7 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 		}
 		for _, bbox := range bboxes {
 			if obj != nil {
-				c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+				keepon = c.geoSearch(bbox, func(id string, o geojson.Object, fields []float64) bool {
 					if o.Intersects(obj) {
 						if iterator(id, o, fields) {
 							return false
@@ -510,26 +501,31 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 					return true
 				})
 			}
-			c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
-				if o.IntersectsBBox(bbox) {
-					if iterator(id, o, fields) {
-						return false
+			if keepon {
+				keepon = c.geoSearch(bbox, func(id string, o geojson.Object, fields []float64) bool {
+					if o.IntersectsBBox(bbox) {
+						if iterator(id, o, fields) {
+							return false
+						}
 					}
-				}
-				return true
-			})
+					return true
+				})
+			}
+			if !keepon {
+				break
+			}
 		}
-		return 0
+		return keepon
 	}
 	if obj != nil {
-		return c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+		return c.geoSearch(bbox, func(id string, o geojson.Object, fields []float64) bool {
 			if o.Intersects(obj) {
 				return iterator(id, o, fields)
 			}
 			return true
 		})
 	}
-	return c.geoSearch(cursor, bbox, func(id string, o geojson.Object, fields []float64) bool {
+	return c.geoSearch(bbox, func(id string, o geojson.Object, fields []float64) bool {
 		if o.IntersectsBBox(bbox) {
 			return iterator(id, o, fields)
 		}
@@ -537,8 +533,8 @@ func (c *Collection) Intersects(cursor uint64, sparse uint8, obj geojson.Object,
 	})
 }
 
-func (c *Collection) NearestNeighbors(k int, lat, lon float64, iterator func(id string, obj geojson.Object, fields []float64) bool) {
-	c.index.NearestNeighbors(k, lat, lon, func(item index.Item) bool {
+func (c *Collection) NearestNeighbors(lat, lon float64, iterator func(id string, obj geojson.Object, fields []float64) bool) bool {
+	return c.index.NearestNeighbors(lat, lon, func(item index.Item) bool {
 		var iitm *itemT
 		iitm, ok := item.(*itemT)
 		if !ok {

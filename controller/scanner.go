@@ -41,6 +41,7 @@ type scanWriter struct {
 	wheres         []whereT
 	numberItems    uint64
 	nofields       bool
+	cursor         uint64
 	limit          uint64
 	hitLimit       bool
 	once           bool
@@ -65,7 +66,7 @@ type ScanWriterParams struct {
 func (c *Controller) newScanWriter(
 	wr *bytes.Buffer, msg *server.Message, key string, output outputT,
 	precision uint64, globPattern string, matchValues bool,
-	limit uint64, wheres []whereT, nofields bool,
+	cursor, limit uint64, wheres []whereT, nofields bool,
 ) (
 	*scanWriter, error,
 ) {
@@ -83,6 +84,7 @@ func (c *Controller) newScanWriter(
 		c:           c,
 		wr:          wr,
 		msg:         msg,
+		cursor:      cursor,
 		limit:       limit,
 		wheres:      wheres,
 		output:      output,
@@ -149,9 +151,10 @@ func (sw *scanWriter) writeHead() {
 	}
 }
 
-func (sw *scanWriter) writeFoot(cursor uint64) {
+func (sw *scanWriter) writeFoot() {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
+	cursor := sw.numberItems + sw.cursor
 	if !sw.hitLimit {
 		cursor = 0
 	}
@@ -275,7 +278,6 @@ func (sw *scanWriter) writeObject(opts ScanWriterParams) bool {
 	if sw.output == outputCount {
 		return true
 	}
-
 	switch sw.msg.OutputType {
 	case server.JSON:
 		var wr bytes.Buffer

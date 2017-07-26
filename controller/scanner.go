@@ -279,9 +279,8 @@ func (sw *scanWriter) writeObject(opts ScanWriterParams) bool {
 		return true
 	}
 	if sw.output == outputCount {
-		return true
+		return sw.count < sw.limit
 	}
-
 	switch sw.msg.OutputType {
 	case server.JSON:
 		var wr bytes.Buffer

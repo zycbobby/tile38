@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -304,14 +305,18 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	}
 	sw.writeHead()
 	if sw.col != nil {
-		iter := func(id string, o geojson.Object, fields []float64) bool {
+		iter := func(id string, o geojson.Object, fields []float64, dist *float64) bool {
 			if c.hasExpired(s.key, id) {
 				return true
 			}
 			// Calculate distance if we need to
 			distance := 0.0
 			if s.distance {
-				distance = o.CalculatedPoint().DistanceTo(geojson.Position{X: s.lon, Y: s.lat, Z: 0})
+				if dist != nil {
+					distance = *dist
+				} else {
+					distance = o.CalculatedPoint().DistanceTo(geojson.Position{X: s.lon, Y: s.lat, Z: 0})
+				}
 			}
 			return sw.writeObject(ScanWriterParams{
 				id:       id,
@@ -321,9 +326,13 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 			})
 		}
 		if s.knn {
-			sw.col.NearestNeighbors(s.lat, s.lon, iter)
+			nearestNeighbors(sw, s.lat, s.lon, iter)
 		} else {
-			sw.col.Nearby(s.sparse, s.lat, s.lon, s.meters, minZ, maxZ, iter)
+			sw.col.Nearby(s.sparse, s.lat, s.lon, s.meters, minZ, maxZ,
+				func(id string, o geojson.Object, fields []float64) bool {
+					return iter(id, o, fields, nil)
+				},
+			)
 		}
 	}
 	sw.writeFoot()
@@ -331,6 +340,39 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 		wr.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
 	}
 	return string(wr.Bytes()), nil
+}
+
+type iterItem struct {
+	id     string
+	o      geojson.Object
+	fields []float64
+	dist   float64
+}
+
+func nearestNeighbors(sw *scanWriter, lat, lon float64, iter func(id string, o geojson.Object, fields []float64, dist *float64) bool) {
+	limit := sw.limit * 10
+	if limit > limitItems*10 {
+		limit = limitItems * 10
+	}
+	k := sw.cursor + limit
+	var items []iterItem
+	sw.col.NearestNeighbors(lat, lon, func(id string, o geojson.Object, fields []float64) bool {
+		if k == 0 {
+			return false
+		}
+		dist := o.CalculatedPoint().DistanceTo(geojson.Position{X: lon, Y: lat, Z: 0})
+		items = append(items, iterItem{id: id, o: o, fields: fields, dist: dist})
+		k--
+		return true
+	})
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].dist < items[j].dist
+	})
+	for _, item := range items {
+		if !iter(item.id, item.o, item.fields, &item.dist) {
+			return
+		}
+	}
 }
 
 func (c *Controller) cmdWithin(msg *server.Message) (res string, err error) {

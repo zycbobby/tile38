@@ -409,16 +409,22 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		}
 	}
 	// Ping. Just send back the response. No need to put through the pipeline.
-	if msg.Command == "ping" {
+	if msg.Command == "ping" || msg.Command == "echo" {
 		switch msg.OutputType {
 		case server.JSON:
-			return writeOutput(`{"ok":true,"ping":"pong","elapsed":"` + time.Now().Sub(start).String() + `"}`)
+			if len(msg.Values) > 1 {
+				return writeOutput(`{"ok":true,"` + msg.Command + `":` + jsonString(msg.Values[1].String()) + `,"elapsed":"` + time.Now().Sub(start).String() + `"}`)
+			}
+			return writeOutput(`{"ok":true,"` + msg.Command + `":"pong","elapsed":"` + time.Now().Sub(start).String() + `"}`)
 		case server.RESP:
+			if len(msg.Values) > 1 {
+				data, _ := msg.Values[1].MarshalRESP()
+				return writeOutput(string(data))
+			}
 			return writeOutput("+PONG\r\n")
 		}
 		return nil
 	}
-
 	writeErr := func(err error) error {
 		switch msg.OutputType {
 		case server.JSON:
@@ -496,6 +502,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		defer c.mu.Unlock()
 	case "output":
 		// this is local connection operation. Locks not needed.
+	case "echo":
 	case "massinsert":
 		// dev operation
 		c.mu.Lock()

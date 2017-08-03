@@ -492,6 +492,7 @@ func (h *Hook) proc() (ok bool) {
 				log.Debugf("Endpoint connect/send error: %v: %v: %v", idx, endpoint, err)
 				continue
 			}
+			log.Debugf("Endpoint send ok: %v: %v: %v", idx, endpoint, err)
 			sent = true
 			break
 		}

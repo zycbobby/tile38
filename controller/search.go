@@ -400,40 +400,39 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 	if err != nil {
 		return "", err
 	}
-	if sw.col == nil {
-		return "", errKeyNotFound
-	}
 	if msg.OutputType == server.JSON {
 		wr.WriteString(`{"ok":true`)
 	}
 	sw.writeHead()
-	minZ, maxZ := zMinMaxFromWheres(s.wheres)
-	if cmd == "within" {
-		sw.col.Within(s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
-			func(id string, o geojson.Object, fields []float64) bool {
-				if c.hasExpired(s.key, id) {
-					return true
-				}
-				return sw.writeObject(ScanWriterParams{
-					id:     id,
-					o:      o,
-					fields: fields,
-				})
-			},
-		)
-	} else if cmd == "intersects" {
-		sw.col.Intersects(s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
-			func(id string, o geojson.Object, fields []float64) bool {
-				if c.hasExpired(s.key, id) {
-					return true
-				}
-				return sw.writeObject(ScanWriterParams{
-					id:     id,
-					o:      o,
-					fields: fields,
-				})
-			},
-		)
+	if sw.col != nil {
+		minZ, maxZ := zMinMaxFromWheres(s.wheres)
+		if cmd == "within" {
+			sw.col.Within(s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
+				func(id string, o geojson.Object, fields []float64) bool {
+					if c.hasExpired(s.key, id) {
+						return true
+					}
+					return sw.writeObject(ScanWriterParams{
+						id:     id,
+						o:      o,
+						fields: fields,
+					})
+				},
+			)
+		} else if cmd == "intersects" {
+			sw.col.Intersects(s.sparse, s.o, s.minLat, s.minLon, s.maxLat, s.maxLon, minZ, maxZ,
+				func(id string, o geojson.Object, fields []float64) bool {
+					if c.hasExpired(s.key, id) {
+						return true
+					}
+					return sw.writeObject(ScanWriterParams{
+						id:     id,
+						o:      o,
+						fields: fields,
+					})
+				},
+			)
+		}
 	}
 	sw.writeFoot()
 	if msg.OutputType == server.JSON {

@@ -84,6 +84,7 @@ type Controller struct {
 	lives     map[*liveBuffer]bool
 	lcond     *sync.Cond
 	fcup      bool                        // follow caught up
+	fcuponce  bool                        // follow caught up once
 	shrinking bool                        // aof shrinking flag
 	shrinklog [][]string                  // aof shrinking log
 	hooks     map[string]*Hook            // hook name
@@ -492,7 +493,7 @@ func (c *Controller) handleInputCommand(conn *server.Conn, msg *server.Message, 
 		// read operations
 		c.mu.RLock()
 		defer c.mu.RUnlock()
-		if c.config.FollowHost != "" && !c.fcup {
+		if c.config.FollowHost != "" && !c.fcuponce {
 			return writeErr(errors.New("catching up to leader"))
 		}
 	case "follow", "readonly", "config":

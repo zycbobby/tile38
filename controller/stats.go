@@ -80,6 +80,7 @@ func (c *Controller) cmdServer(msg *server.Message) (res string, err error) {
 	if c.config.FollowHost != "" {
 		m["following"] = fmt.Sprintf("%s:%d", c.config.FollowHost, c.config.FollowPort)
 		m["caught_up"] = c.fcup
+		m["caught_up_once"] = c.fcuponce
 	}
 	m["http_transport"] = c.http
 	m["pid"] = os.Getpid()

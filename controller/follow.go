@@ -218,6 +218,7 @@ func (c *Controller) followStep(host string, port int, followc uint64) error {
 	if caughtUp {
 		c.mu.Lock()
 		c.fcup = true
+		c.fcuponce = true
 		c.mu.Unlock()
 		log.Info("caught up")
 	}
@@ -241,6 +242,7 @@ func (c *Controller) followStep(host string, port int, followc uint64) error {
 				caughtUp = true
 				c.mu.Lock()
 				c.fcup = true
+				c.fcuponce = true
 				c.mu.Unlock()
 				log.Info("caught up")
 			}

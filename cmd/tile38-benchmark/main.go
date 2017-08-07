@@ -177,7 +177,7 @@ func main() {
 					return redbench.AppendCommand(buf, "PING")
 				},
 			)
-		case "SET":
+		case "SET", "SET-POINT", "SET-RECT", "SET-STRING":
 			if redis {
 				redbench.Bench("SET", addr, fillOpts(), prepFn,
 					func(buf []byte) []byte {
@@ -186,34 +186,43 @@ func main() {
 				)
 			} else {
 				var i int64
-				redbench.Bench("SET (point)", addr, fillOpts(), prepFn,
-					func(buf []byte) []byte {
-						i := atomic.AddInt64(&i, 1)
-						lat, lon := randPoint()
-						return redbench.AppendCommand(buf, "SET", "key:bench", "id:"+strconv.FormatInt(i, 10), "POINT",
-							strconv.FormatFloat(lat, 'f', 5, 64),
-							strconv.FormatFloat(lon, 'f', 5, 64),
-						)
-					},
-				)
-				redbench.Bench("SET (rect)", addr, fillOpts(), prepFn,
-					func(buf []byte) []byte {
-						i := atomic.AddInt64(&i, 1)
-						minlat, minlon, maxlat, maxlon := randRect()
-						return redbench.AppendCommand(buf, "SET", "key:bench", "id:"+strconv.FormatInt(i, 10), "BOUNDS",
-							strconv.FormatFloat(minlat, 'f', 5, 64),
-							strconv.FormatFloat(minlon, 'f', 5, 64),
-							strconv.FormatFloat(maxlat, 'f', 5, 64),
-							strconv.FormatFloat(maxlon, 'f', 5, 64),
-						)
-					},
-				)
-				redbench.Bench("SET (string)", addr, fillOpts(), prepFn,
-					func(buf []byte) []byte {
-						i := atomic.AddInt64(&i, 1)
-						return redbench.AppendCommand(buf, "SET", "key:bench", "id:"+strconv.FormatInt(i, 10), "STRING", "xxx")
-					},
-				)
+				switch strings.ToUpper(strings.TrimSpace(test)) {
+				case "SET", "SET-POINT":
+					redbench.Bench("SET (point)", addr, fillOpts(), prepFn,
+						func(buf []byte) []byte {
+							i := atomic.AddInt64(&i, 1)
+							lat, lon := randPoint()
+							return redbench.AppendCommand(buf, "SET", "key:bench", "id:"+strconv.FormatInt(i, 10), "POINT",
+								strconv.FormatFloat(lat, 'f', 5, 64),
+								strconv.FormatFloat(lon, 'f', 5, 64),
+							)
+						},
+					)
+				}
+				switch strings.ToUpper(strings.TrimSpace(test)) {
+				case "SET", "SET-RECT":
+					redbench.Bench("SET (rect)", addr, fillOpts(), prepFn,
+						func(buf []byte) []byte {
+							i := atomic.AddInt64(&i, 1)
+							minlat, minlon, maxlat, maxlon := randRect()
+							return redbench.AppendCommand(buf, "SET", "key:bench", "id:"+strconv.FormatInt(i, 10), "BOUNDS",
+								strconv.FormatFloat(minlat, 'f', 5, 64),
+								strconv.FormatFloat(minlon, 'f', 5, 64),
+								strconv.FormatFloat(maxlat, 'f', 5, 64),
+								strconv.FormatFloat(maxlon, 'f', 5, 64),
+							)
+						},
+					)
+				}
+				switch strings.ToUpper(strings.TrimSpace(test)) {
+				case "SET", "SET-STRING":
+					redbench.Bench("SET (string)", addr, fillOpts(), prepFn,
+						func(buf []byte) []byte {
+							i := atomic.AddInt64(&i, 1)
+							return redbench.AppendCommand(buf, "SET", "key:bench", "id:"+strconv.FormatInt(i, 10), "STRING", "xxx")
+						},
+					)
+				}
 			}
 		case "GET":
 			if redis {

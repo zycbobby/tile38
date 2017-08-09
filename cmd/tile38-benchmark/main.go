@@ -177,6 +177,23 @@ func main() {
 					return redbench.AppendCommand(buf, "PING")
 				},
 			)
+		case "GEOADD":
+			//GEOADD key longitude latitude member
+			if redis {
+				var i int64
+				redbench.Bench("GEOADD", addr, fillOpts(), prepFn,
+					func(buf []byte) []byte {
+						i := atomic.AddInt64(&i, 1)
+						lat, lon := randPoint()
+						return redbench.AppendCommand(buf, "GEOADD", "key:bench",
+							strconv.FormatFloat(lat, 'f', 5, 64),
+							strconv.FormatFloat(lon, 'f', 5, 64),
+							"id:"+strconv.FormatInt(i, 10),
+						)
+					},
+				)
+			}
+
 		case "SET", "SET-POINT", "SET-RECT", "SET-STRING":
 			if redis {
 				redbench.Bench("SET", addr, fillOpts(), prepFn,

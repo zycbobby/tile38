@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"errors"
+	"math"
 	"strconv"
 	"sync"
 
@@ -14,7 +15,6 @@ import (
 )
 
 const limitItems = 100
-const capLimit = 100000
 
 type outputT int
 
@@ -70,15 +70,17 @@ func (c *Controller) newScanWriter(
 ) (
 	*scanWriter, error,
 ) {
-	if limit == 0 {
-		limit = limitItems
-	} else if limit > capLimit {
-		limit = capLimit
-	}
 	switch output {
 	default:
 		return nil, errors.New("invalid output type")
 	case outputIDs, outputObjects, outputCount, outputBounds, outputPoints, outputHashes:
+	}
+	if limit == 0 {
+		if output == outputCount {
+			limit = math.MaxUint64
+		} else {
+			limit = limitItems
+		}
 	}
 	sw := &scanWriter{
 		c:           c,

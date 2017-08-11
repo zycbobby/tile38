@@ -74,7 +74,7 @@ func (c *Controller) cmdBounds(msg *server.Message) (string, error) {
 	if msg.OutputType == server.JSON {
 		buf.WriteString(`{"ok":true`)
 	}
-	minX, minY, minZ, maxX, maxY, maxZ := col.Bounds()
+	minX, minY, maxX, maxY := col.Bounds()
 
 	bbox := geojson.New2DBBox(minX, minY, maxX, maxY)
 	if msg.OutputType == server.JSON {
@@ -85,12 +85,10 @@ func (c *Controller) cmdBounds(msg *server.Message) (string, error) {
 			resp.ArrayValue([]resp.Value{
 				resp.FloatValue(minX),
 				resp.FloatValue(minY),
-				resp.FloatValue(minZ),
 			}),
 			resp.ArrayValue([]resp.Value{
 				resp.FloatValue(maxX),
 				resp.FloatValue(maxY),
-				resp.FloatValue(maxZ),
 			}),
 		}))
 	}

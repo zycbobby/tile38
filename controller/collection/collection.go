@@ -113,7 +113,7 @@ func (c *Collection) TotalWeight() int {
 }
 
 // Bounds returns the bounds of all the items in the collection.
-func (c *Collection) Bounds() (minX, minY, minZ, maxX, maxY, maxZ float64) {
+func (c *Collection) Bounds() (minX, minY, maxX, maxY float64) {
 	return c.index.Bounds()
 }
 
@@ -357,12 +357,8 @@ func (c *Collection) ScanGreaterOrEqual(id string, desc bool,
 }
 
 func (c *Collection) geoSearch(bbox geojson.BBox, iterator func(id string, obj geojson.Object, fields []float64) bool) bool {
-	return c.index.Search(bbox.Min.Y, bbox.Min.X, bbox.Max.Y, bbox.Max.X, bbox.Min.Z, bbox.Max.Z, func(item index.Item) bool {
-		var iitm *itemT
-		iitm, ok := item.(*itemT)
-		if !ok {
-			return true // just ignore
-		}
+	return c.index.Search(bbox.Min.Y, bbox.Min.X, bbox.Max.Y, bbox.Max.X, bbox.Min.Z, bbox.Max.Z, func(item interface{}) bool {
+		iitm := item.(*itemT)
 		if !iterator(iitm.id, iitm.object, c.getFieldValues(iitm.id)) {
 			return false
 		}
@@ -534,7 +530,7 @@ func (c *Collection) Intersects(sparse uint8, obj geojson.Object, minLat, minLon
 }
 
 func (c *Collection) NearestNeighbors(lat, lon float64, iterator func(id string, obj geojson.Object, fields []float64) bool) bool {
-	return c.index.NearestNeighbors(lat, lon, func(item index.Item) bool {
+	return c.index.NearestNeighbors(lat, lon, func(item interface{}) bool {
 		var iitm *itemT
 		iitm, ok := item.(*itemT)
 		if !ok {

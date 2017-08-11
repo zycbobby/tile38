@@ -34,14 +34,14 @@ func subTestKeys(t *testing.T, mc *mockServer) {
 func keys_BOUNDS_test(mc *mockServer) error {
 	return mc.DoBatch([][]interface{}{
 		{"SET", "mykey", "myid1", "POINT", 33, -115}, {"OK"},
-		{"BOUNDS", "mykey"}, {"[[-115 33 0] [-115 33 0]]"},
+		{"BOUNDS", "mykey"}, {"[[-115 33] [-115 33]]"},
 		{"SET", "mykey", "myid2", "POINT", 34, -112}, {"OK"},
-		{"BOUNDS", "mykey"}, {"[[-115 33 0] [-112 34 0]]"},
+		{"BOUNDS", "mykey"}, {"[[-115 33] [-112 34]]"},
 		{"DEL", "mykey", "myid2"}, {1},
-		{"BOUNDS", "mykey"}, {"[[-115 33 0] [-115 33 0]]"},
+		{"BOUNDS", "mykey"}, {"[[-115 33] [-115 33]]"},
 		{"SET", "mykey", "myid3", "OBJECT", `{"type":"Point","coordinates":[-130,38,10]}`}, {"OK"},
 		{"SET", "mykey", "myid4", "OBJECT", `{"type":"Point","coordinates":[-110,25,-8]}`}, {"OK"},
-		{"BOUNDS", "mykey"}, {"[[-130 25 -8] [-110 38 10]]"},
+		{"BOUNDS", "mykey"}, {"[[-130 25] [-110 38]]"},
 	})
 }
 func keys_DEL_test(mc *mockServer) error {

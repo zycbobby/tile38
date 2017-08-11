@@ -1,0 +1,104 @@
+package rtreebase
+
+import (
+	"fmt"
+	"image/color"
+	"io"
+	"math"
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/tidwall/pinhole"
+)
+
+// SavePNG draws and saves an image of the R-tree
+func (tr *RTree) SavePNG(path string, width, height int, scale, rotateY float64, showNodes bool, withGIF bool, printer io.Writer) error {
+	return tr.savePNG2D(path, width, height, scale, rotateY, showNodes, withGIF, printer)
+}
+
+func (tr *RTree) savePNG2D(path string, width, height int, scale, rotateY float64, showNodes bool, withGIF bool, printer io.Writer) error {
+	p := pinhole.New()
+	tr.Traverse(func(min, max [D]float64, level int, item interface{}) bool {
+		p.Begin()
+		if level > 0 && showNodes {
+			p.DrawCube(min[0], min[1], 0, max[0], max[1], 0)
+			switch level {
+			default:
+				p.Colorize(color.RGBA{64, 64, 64, 128})
+			case 1:
+				p.Colorize(color.RGBA{32, 64, 32, 64})
+			case 2:
+				p.Colorize(color.RGBA{48, 48, 96, 96})
+			case 3:
+				p.Colorize(color.RGBA{96, 128, 128, 128})
+			case 4:
+				p.Colorize(color.RGBA{128, 128, 196, 196})
+			}
+		} else {
+			p.DrawDot(min[0], min[1], 0, 0.05)
+			p.Colorize(color.White)
+		}
+		p.End()
+		return true
+	})
+	p.Scale(scale, scale, scale)
+	p.Rotate(0, rotateY, 0)
+	// render the paths in an image
+	opts := *pinhole.DefaultImageOptions
+	opts.LineWidth = 0.025
+	opts.BGColor = color.Black
+	if err := p.SavePNG(path, width, height, &opts); err != nil {
+		return err
+	}
+	if printer != nil {
+		fmt.Fprintf(printer, "wrote %s\n", path)
+	}
+	if withGIF {
+		if err := createGIF(p, width, height, path, &opts, printer); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func createGIF(p *pinhole.Pinhole, width, height int, path string, opts *pinhole.ImageOptions, printer io.Writer) error {
+	if err := os.MkdirAll("frames", 0700); err != nil {
+		return err
+	}
+	//var palette = palette.WebSafe
+	//outGif := &gif.GIF{}
+	for i := 0; i < 120; i++ {
+		p.Rotate(0, math.Pi*2/120.0, 0)
+		if err := p.SavePNG(fmt.Sprintf("frames/%d.png", i), width, height, opts); err != nil {
+			return err
+		}
+		//inGif := image.NewPaletted(inPng.Bounds(), palette)
+		//draw.Draw(inGif, inPng.Bounds(), inPng, image.Point{}, draw.Src)
+		//outGif.Image = append(outGif.Image, inGif)
+		//outGif.Delay = append(outGif.Delay, 0)
+		if printer != nil {
+			fmt.Fprintf(printer, "wrote frame %d/%d\n", i, 120)
+		}
+	}
+	if strings.HasSuffix(path, ".png") {
+		path = path[:len(path)-4] + ".gif"
+	}
+	_, err := exec.Command("ffmpeg", "-y", "-i", "frames/%d.png", path).CombinedOutput()
+	if err != nil {
+		return err
+	}
+
+	//ffmpeg -i frames/%d.png test.gif
+	//f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0600)
+	//if err != nil {
+	//	return err
+	//}
+	//defer f.Close()
+	//if err := gif.EncodeAll(f, outGif); err != nil {
+	//	return err
+	//}
+	if printer != nil {
+		fmt.Fprintf(printer, "wrote %s\n", path)
+	}
+	return nil
+}

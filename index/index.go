@@ -2,6 +2,7 @@ package index
 
 import (
 	"math"
+	"unsafe"
 
 	"github.com/tidwall/tile38/index/rtree"
 )
@@ -32,14 +33,14 @@ type Index struct {
 	r    *rtree.RTree
 	nr   map[*rtree.Rect]Item   // normalized points
 	nrr  map[Item][]*rtree.Rect // normalized points
-	mulm map[Item]bool          // store items that contain multiple rects
+	mulm map[interface{}]bool   // store items that contain multiple rects
 }
 
 // New create a new index
 func New() *Index {
 	return &Index{
 		r:    rtree.New(),
-		mulm: make(map[Item]bool),
+		mulm: make(map[interface{}]bool),
 		nr:   make(map[*rtree.Rect]Item),
 		nrr:  make(map[Item][]*rtree.Rect),
 	}
@@ -96,7 +97,7 @@ func (ix *Index) Remove(item Item) {
 // Count counts all items in the index.
 func (ix *Index) Count() int {
 	count := 0
-	ix.Search(-90, -180, 90, 180, math.Inf(-1), math.Inf(+1), func(item Item) bool {
+	ix.Search(-90, -180, 90, 180, math.Inf(-1), math.Inf(+1), func(_ interface{}) bool {
 		count++
 		return true
 	})
@@ -104,7 +105,7 @@ func (ix *Index) Count() int {
 }
 
 // Bounds returns the minimum bounding rectangle of all items in the index.
-func (ix *Index) Bounds() (MinX, MinY, MinZ, MaxX, MaxY, MaxZ float64) {
+func (ix *Index) Bounds() (MinX, MinY, MaxX, MaxY float64) {
 	return ix.r.Bounds()
 }
 
@@ -113,70 +114,90 @@ func (ix *Index) RemoveAll() {
 	ix.r.RemoveAll()
 }
 
-func (ix *Index) getRTreeItem(item rtree.Item) Item {
-	switch item := item.(type) {
-	case Item:
-		return item
-	case *rtree.Rect:
-		return ix.nr[item]
-	}
-	return nil
+type UintptrInterface struct {
+	Type uintptr
+	Ptr  uintptr
+}
+type UnsafePointerInterface struct {
+	Type uintptr
+	Ptr  unsafe.Pointer
 }
 
-func (ix *Index) NearestNeighbors(lat, lon float64, iterator func(item Item) bool) bool {
+func GetUintptrInterface(v interface{}) UintptrInterface {
+	return *(*UintptrInterface)(unsafe.Pointer(&v))
+}
+
+func GetUnsafePointerInterface(v interface{}) UnsafePointerInterface {
+	return *(*UnsafePointerInterface)(unsafe.Pointer(&v))
+}
+
+var rectType = func() uintptr {
+	var rrrr rtree.Rect
+	return GetUintptrInterface(&rrrr).Type
+}()
+
+func (ix *Index) getRTreeItem(item interface{}) interface{} {
+	uzi := GetUnsafePointerInterface(item)
+	if uzi.Type == rectType {
+		return ix.nr[(*rtree.Rect)(uzi.Ptr)]
+	}
+	return item
+}
+
+func (ix *Index) NearestNeighbors(lat, lon float64, iterator func(item interface{}) bool) bool {
 	x, y, _ := normPoint(lat, lon)
-	return ix.r.NearestNeighbors(x, y, 0, func(item rtree.Item, dist float64) bool {
-		iitm := ix.getRTreeItem(item)
-		if item == nil {
-			return true
-		}
-		return iterator(iitm)
+	return ix.r.NearestNeighbors(x, y, func(item interface{}, dist float64) bool {
+		return iterator(ix.getRTreeItem(item))
 	})
 }
 
 // Search returns all items that intersect the bounding box.
-func (ix *Index) Search(swLat, swLon, neLat, neLon, minZ, maxZ float64, iterator func(item Item) bool) bool {
+func (ix *Index) Search(swLat, swLon, neLat, neLon, minZ, maxZ float64,
+	iterator func(item interface{}) bool,
+) bool {
 	var keepon = true
-	var idm = make(map[Item]bool)
+	var idm = make(map[interface{}]bool)
 	mins, maxs, _ := normRect(swLat, swLon, neLat, neLon)
 	// Points
 	if len(mins) == 1 {
 		// There is only one rectangle.
 		// It's possible that a r rect may span multiple entries. Check mulm map for spanning rects.
 		if keepon {
-			ix.r.Search(mins[0][0], mins[0][1], minZ, maxs[0][0], maxs[0][1], maxZ, func(item rtree.Item) bool {
-				iitm := ix.getRTreeItem(item)
-				if iitm != nil {
-					if ix.mulm[iitm] {
-						if !idm[iitm] {
-							idm[iitm] = true
-							keepon = iterator(iitm)
+			ix.r.Search(mins[0][0], mins[0][1], minZ, maxs[0][0], maxs[0][1], maxZ,
+				func(v interface{}) bool {
+					item := ix.getRTreeItem(v)
+					if len(ix.mulm) > 0 && ix.mulm[item] {
+						if !idm[item] {
+							idm[item] = true
+							keepon = iterator(item)
 						}
 					} else {
-						keepon = iterator(iitm)
+						keepon = iterator(item)
 					}
-				}
-				return keepon
-			})
+					return keepon
+				},
+			)
 		}
 	} else {
 		// There are multiple rectangles. Duplicates might occur.
 		for i := range mins {
 			if keepon {
-				ix.r.Search(mins[i][0], mins[i][1], minZ, maxs[i][0], maxs[i][1], maxZ, func(item rtree.Item) bool {
-					iitm := ix.getRTreeItem(item)
-					if iitm != nil {
-						if ix.mulm[iitm] {
-							if !idm[iitm] {
-								idm[iitm] = true
+				ix.r.Search(mins[i][0], mins[i][1], minZ, maxs[i][0], maxs[i][1], maxZ,
+					func(item interface{}) bool {
+						iitm := ix.getRTreeItem(item)
+						if iitm != nil {
+							if ix.mulm[iitm] {
+								if !idm[iitm] {
+									idm[iitm] = true
+									keepon = iterator(iitm)
+								}
+							} else {
 								keepon = iterator(iitm)
 							}
-						} else {
-							keepon = iterator(iitm)
 						}
-					}
-					return keepon
-				})
+						return keepon
+					},
+				)
 			}
 		}
 	}

@@ -1,5 +1,7 @@
 package rtree
 
+import "github.com/tidwall/tile38/index/rtreebase"
+
 // Item is an rtree item
 type Item interface {
 	Rect() (minX, minY, minZ, maxX, maxY, maxZ float64)
@@ -17,33 +19,38 @@ func (item *Rect) Rect() (minX, minY, minZ, maxX, maxY, maxZ float64) {
 
 // RTree is an implementation of an rtree
 type RTree struct {
-	tr *d3RTree
+	tr *rtreebase.RTree
 }
 
 // New creates a new RTree
 func New() *RTree {
 	return &RTree{
-		tr: d3New(),
+		tr: rtreebase.New(),
 	}
 }
 
 // Insert inserts item into rtree
 func (tr *RTree) Insert(item Item) {
-	minX, minY, minZ, maxX, maxY, maxZ := item.Rect()
-	tr.tr.Insert([3]float64{minX, minY, minZ}, [3]float64{maxX, maxY, maxZ}, item)
+	minX, minY, _, maxX, maxY, _ := item.Rect()
+	tr.tr.Insert([2]float64{minX, minY}, [2]float64{maxX, maxY}, item)
 }
 
 // Remove removes item from rtree
 func (tr *RTree) Remove(item Item) {
-	minX, minY, minZ, maxX, maxY, maxZ := item.Rect()
-	tr.tr.Remove([3]float64{minX, minY, minZ}, [3]float64{maxX, maxY, maxZ}, item)
+	minX, minY, _, maxX, maxY, _ := item.Rect()
+	tr.tr.Remove([2]float64{minX, minY}, [2]float64{maxX, maxY}, item)
 }
 
 // Search finds all items in bounding box.
-func (tr *RTree) Search(minX, minY, minZ, maxX, maxY, maxZ float64, iterator func(item Item) bool) {
-	tr.tr.Search([3]float64{minX, minY, minZ}, [3]float64{maxX, maxY, maxZ}, func(data interface{}) bool {
-		return iterator(data.(Item))
+func (tr *RTree) Search(minX, minY, minZ, maxX, maxY, maxZ float64, iterator func(data interface{}) bool) {
+	// start := time.Now()
+	// var count int
+	tr.tr.Search([2]float64{minX, minY}, [2]float64{maxX, maxY}, func(data interface{}) bool {
+		// count++
+		return iterator(data)
 	})
+	// dur := time.Since(start)
+	// fmt.Printf("%s %d\n", dur, count)
 }
 
 // Count return the number of items in rtree.
@@ -53,21 +60,18 @@ func (tr *RTree) Count() int {
 
 // RemoveAll removes all items from rtree.
 func (tr *RTree) RemoveAll() {
-	tr.tr.RemoveAll()
+	tr.tr = rtreebase.New()
 }
 
-func (tr *RTree) Bounds() (minX, minY, minZ, maxX, maxY, maxZ float64) {
-	var rect d3rectT
-	if tr.tr.root != nil {
-		if tr.tr.root.count > 0 {
-			rect = tr.tr.root.branch[0].rect
-			for i := 1; i < tr.tr.root.count; i++ {
-				rect2 := tr.tr.root.branch[i].rect
-				rect = d3combineRect(&rect, &rect2)
-			}
-		}
-	}
-	minX, minY, minZ = float64(rect.min[0]), float64(rect.min[1]), float64(rect.min[2])
-	maxX, maxY, maxZ = float64(rect.max[0]), float64(rect.max[1]), float64(rect.max[2])
-	return
+// Bounds returns the bounds of the R-tree
+func (tr *RTree) Bounds() (minX, minY, maxX, maxY float64) {
+	min, max := tr.tr.Bounds()
+	return min[0], min[1], max[0], max[1]
+}
+
+// NearestNeighbors gets the closest Spatials to the Point.
+func (tr *RTree) NearestNeighbors(x, y float64, iter func(item interface{}, dist float64) bool) bool {
+	return tr.tr.KNN([2]float64{x, y}, [2]float64{x, y}, true, func(item interface{}, dist float64) bool {
+		return iter(item, dist)
+	})
 }

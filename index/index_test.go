@@ -60,9 +60,9 @@ func TestRandomInserts(t *testing.T) {
 	}
 	count = 0
 	items := make([]Item, 0, l)
-	tr.Search(-90, -180, 90, 180, 0, 0, func(item Item) bool {
+	tr.Search(-90, -180, 90, 180, 0, 0, func(item interface{}) bool {
 		count++
-		items = append(items, item)
+		items = append(items, item.(Item))
 		return true
 	})
 	if count != l {
@@ -70,7 +70,7 @@ func TestRandomInserts(t *testing.T) {
 	}
 	start = time.Now()
 	count1 := 0
-	tr.Search(33, -115, 34, -114, 0, 0, func(item Item) bool {
+	tr.Search(33, -115, 34, -114, 0, 0, func(item interface{}) bool {
 		count1++
 		return true
 	})
@@ -79,7 +79,7 @@ func TestRandomInserts(t *testing.T) {
 	start = time.Now()
 	count2 := 0
 
-	tr.Search(33-180, -115-360, 34-180, -114-360, 0, 0, func(item Item) bool {
+	tr.Search(33-180, -115-360, 34-180, -114-360, 0, 0, func(item interface{}) bool {
 		count2++
 		return true
 	})
@@ -87,7 +87,7 @@ func TestRandomInserts(t *testing.T) {
 
 	start = time.Now()
 	count3 := 0
-	tr.Search(-10, 170, 20, 200, 0, 0, func(item Item) bool {
+	tr.Search(-10, 170, 20, 200, 0, 0, func(item interface{}) bool {
 		count3++
 		return true
 	})
@@ -99,16 +99,16 @@ func TestRandomInserts(t *testing.T) {
 	fmt.Printf("Searched %d items in %s.\n", count2, searchdur2.String())
 	fmt.Printf("Searched %d items in %s.\n", count3, searchdur3.String())
 
-	tr.Search(-10, 170, 20, 200, 0, 0, func(item Item) bool {
-		lat1, lon1, _, lat2, lon2, _ := item.Rect()
+	tr.Search(-10, 170, 20, 200, 0, 0, func(item interface{}) bool {
+		lat1, lon1, _, lat2, lon2, _ := item.(Item).Rect()
 		if lat1 == lat2 && lon1 == lon2 {
 			return false
 		}
 		return true
 	})
 
-	tr.Search(-10, 170, 20, 200, 0, 0, func(item Item) bool {
-		lat1, lon1, _, lat2, lon2, _ := item.Rect()
+	tr.Search(-10, 170, 20, 200, 0, 0, func(item interface{}) bool {
+		lat1, lon1, _, lat2, lon2, _ := item.(Item).Rect()
 		if lat1 != lat2 || lon1 != lon2 {
 			return false
 		}
@@ -173,8 +173,8 @@ func TestInsertVarious(t *testing.T) {
 		t.Fatalf("count = %d, expect 1", count)
 	}
 	found := false
-	tr.Search(-90, -180, 90, 180, 0, 0, func(item2 Item) bool {
-		if item2 == item {
+	tr.Search(-90, -180, 90, 180, 0, 0, func(item2 interface{}) bool {
+		if item2.(Item) == item {
 			found = true
 		}
 		return true

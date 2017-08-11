@@ -52,8 +52,8 @@ func TestA(t *testing.T) {
 	tr.Insert(item1)
 	tr.Insert(item2)
 	var itemA Item
-	tr.Search(21, 20, 0, 25, 25, 0, func(item Item) bool {
-		itemA = item
+	tr.Search(21, 20, 0, 25, 25, 0, func(item interface{}) bool {
+		itemA = item.(Item)
 		return true
 	})
 	if tr.Count() != 2 {
@@ -83,13 +83,13 @@ func TestBounds(t *testing.T) {
 	tr.Insert(wpp(10, 30, 0))
 	tr.Insert(wpp(20, 10, 0))
 	tr.Insert(wpp(30, 10, 0))
-	minX, minY, minZ, maxX, maxY, maxZ := tr.Bounds()
-	if minX != 10 || minY != 10 || minZ != 0 || maxX != 30 || maxY != 30 || maxZ != 0 {
-		t.Fatalf("expected 10,10,0 30,30,0, got %v,%v %v,%v\n", minX, minY, minZ, maxX, maxY, maxZ)
+	minX, minY, maxX, maxY := tr.Bounds()
+	if minX != 10 || minY != 10 || maxX != 30 || maxY != 30 {
+		t.Fatalf("expected 10,10 30,30, got %v,%v %v,%v\n", minX, minY, maxX, maxY)
 	}
 }
 func TestKNN(t *testing.T) {
-	x, y, z := 20., 20., 0.
+	x, y := 20., 20.
 	tr := New()
 	tr.Insert(wpp(5, 5, 0))
 	tr.Insert(wpp(19, 19, 0))
@@ -97,8 +97,8 @@ func TestKNN(t *testing.T) {
 	tr.Insert(wpp(-5, 5, 0))
 	tr.Insert(wpp(33, 21, 0))
 	var items []Item
-	tr.NearestNeighbors(x, y, z, func(item Item, dist float64) bool {
-		items = append(items, item)
+	tr.NearestNeighbors(x, y, func(item interface{}, dist float64) bool {
+		items = append(items, item.(Item))
 		return true
 	})
 	var res string

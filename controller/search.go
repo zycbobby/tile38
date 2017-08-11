@@ -323,6 +323,7 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 				o:        o,
 				fields:   fields,
 				distance: distance,
+				noLock:   true,
 			})
 		}
 		if s.knn {
@@ -416,6 +417,7 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 						id:     id,
 						o:      o,
 						fields: fields,
+						noLock: true,
 					})
 				},
 			)
@@ -429,6 +431,7 @@ func (c *Controller) cmdWithinOrIntersects(cmd string, msg *server.Message) (res
 						id:     id,
 						o:      o,
 						fields: fields,
+						noLock: true,
 					})
 				},
 			)
@@ -485,6 +488,7 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 							id:     id,
 							o:      o,
 							fields: fields,
+							noLock: true,
 						})
 					},
 				)
@@ -498,6 +502,7 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 							id:     id,
 							o:      o,
 							fields: fields,
+							noLock: true,
 						})
 					},
 				)

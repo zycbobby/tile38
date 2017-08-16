@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.9.1] - 2017-08-16
+### Added
+- cd05708: Spatial index optimizations
+- #208: Debug message for failed webhook notifications (@karnivas)
+- #201: New ECHO command (@yorkxiao)
+- #183: Include tile38-cli in Docker image (@jchamberlain)
+- #121: Allow reads for disconnected followers (@octete)
+
+### Fixed
+- 3fae3f7: Allow cursors for kNN queries
+- #211: Crash when shrinking AOF on Windows (@icewukong)
+- #203: Lifted LIMIT restriction all queries and COUNT keyword (@yorkxiao, @FX-HAO)
+- #207: Send empty results for queries on nonexistent keys (@FX-HAO)
+- #195: Added kNN overscan ordering (@rshura)
+- #199: Apply LIMIT after WHERE clause (@rshura)
+- #199: Require Go 1.7 (@rshura)
+- #198: Omit fields for Resp when NOFIELDS is used (@rshura)
+
 ## [1.9.0] - 2017-04-13
 ### Added
 - #159: AMQP/RabbitMQ webhook support (@m1ome, @paavalan)
@@ -11,7 +29,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - #20: Ability to specify pidfile via args (@olevole)
 
 ### Fixed
-- #b1c76d: tile38-cli auto doesn't auto reconnect
+- b1c76d7: tile38-cli auto doesn't auto reconnect
 - #156: Use redis-style TTL implementation (@Lars-Meijer, @m1ome)
 - #150: Live "inside" fence event not triggering for new object (@phulst)
 

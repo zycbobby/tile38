@@ -39,6 +39,7 @@ type scanWriter struct {
 	fvals          []float64
 	output         outputT
 	wheres         []whereT
+	whereins       []whereinT
 	numberItems    uint64
 	nofields       bool
 	cursor         uint64
@@ -66,7 +67,7 @@ type ScanWriterParams struct {
 func (c *Controller) newScanWriter(
 	wr *bytes.Buffer, msg *server.Message, key string, output outputT,
 	precision uint64, globPattern string, matchValues bool,
-	cursor, limit uint64, wheres []whereT, nofields bool,
+	cursor, limit uint64, wheres []whereT, whereins []whereinT, nofields bool,
 ) (
 	*scanWriter, error,
 ) {
@@ -89,6 +90,7 @@ func (c *Controller) newScanWriter(
 		cursor:      cursor,
 		limit:       limit,
 		wheres:      wheres,
+		whereins:    whereins,
 		output:      output,
 		nofields:    nofields,
 		precision:   precision,
@@ -215,6 +217,18 @@ func (sw *scanWriter) fieldMatch(fields []float64, o geojson.Object) ([]float64,
 				return sw.fvals, false
 			}
 		}
+		for _, wherein := range sw.whereins {
+			var value float64
+			idx, ok := sw.fmap[wherein.field]
+			if ok {
+				if len(fields) > idx {
+					value = fields[idx]
+				}
+			}
+			if !wherein.match(value) {
+				return sw.fvals, false
+			}
+		}
 	} else {
 		for idx := range sw.farr {
 			var value float64
@@ -239,6 +253,16 @@ func (sw *scanWriter) fieldMatch(fields []float64, o geojson.Object) ([]float64,
 				value = sw.fvals[idx]
 			}
 			if !where.match(value) {
+				return sw.fvals, false
+			}
+		}
+		for _, wherein := range sw.whereins {
+			var value float64
+			idx, ok := sw.fmap[wherein.field]
+			if ok {
+				value = sw.fvals[idx]
+			}
+			if !wherein.match(value) {
 				return sw.fvals, false
 			}
 		}

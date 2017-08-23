@@ -156,6 +156,16 @@ func zMinMaxFromWheres(wheres []whereT) (minZ, maxZ float64) {
 	return
 }
 
+type whereinT struct {
+	field string
+	val_map map[float64]struct{}
+}
+
+func (wherein whereinT) match(value float64) bool {
+	_, ok := wherein.val_map[value]
+	return ok
+}
+
 type searchScanBaseTokens struct {
 	key       string
 	cursor    uint64
@@ -168,6 +178,7 @@ type searchScanBaseTokens struct {
 	accept    map[string]bool
 	glob      string
 	wheres    []whereT
+	whereins  []whereinT
 	nofields  bool
 	ulimit    bool
 	limit     uint64
@@ -244,6 +255,38 @@ func parseSearchScanBaseTokens(cmd string, vs []resp.Value) (vsout []resp.Value,
 					}
 				}
 				t.wheres = append(t.wheres, whereT{field, minx, min, maxx, max})
+				continue
+			} else if (wtok[0] == 'W' || wtok[0] == 'w') && strings.ToLower(wtok) == "wherein" {
+				vs = nvs
+				var field, nvals_str, val_str string
+				if vs, field, ok = tokenval(vs); !ok || field == "" {
+					err = errInvalidNumberOfArguments
+					return
+				}
+				if vs, nvals_str, ok = tokenval(vs); !ok || nvals_str == "" {
+					err = errInvalidNumberOfArguments
+					return
+				}
+				var i, nvals uint64
+				if nvals, err = strconv.ParseUint(nvals_str, 10, 64); err != nil {
+					err = errInvalidArgument(nvals_str)
+					return
+				}
+				val_map := make(map[float64]struct{})
+				var val float64
+				var empty struct{}
+				for i = 0; i < nvals; i++ {
+					if vs, val_str, ok = tokenval(vs); !ok || val_str == "" {
+						err = errInvalidNumberOfArguments
+						return
+					}
+					if val, err = strconv.ParseFloat(val_str, 64); err != nil  {
+						err = errInvalidArgument(val_str)
+						return
+					}
+					val_map[val] = empty
+				}
+				t.whereins = append(t.whereins, whereinT{field, val_map})
 				continue
 			} else if (wtok[0] == 'N' || wtok[0] == 'n') && strings.ToLower(wtok) == "nofields" {
 				vs = nvs

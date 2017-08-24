@@ -15,6 +15,10 @@ import (
 )
 
 const (
+	defaultKeepAlive = 300 // seconds
+)
+
+const (
 	RequirePass   = "requirepass"
 	LeaderAuth    = "leaderauth"
 	ProtectedMode = "protected-mode"
@@ -169,7 +173,7 @@ func (c *Controller) setConfigProperty(name, value string, fromLoad bool) error 
 		}
 	case KeepAlive:
 		if value == "" {
-			c.config.KeepAlive = 300
+			c.config.KeepAlive = defaultKeepAlive
 		} else {
 			keepalive, err := strconv.ParseUint(value, 10, 64)
 			if err != nil {
@@ -217,6 +221,7 @@ func (c *Controller) getConfigProperty(name string) string {
 
 func (c *Controller) initConfig() error {
 	c.config = Config{ServerID: randomKey(16)}
+	c.config.KeepAlive = defaultKeepAlive
 	return c.writeConfig(true)
 }
 

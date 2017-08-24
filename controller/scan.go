@@ -30,7 +30,7 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 	if err != nil {
 		return "", err
 	}
-	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.cursor, s.limit, s.wheres, s.nofields)
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.cursor, s.limit, s.wheres, s.whereins, s.nofields)
 	if err != nil {
 		return "", err
 	}

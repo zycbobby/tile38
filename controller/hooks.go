@@ -133,7 +133,7 @@ func (c *Controller) cmdSetHook(msg *server.Message) (res string, d commandDetai
 	hook.cond = sync.NewCond(&hook.mu)
 
 	var wr bytes.Buffer
-	hook.ScanWriter, err = c.newScanWriter(&wr, cmsg, s.key, s.output, s.precision, s.glob, false, s.cursor, s.limit, s.wheres, s.nofields)
+	hook.ScanWriter, err = c.newScanWriter(&wr, cmsg, s.key, s.output, s.precision, s.glob, false, s.cursor, s.limit, s.wheres, s.whereins, s.nofields)
 	if err != nil {
 		return "", d, err
 	}

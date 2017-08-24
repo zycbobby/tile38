@@ -105,7 +105,11 @@ func (a Argument) String() string {
 		subs = strings.TrimSpace(subs)
 		s += " " + subs
 		if a.Variadic {
-			s += " [" + subs + " ...]"
+			if len(names) == 0 {
+				s += " [" + subs + " ...]"
+			} else {
+				s += " [" + names[len(names)-1] + " ...]"
+			}
 		}
 		if a.Multiple {
 			s += " ..."

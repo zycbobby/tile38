@@ -29,6 +29,7 @@ func subTestKeys(t *testing.T, mc *mockServer) {
 	runStep(t, mc, "SET EX", keys_SET_EX_test)
 	runStep(t, mc, "PDEL", keys_PDEL_test)
 	runStep(t, mc, "FIELDS", keys_FIELDS_test)
+	runStep(t, mc, "WHEREIN", keys_WHEREIN_test)
 }
 
 func keys_BOUNDS_test(mc *mockServer) error {
@@ -330,5 +331,18 @@ func keys_PDEL_test(mc *mockServer) error {
 		{"PDEL", "mykey", "*b"}, {2},
 		{"PDEL", "mykey", "*"}, {2},
 		{"PDEL", "mykey", "*"}, {0},
+	})
+}
+
+func keys_WHEREIN_test(mc *mockServer) error {
+	return mc.DoBatch([][]interface{}{
+		{"SET", "mykey", "myid_a1", "FIELD", "a", 1, "POINT", 33, -115}, {"OK"},
+		{"WITHIN", "mykey", "WHEREIN", "a", 3, 0, 1, 2, "BOUNDS", 32.8, -115.2, 33.2, -114.8}, {`[0 [[myid_a1 {"type":"Point","coordinates":[-115,33]} [a 1]]]]`},
+		{"WITHIN", "mykey", "WHEREIN", "a", "a", 0, 1, 2, "BOUNDS", 32.8, -115.2, 33.2, -114.8}, {"ERR invalid argument 'a'"},
+		{"WITHIN", "mykey", "WHEREIN", "a", 1, 0, 1, 2, "BOUNDS", 32.8, -115.2, 33.2, -114.8}, {"ERR invalid argument '1'"},
+		{"WITHIN", "mykey", "WHEREIN", "a", 3, 0, "a", 2, "BOUNDS", 32.8, -115.2, 33.2, -114.8}, {"ERR invalid argument 'a'"},
+		{"SET", "mykey", "myid_a2", "FIELD", "a", 2, "POINT", 32.99, -115}, {"OK"},
+		{"SET", "mykey", "myid_a3", "FIELD", "a", 3, "POINT", 33, -115.02}, {"OK"},
+		{"WITHIN", "mykey", "WHEREIN", "a", 3, 0, 1, 2, "BOUNDS", 32.8, -115.2, 33.2, -114.8}, {`[0 [[myid_a1 {"type":"Point","coordinates":[-115,33]} [a 1]] [myid_a2 {"type":"Point","coordinates":[-115,32.99]} [a 2]]]]`},
 	})
 }

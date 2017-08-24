@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	defaultKeepAlive = 300 // seconds
+	defaultKeepAlive     = 300 // seconds
+	defaultProtectedMode = "yes"
 )
 
 const (
@@ -162,7 +163,7 @@ func (c *Controller) setConfigProperty(name, value string, fromLoad bool) error 
 		switch strings.ToLower(value) {
 		case "":
 			if fromLoad {
-				c.config.ProtectedMode = "yes"
+				c.config.ProtectedMode = defaultProtectedMode
 			} else {
 				invalid = true
 			}
@@ -221,7 +222,6 @@ func (c *Controller) getConfigProperty(name string) string {
 
 func (c *Controller) initConfig() error {
 	c.config = Config{ServerID: randomKey(16)}
-	c.config.KeepAlive = defaultKeepAlive
 	return c.writeConfig(true)
 }
 
@@ -238,16 +238,29 @@ func (c *Controller) writeConfig(writeProperties bool) error {
 		// save properties
 		c.config.RequirePassP = c.config.RequirePass
 		c.config.LeaderAuthP = c.config.LeaderAuth
-		c.config.ProtectedModeP = c.config.ProtectedMode
+		if c.config.ProtectedMode == defaultProtectedMode {
+			c.config.ProtectedModeP = ""
+		} else {
+			c.config.ProtectedModeP = c.config.ProtectedMode
+		}
 		c.config.MaxMemoryP = formatMemSize(c.config.MaxMemory)
-		c.config.AutoGCP = strconv.FormatUint(c.config.AutoGC, 10)
-		c.config.KeepAliveP = strconv.FormatUint(uint64(c.config.KeepAlive), 10)
+		if c.config.AutoGC == 0 {
+			c.config.AutoGCP = ""
+		} else {
+			c.config.AutoGCP = strconv.FormatUint(c.config.AutoGC, 10)
+		}
+		if c.config.KeepAlive == defaultKeepAlive {
+			c.config.KeepAliveP = ""
+		} else {
+			c.config.KeepAliveP = strconv.FormatUint(uint64(c.config.KeepAlive), 10)
+		}
 	}
 	var data []byte
 	data, err = json.MarshalIndent(c.config, "", "\t")
 	if err != nil {
 		return err
 	}
+	data = append(data, '\n')
 	err = ioutil.WriteFile(c.dir+"/config", data, 0600)
 	if err != nil {
 		return err

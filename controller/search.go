@@ -10,6 +10,7 @@ import (
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/bing"
 	"github.com/tidwall/tile38/controller/glob"
+	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/geojson/geohash"
@@ -50,6 +51,8 @@ func (c *Controller) cmdSearchArgs(cmd string, vs []resp.Value, types []string) 
 		err = errInvalidNumberOfArguments
 		return
 	}
+	// log.Infof("vs %v, typ %v", vs, typ)
+	// vs [23.5 113.5 50000], typ point
 	if s.searchScanBaseTokens.output == outputBounds {
 		if cmd == "within" || cmd == "intersects" {
 			if _, err := strconv.ParseFloat(typ, 64); err == nil {
@@ -89,15 +92,18 @@ func (c *Controller) cmdSearchArgs(cmd string, vs []resp.Value, types []string) 
 		}
 
 		umeters := true
+		// 如果没有距离参数的话就使用knn算法
 		if vs, smeters, ok = tokenval(vs); !ok || smeters == "" {
 			umeters = false
 			if cmd == "nearby" {
 				// possible that this is KNN search
 				s.knn = s.searchScanBaseTokens.ulimit && // must be true
 					!s.searchScanBaseTokens.usparse // must be false
+				// log.Infof("knn %v, %v", s.knn, s.searchScanBaseTokens)
 			}
 			if !s.knn {
 				err = errInvalidArgument(slat)
+				// log.Infof("not knn, %v", err)
 				return
 			}
 		}
@@ -284,6 +290,7 @@ var nearbyTypes = []string{"point"}
 var withinOrIntersectsTypes = []string{"geo", "bounds", "hash", "tile", "quadkey", "get", "object"}
 
 func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
+	// log.Info("%v", msg)
 	start := time.Now()
 	vs := msg.Values[1:]
 	wr := &bytes.Buffer{}
@@ -343,6 +350,71 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 	return string(wr.Bytes()), nil
 }
 
+func (c *Controller) cmdNearbyDistinct(msg *server.Message) (res string, err error) {
+	log.Info("%v", msg)
+	start := time.Now()
+	vs := msg.Values[1:]
+	wr := &bytes.Buffer{}
+	s, err := c.cmdSearchArgs("nearby", vs, nearbyTypes)
+	log.Infof("search %v", s)
+	if err != nil {
+		return "", err
+	}
+	s.cmd = "nearby"
+	if s.fence {
+		return "", s
+	}
+	// minZ, maxZ := zMinMaxFromWheres(s.wheres)
+	sw, err := c.newScanWriter(wr, msg, s.key, s.output, s.precision, s.glob, false, s.cursor, s.limit, s.wheres, s.whereins, s.nofields)
+	if err != nil {
+		return "", err
+	}
+	if msg.OutputType == server.JSON {
+		wr.WriteString(`{"ok":true`)
+	}
+	sw.writeHead()
+	if sw.col != nil {
+		iter := func(id string, o geojson.Object, fields []float64, dist *float64) bool {
+			if c.hasExpired(s.key, id) {
+				return true
+			}
+			// Calculate distance if we need to
+			distance := 0.0
+			if s.distance {
+				if dist != nil {
+					distance = *dist
+				} else {
+					distance = o.CalculatedPoint().DistanceTo(geojson.Position{X: s.lon, Y: s.lat, Z: 0})
+				}
+			}
+			return sw.writeObject(ScanWriterParams{
+				id:       id,
+				o:        o,
+				fields:   fields,
+				distance: distance,
+				noLock:   true,
+			})
+		}
+		nearestNeighborsDistinct(sw, s.lat, s.lon, s.meters, iter)
+		// if s.knn {
+		// 	log.Infof("knn")
+		// 	nearestNeighborsDistinct(sw, s.lat, s.lon, iter)
+		// } else {
+		// 	log.Infof("not knn")
+		// 	sw.col.Nearby(s.sparse, s.lat, s.lon, s.meters, minZ, maxZ,
+		// 		func(id string, o geojson.Object, fields []float64) bool {
+		// 			return iter(id, o, fields, nil)
+		// 		},
+		// 	)
+		// }
+	}
+	sw.writeFoot()
+	if msg.OutputType == server.JSON {
+		wr.WriteString(`,"elapsed":"` + time.Now().Sub(start).String() + "\"}")
+	}
+	return string(wr.Bytes()), nil
+}
+
 type iterItem struct {
 	id     string
 	o      geojson.Object
@@ -363,6 +435,44 @@ func nearestNeighbors(sw *scanWriter, lat, lon float64, iter func(id string, o g
 		}
 		dist := o.CalculatedPoint().DistanceTo(geojson.Position{X: lon, Y: lat, Z: 0})
 		items = append(items, iterItem{id: id, o: o, fields: fields, dist: dist})
+		k--
+		return true
+	})
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].dist < items[j].dist
+	})
+	for _, item := range items {
+		if !iter(item.id, item.o, item.fields, &item.dist) {
+			return
+		}
+	}
+}
+
+// 根据id来
+func nearestNeighborsDistinct(sw *scanWriter, lat, lon float64, distance float64, iter func(id string, o geojson.Object, fields []float64, dist *float64) bool) {
+	limit := sw.limit * 10
+	if limit > limitItems*10 {
+		limit = limitItems * 10
+	}
+	k := sw.cursor + limit
+	var items []iterItem
+	ids := map[string]bool{}
+	sw.col.NearestNeighbors(lat, lon, func(id string, o geojson.Object, fields []float64) bool {
+		if k == 0 {
+			return false
+		}
+
+		_idArr := strings.Split(id, ":")
+		if ids[strings.Join(_idArr[:len(_idArr)-1], ":")] {
+			return true
+		}
+
+		dist := o.CalculatedPoint().DistanceTo(geojson.Position{X: lon, Y: lat, Z: 0})
+		if dist > distance {
+			return false
+		}
+		items = append(items, iterItem{id: id, o: o, fields: fields, dist: dist})
+		ids[strings.Join(_idArr[:len(_idArr)-1], ":")] = true
 		k--
 		return true
 	})
@@ -473,6 +583,7 @@ func (c *Controller) cmdSearch(msg *server.Message) (res string, err error) {
 	}
 	sw.writeHead()
 	if sw.col != nil {
+		// log.Infof("search %v", msg)
 		if sw.output == outputCount && len(sw.wheres) == 0 && sw.globEverything == true {
 			count := sw.col.Count() - int(s.cursor)
 			if count < 0 {

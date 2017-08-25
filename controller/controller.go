@@ -621,6 +621,9 @@ func (c *Controller) command(
 		res, err = c.cmdScan(msg)
 	case "nearby":
 		res, err = c.cmdNearby(msg)
+	case "nearbydistinct":
+		// log.Infof("nearbydistinct")
+		res, err = c.cmdNearbyDistinct(msg)
 	case "within":
 		res, err = c.cmdWithin(msg)
 	case "intersects":

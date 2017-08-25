@@ -455,26 +455,28 @@ func nearestNeighborsDistinct(sw *scanWriter, lat, lon float64, distance float64
 	}
 	k := sw.cursor + limit
 	var items []iterItem
-	ids := map[string]bool{}
+	ids := map[string]iterItem{}
 	sw.col.NearestNeighbors(lat, lon, func(id string, o geojson.Object, fields []float64) bool {
 		if k == 0 {
 			return false
 		}
 
 		_idArr := strings.Split(id, ":")
-		if ids[strings.Join(_idArr[:len(_idArr)-1], ":")] {
-			return true
-		}
-
 		dist := o.CalculatedPoint().DistanceTo(geojson.Position{X: lon, Y: lat, Z: 0})
 		if dist > distance {
 			return false
 		}
-		items = append(items, iterItem{id: id, o: o, fields: fields, dist: dist})
-		ids[strings.Join(_idArr[:len(_idArr)-1], ":")] = true
+
+		if _e, exists := ids[strings.Join(_idArr[:len(_idArr)-1], ":")]; !exists || _e.dist > dist {
+			_item := iterItem{id: id, o: o, fields: fields, dist: dist}
+			ids[strings.Join(_idArr[:len(_idArr)-1], ":")] = _item
+		}
 		k--
 		return true
 	})
+	for _, v := range ids {
+		items = append(items, v)
+	}
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].dist < items[j].dist
 	})

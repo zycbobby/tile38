@@ -10,7 +10,6 @@ import (
 	"github.com/tidwall/resp"
 	"github.com/tidwall/tile38/controller/bing"
 	"github.com/tidwall/tile38/controller/glob"
-	"github.com/tidwall/tile38/controller/log"
 	"github.com/tidwall/tile38/controller/server"
 	"github.com/tidwall/tile38/geojson"
 	"github.com/tidwall/tile38/geojson/geohash"
@@ -351,12 +350,12 @@ func (c *Controller) cmdNearby(msg *server.Message) (res string, err error) {
 }
 
 func (c *Controller) cmdNearbyDistinct(msg *server.Message) (res string, err error) {
-	log.Info("%v", msg)
+	// log.Info("%v", msg)
 	start := time.Now()
 	vs := msg.Values[1:]
 	wr := &bytes.Buffer{}
 	s, err := c.cmdSearchArgs("nearby", vs, nearbyTypes)
-	log.Infof("search %v", s)
+	// log.Infof("search %v", s)
 	if err != nil {
 		return "", err
 	}

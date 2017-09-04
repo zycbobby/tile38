@@ -39,7 +39,8 @@ func (c *Controller) cmdScan(msg *server.Message) (res string, err error) {
 	}
 	sw.writeHead()
 	if sw.col != nil {
-		if sw.output == outputCount && len(sw.wheres) == 0 && sw.globEverything == true {
+		if sw.output == outputCount && len(sw.wheres) == 0 &&
+			len(sw.whereins) == 0 && sw.globEverything == true {
 			count := sw.col.Count() - int(s.cursor)
 			if count < 0 {
 				count = 0

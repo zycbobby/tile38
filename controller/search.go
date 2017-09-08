@@ -394,18 +394,9 @@ func (c *Controller) cmdNearbyDistinct(msg *server.Message) (res string, err err
 				noLock:   true,
 			})
 		}
+
+		// nearbydistinct这个操作而言,knn一定更快
 		nearestNeighborsDistinct(sw, s.lat, s.lon, s.meters, iter)
-		// if s.knn {
-		// 	log.Infof("knn")
-		// 	nearestNeighborsDistinct(sw, s.lat, s.lon, iter)
-		// } else {
-		// 	log.Infof("not knn")
-		// 	sw.col.Nearby(s.sparse, s.lat, s.lon, s.meters, minZ, maxZ,
-		// 		func(id string, o geojson.Object, fields []float64) bool {
-		// 			return iter(id, o, fields, nil)
-		// 		},
-		// 	)
-		// }
 	}
 	sw.writeFoot()
 	if msg.OutputType == server.JSON {
@@ -460,18 +451,17 @@ func nearestNeighborsDistinct(sw *scanWriter, lat, lon float64, distance float64
 		if k == 0 {
 			return false
 		}
-
-		_idArr := strings.Split(id, ":")
 		dist := o.CalculatedPoint().DistanceTo(geojson.Position{X: lon, Y: lat, Z: 0})
 		if dist > distance {
 			return false
 		}
+		_lastIndex := strings.LastIndex(id, ":")
 
-		if _e, exists := ids[strings.Join(_idArr[:len(_idArr)-1], ":")]; !exists || _e.dist > dist {
+		if _e, exists := ids[id[:_lastIndex]]; !exists || _e.dist > dist {
 			_item := iterItem{id: id, o: o, fields: fields, dist: dist}
-			ids[strings.Join(_idArr[:len(_idArr)-1], ":")] = _item
+			ids[id[:_lastIndex]] = _item
+			k--
 		}
-		k--
 		return true
 	})
 	for _, v := range ids {
